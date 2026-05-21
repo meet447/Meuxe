@@ -10,6 +10,30 @@ fn is_masked_key(key: &str) -> bool {
     key.contains("...")
 }
 
+/// Resolve an LLM API key from the request or stored config (handles masked/blank UI values).
+pub fn resolve_llm_api_key(
+    config: &AppConfig,
+    provider_id: Option<&str>,
+    incoming: &str,
+) -> String {
+    if !incoming.is_empty() && !is_masked_key(incoming) {
+        return incoming.to_string();
+    }
+    if let Some(id) = provider_id {
+        if let Some(provider) = config.llm_providers.get(id) {
+            if let Some(key) = provider.api_key.as_ref().filter(|k| !k.is_empty()) {
+                return key.clone();
+            }
+        }
+    }
+    config
+        .llm
+        .api_key
+        .clone()
+        .filter(|k| !k.is_empty())
+        .unwrap_or_default()
+}
+
 // --- Provider Presets ---
 
 #[derive(Debug, Clone, Copy)]
@@ -216,6 +240,23 @@ impl ConfigManager {
         Self {
             config_path: data_dir.join("config.json"),
         }
+    }
+
+    /// Replace config with defaults (used for full app reset).
+    pub fn reset_to_default(&self) -> Result<()> {
+        if self.config_path.exists() {
+            std::fs::remove_file(&self.config_path)?;
+        }
+        self.save_fresh(&AppConfig::default())
+    }
+
+    fn save_fresh(&self, config: &AppConfig) -> Result<()> {
+        if let Some(parent) = self.config_path.parent() {
+            std::fs::create_dir_all(parent)?;
+        }
+        let json = serde_json::to_string_pretty(config)?;
+        std::fs::write(&self.config_path, json)?;
+        Ok(())
     }
 
     pub fn load(&self) -> Result<AppConfig> {

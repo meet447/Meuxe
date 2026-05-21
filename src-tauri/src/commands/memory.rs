@@ -1,15 +1,15 @@
 use crate::AppState;
-use base64::{engine::general_purpose::STANDARD as BASE64, Engine as _};
 use chrono::Utc;
+use meux_core::composio::{
+    client::{connection_status_from_value, extract_proxy_text, tool_payload, value_string},
+    extract_github_readme_markdown, gmail_messages_to_markdown, is_composio_connected,
+    status_display_label, ComposioClient, GITHUB_README_TOOL, GMAIL_FETCH_TOOL,
+};
 use meux_core::composio_toolkits::{default_enabled_toolkits, toolkit_display_name};
 use meux_core::config::types::ComposioConnectionConfig;
 use serde_json::Value;
 use std::sync::Arc;
 use tauri::{AppHandle, Emitter, State};
-
-const COMPOSIO_BASE_URL: &str = "https://backend.composio.dev";
-const GITHUB_README_TOOL: &str = "GITHUB_GET_A_REPOSITORY_README";
-const GMAIL_FETCH_TOOL: &str = "GMAIL_FETCH_EMAILS";
 
 fn get_user_id(state: &AppState) -> String {
     let config = state.config.load().unwrap_or_default();
@@ -29,329 +29,6 @@ fn composio_api_key(state: &AppState) -> Result<String, String> {
         .api_key
         .filter(|key| !key.trim().is_empty() && !key.contains("..."))
         .ok_or_else(|| "Composio API key is not configured".to_string())
-}
-
-fn composio_client(api_key: &str) -> reqwest::Client {
-    let mut headers = reqwest::header::HeaderMap::new();
-    headers.insert(
-        "x-api-key",
-        reqwest::header::HeaderValue::from_str(api_key)
-            .unwrap_or_else(|_| reqwest::header::HeaderValue::from_static("")),
-    );
-    headers.insert(
-        reqwest::header::CONTENT_TYPE,
-        reqwest::header::HeaderValue::from_static("application/json"),
-    );
-    reqwest::Client::builder()
-        .default_headers(headers)
-        .build()
-        .unwrap_or_else(|_| reqwest::Client::new())
-}
-
-async fn composio_request_json(request: reqwest::RequestBuilder) -> Result<Value, String> {
-    let response = request.send().await.map_err(|e| e.to_string())?;
-    let status = response.status();
-    let text = response.text().await.map_err(|e| e.to_string())?;
-    if !status.is_success() {
-        return Err(format!("Composio request failed ({status}): {text}"));
-    }
-    serde_json::from_str(&text).map_err(|e| format!("Invalid Composio response: {e}"))
-}
-
-fn composio_items(value: &Value) -> Vec<Value> {
-    value
-        .get("items")
-        .and_then(Value::as_array)
-        .cloned()
-        .or_else(|| value.get("data").and_then(Value::as_array).cloned())
-        .unwrap_or_default()
-}
-
-fn value_string(value: &Value, keys: &[&str]) -> Option<String> {
-    keys.iter()
-        .find_map(|key| value.get(*key).and_then(Value::as_str).map(str::to_string))
-}
-
-fn connection_status_from_value(value: &Value) -> String {
-    value_string(value, &["status"])
-        .or_else(|| {
-            value
-                .get("connection")
-                .and_then(|c| value_string(c, &["status"]))
-        })
-        .unwrap_or_else(|| "unknown".to_string())
-}
-
-async fn composio_find_or_create_auth_config(
-    client: &reqwest::Client,
-    toolkit: &str,
-) -> Result<String, String> {
-    let list_url = format!("{COMPOSIO_BASE_URL}/api/v3/auth_configs");
-    let listed = composio_request_json(
-        client
-            .get(&list_url)
-            .query(&[("toolkit_slug", toolkit), ("limit", "20")]),
-    )
-    .await?;
-    if let Some(id) = composio_items(&listed)
-        .iter()
-        .find_map(|item| value_string(item, &["id", "nanoid"]))
-    {
-        return Ok(id);
-    }
-
-    let created = composio_request_json(client.post(&list_url).json(&serde_json::json!({
-        "toolkit": { "slug": toolkit },
-        "auth_config": {
-            "type": "use_composio_managed_auth",
-            "name": format!("MeuxCompanion {toolkit} Auth")
-        }
-    })))
-    .await?;
-    value_string(&created, &["id", "nanoid"])
-        .or_else(|| {
-            created
-                .get("auth_config")
-                .and_then(|v| value_string(v, &["id", "nanoid"]))
-        })
-        .ok_or_else(|| "Composio did not return an auth config id".to_string())
-}
-
-async fn composio_connected_account(
-    client: &reqwest::Client,
-    connected_account_id: &str,
-) -> Result<Value, String> {
-    composio_request_json(client.get(format!(
-        "{COMPOSIO_BASE_URL}/api/v3/connected_accounts/{connected_account_id}"
-    )))
-    .await
-}
-
-async fn composio_list_connected_accounts(
-    client: &reqwest::Client,
-    user_id: &str,
-    auth_config_id: Option<&str>,
-) -> Result<Vec<Value>, String> {
-    let mut query: Vec<(&str, &str)> = vec![("user_ids", user_id), ("limit", "100")];
-    if let Some(auth_config_id) = auth_config_id {
-        query.push(("auth_config_ids", auth_config_id));
-    }
-    let value = composio_request_json(
-        client
-            .get(format!("{COMPOSIO_BASE_URL}/api/v3/connected_accounts"))
-            .query(&query),
-    )
-    .await?;
-    Ok(composio_items(&value))
-}
-
-fn composio_tool_succeeded(value: &Value) -> bool {
-    value
-        .get("successful")
-        .and_then(Value::as_bool)
-        .unwrap_or(true)
-}
-
-fn composio_tool_error(value: &Value) -> Option<String> {
-    if composio_tool_succeeded(value) {
-        return None;
-    }
-    value
-        .get("error")
-        .and_then(|err| err.as_str().map(str::to_string))
-        .or_else(|| {
-            value
-                .get("error")
-                .and_then(|err| err.get("message"))
-                .and_then(Value::as_str)
-                .map(str::to_string)
-        })
-}
-
-fn composio_tool_payload(value: &Value) -> &Value {
-    value.get("data").unwrap_or(value)
-}
-
-async fn composio_execute_tool(
-    client: &reqwest::Client,
-    tool_slug: &str,
-    user_id: &str,
-    connected_account_id: &str,
-    arguments: Value,
-) -> Result<Value, String> {
-    let response = composio_request_json(
-        client
-            .post(format!(
-                "{COMPOSIO_BASE_URL}/api/v3.1/tools/execute/{tool_slug}"
-            ))
-            .json(&serde_json::json!({
-                "user_id": user_id,
-                "connected_account_id": connected_account_id,
-                "arguments": arguments,
-            })),
-    )
-    .await?;
-    if let Some(error) = composio_tool_error(&response) {
-        return Err(format!("Composio tool {tool_slug} failed: {error}"));
-    }
-    Ok(response)
-}
-
-async fn composio_proxy_request(
-    client: &reqwest::Client,
-    connected_account_id: &str,
-    endpoint: &str,
-    method: &str,
-    parameters: Vec<serde_json::Value>,
-) -> Result<Value, String> {
-    let response = composio_request_json(
-        client
-            .post(format!("{COMPOSIO_BASE_URL}/api/v3.1/tools/execute/proxy"))
-            .json(&serde_json::json!({
-                "connected_account_id": connected_account_id,
-                "endpoint": endpoint,
-                "method": method,
-                "parameters": parameters,
-            })),
-    )
-    .await?;
-    if let Some(error) = composio_tool_error(&response) {
-        return Err(format!("Composio proxy request failed: {error}"));
-    }
-    Ok(response)
-}
-
-fn composio_connected_account_for_toolkit(
-    config: &meux_core::config::types::AppConfig,
-    toolkit: &str,
-) -> Result<String, String> {
-    config
-        .composio
-        .connections
-        .get(toolkit)
-        .and_then(|connection| connection.connected_account_id.clone())
-        .filter(|id| !id.trim().is_empty())
-        .ok_or_else(|| {
-            format!("{toolkit} is not connected. Connect it in Settings → Integrations first.")
-        })
-}
-
-fn extract_proxy_text(value: &Value) -> Result<String, String> {
-    let payload = composio_tool_payload(value);
-    if let Some(text) = payload.as_str() {
-        return Ok(text.to_string());
-    }
-    if let Some(text) = payload.get("body").and_then(Value::as_str) {
-        return Ok(text.to_string());
-    }
-    if let Some(text) = payload
-        .get("response")
-        .and_then(|response| response.as_str())
-    {
-        return Ok(text.to_string());
-    }
-    if let Some(content) = payload.get("content").and_then(Value::as_str) {
-        if payload
-            .get("encoding")
-            .and_then(Value::as_str)
-            .is_some_and(|encoding| encoding.eq_ignore_ascii_case("base64"))
-        {
-            let decoded = BASE64
-                .decode(content)
-                .map_err(|e| format!("Failed to decode base64 proxy content: {e}"))?;
-            return String::from_utf8(decoded)
-                .map_err(|e| format!("Proxy content was not valid UTF-8: {e}"));
-        }
-        return Ok(content.to_string());
-    }
-    Err("Composio proxy response did not include readable text".to_string())
-}
-
-fn extract_github_readme_markdown(
-    tool_response: &Value,
-    proxy_response: Option<&Value>,
-) -> Result<String, String> {
-    let payload = composio_tool_payload(tool_response);
-    if let Some(text) = payload.as_str() {
-        return Ok(text.to_string());
-    }
-    for key in ["content", "readme", "markdown", "text", "body"] {
-        if let Some(text) = payload.get(key).and_then(Value::as_str) {
-            return Ok(text.to_string());
-        }
-    }
-    if let Some(proxy_response) = proxy_response {
-        if let Ok(text) = extract_proxy_text(proxy_response) {
-            if !text.trim().is_empty() {
-                return Ok(text);
-            }
-        }
-    }
-    Err("Composio GitHub README response did not include markdown content".to_string())
-}
-
-fn gmail_messages_to_markdown(data: &Value) -> String {
-    let messages = data
-        .get("messages")
-        .and_then(Value::as_array)
-        .cloned()
-        .or_else(|| {
-            data.get("data")
-                .and_then(|inner| inner.get("messages"))
-                .and_then(Value::as_array)
-                .cloned()
-        })
-        .unwrap_or_default();
-
-    if messages.is_empty() {
-        return "No recent Gmail messages were returned.".to_string();
-    }
-
-    let mut lines = vec!["# Recent Gmail messages".to_string(), String::new()];
-    for (index, message) in messages.iter().take(25).enumerate() {
-        let subject = message
-            .get("subject")
-            .or_else(|| {
-                message
-                    .get("payload")
-                    .and_then(|payload| payload.get("subject"))
-            })
-            .and_then(Value::as_str)
-            .unwrap_or("(no subject)");
-        let sender = message
-            .get("sender")
-            .or_else(|| message.get("from"))
-            .or_else(|| {
-                message
-                    .get("payload")
-                    .and_then(|payload| payload.get("from"))
-            })
-            .and_then(Value::as_str)
-            .unwrap_or("unknown sender");
-        let snippet = message
-            .get("snippet")
-            .or_else(|| message.get("preview"))
-            .or_else(|| message.get("messageText"))
-            .and_then(Value::as_str)
-            .unwrap_or("");
-        let received = message
-            .get("messageTimestamp")
-            .or_else(|| message.get("internalDate"))
-            .or_else(|| message.get("date"))
-            .and_then(Value::as_str)
-            .unwrap_or("");
-        lines.push(format!("## {index}. {subject}"));
-        lines.push(format!("- From: {sender}"));
-        if !received.is_empty() {
-            lines.push(format!("- Received: {received}"));
-        }
-        if !snippet.is_empty() {
-            lines.push(String::new());
-            lines.push(snippet.to_string());
-        }
-        lines.push(String::new());
-    }
-    lines.join("\n")
 }
 
 #[tauri::command]
@@ -675,20 +352,21 @@ pub async fn composio_status(state: State<'_, Arc<AppState>>) -> Result<serde_js
         .api_key
         .as_ref()
         .is_some_and(|key| !key.trim().is_empty() && !key.contains("..."));
+
+    if !has_key {
+        return Ok(serde_json::json!([]));
+    }
+
     let enabled = if config.composio.enabled_toolkits.is_empty() {
         default_enabled_toolkits()
     } else {
         config.composio.enabled_toolkits.clone()
     };
 
+    let client = ComposioClient::new(config.composio.api_key.clone().unwrap_or_default());
     let mut dirty = false;
-    let client = config
-        .composio
-        .api_key
-        .as_deref()
-        .filter(|_| has_key)
-        .map(composio_client);
     let mut statuses = Vec::new();
+
     for slug in enabled {
         let mut connection = config
             .composio
@@ -697,9 +375,8 @@ pub async fn composio_status(state: State<'_, Arc<AppState>>) -> Result<serde_js
             .cloned()
             .unwrap_or_default();
 
-        if let (Some(client), Some(account_id)) = (&client, connection.connected_account_id.clone())
-        {
-            match composio_connected_account(client, &account_id).await {
+        if let Some(account_id) = connection.connected_account_id.clone() {
+            match client.connected_account(&account_id).await {
                 Ok(value) => {
                     connection.status = connection_status_from_value(&value);
                     connection.last_checked_at = Some(Utc::now().to_rfc3339());
@@ -713,19 +390,13 @@ pub async fn composio_status(state: State<'_, Arc<AppState>>) -> Result<serde_js
             }
         }
 
-        let connected = connection.status.eq_ignore_ascii_case("active")
-            || connection.status.eq_ignore_ascii_case("connected");
+        let connected = is_composio_connected(&connection.status);
+        let status_label = status_display_label(&connection.status, true);
         statuses.push(serde_json::json!({
             "slug": slug,
             "name": toolkit_display_name(&slug),
             "connected": connected,
-            "status": if !has_key {
-                "missing_api_key".to_string()
-            } else if connection.status.is_empty() {
-                "not_connected".to_string()
-            } else {
-                connection.status.clone()
-            },
+            "status": status_label,
             "auth_config_id": connection.auth_config_id,
             "connected_account_id": connection.connected_account_id,
             "redirect_url": connection.redirect_url,
@@ -747,8 +418,15 @@ pub fn composio_save_config(
     enabled_toolkits: Vec<String>,
 ) -> Result<(), String> {
     let mut config = state.config.load().map_err(|e| e.to_string())?;
-    config.composio.api_key = api_key;
-    config.composio.enabled_toolkits = enabled_toolkits;
+    if let Some(key) = api_key {
+        let trimmed = key.trim();
+        if !trimmed.is_empty() && !trimmed.contains("...") {
+            config.composio.api_key = Some(trimmed.to_string());
+        }
+    }
+    if !enabled_toolkits.is_empty() {
+        config.composio.enabled_toolkits = enabled_toolkits;
+    }
     state.config.save(&config).map_err(|e| e.to_string())
 }
 
@@ -759,31 +437,15 @@ pub async fn composio_authorize_toolkit(
 ) -> Result<serde_json::Value, String> {
     let user_id = get_user_id(&state);
     let api_key = composio_api_key(&state)?;
-    let client = composio_client(&api_key);
-    let auth_config_id = composio_find_or_create_auth_config(&client, &toolkit).await?;
-    let response = composio_request_json(
-        client
-            .post(format!(
-                "{COMPOSIO_BASE_URL}/api/v3/connected_accounts/link"
-            ))
-            .json(&serde_json::json!({
-                "auth_config_id": auth_config_id,
-                "user_id": user_id,
-            })),
-    )
-    .await?;
-    let connected_account_id = value_string(&response, &["connected_account_id", "id"])
-        .ok_or_else(|| "Composio did not return a connected account id".to_string())?;
-    let redirect_url = value_string(&response, &["redirect_url", "redirectUrl"])
-        .ok_or_else(|| "Composio did not return a redirect URL".to_string())?;
+    let client = ComposioClient::new(api_key);
+    let auth_config_id = client.find_or_create_auth_config(&toolkit).await.map_err(|e| e.to_string())?;
+    let (connected_account_id, redirect_url, link_status) = client
+        .link_toolkit(&user_id, &auth_config_id)
+        .await
+        .map_err(|e| e.to_string())?;
 
     let mut config = state.config.load().map_err(|e| e.to_string())?;
-    let enabled = if config.composio.enabled_toolkits.is_empty() {
-        default_enabled_toolkits()
-    } else {
-        config.composio.enabled_toolkits.clone()
-    };
-    if !enabled.contains(&toolkit) {
+    if !config.composio.enabled_toolkits.contains(&toolkit) {
         config.composio.enabled_toolkits.push(toolkit.clone());
     }
     config.composio.connections.insert(
@@ -791,7 +453,7 @@ pub async fn composio_authorize_toolkit(
         ComposioConnectionConfig {
             auth_config_id: Some(auth_config_id.clone()),
             connected_account_id: Some(connected_account_id.clone()),
-            status: "initiated".to_string(),
+            status: link_status.clone(),
             redirect_url: Some(redirect_url.clone()),
             last_checked_at: Some(Utc::now().to_rfc3339()),
         },
@@ -803,7 +465,7 @@ pub async fn composio_authorize_toolkit(
         "auth_config_id": auth_config_id,
         "connected_account_id": connected_account_id,
         "redirect_url": redirect_url,
-        "status": "initiated",
+        "status": status_display_label(&link_status, true),
     }))
 }
 
@@ -814,7 +476,7 @@ pub async fn composio_refresh_toolkit(
 ) -> Result<serde_json::Value, String> {
     let user_id = get_user_id(&state);
     let api_key = composio_api_key(&state)?;
-    let client = composio_client(&api_key);
+    let client = ComposioClient::new(api_key);
     let mut config = state.config.load().map_err(|e| e.to_string())?;
     let mut connection = config
         .composio
@@ -824,25 +486,30 @@ pub async fn composio_refresh_toolkit(
         .unwrap_or_default();
 
     if connection.auth_config_id.is_none() {
-        connection.auth_config_id =
-            Some(composio_find_or_create_auth_config(&client, &toolkit).await?);
+        connection.auth_config_id = Some(
+            client
+                .find_or_create_auth_config(&toolkit)
+                .await
+                .map_err(|e| e.to_string())?,
+        );
     }
 
     if let Some(account_id) = connection.connected_account_id.clone() {
-        let value = composio_connected_account(&client, &account_id).await?;
+        let value = client
+            .connected_account(&account_id)
+            .await
+            .map_err(|e| e.to_string())?;
         connection.status = connection_status_from_value(&value);
     } else {
-        let accounts = composio_list_connected_accounts(
-            &client,
-            &user_id,
-            connection.auth_config_id.as_deref(),
-        )
-        .await?;
+        let accounts = client
+            .list_connected_accounts(&user_id, connection.auth_config_id.as_deref())
+            .await
+            .map_err(|e| e.to_string())?;
         if let Some(account) = accounts.first() {
             connection.connected_account_id = value_string(account, &["id", "nanoid"]);
             connection.status = connection_status_from_value(account);
         } else {
-            connection.status = "not_connected".to_string();
+            connection.status = "NOT_CONNECTED".to_string();
         }
     }
     connection.last_checked_at = Some(Utc::now().to_rfc3339());
@@ -856,7 +523,8 @@ pub async fn composio_refresh_toolkit(
         "toolkit": toolkit,
         "auth_config_id": connection.auth_config_id,
         "connected_account_id": connection.connected_account_id,
-        "status": connection.status,
+        "status": status_display_label(&connection.status, true),
+        "connected": is_composio_connected(&connection.status),
         "redirect_url": connection.redirect_url,
         "last_checked_at": connection.last_checked_at,
     }))
@@ -871,37 +539,41 @@ pub async fn composio_sync_github_readme(
 ) -> Result<usize, String> {
     let user_id = get_user_id(&state);
     let api_key = composio_api_key(&state)?;
-    let client = composio_client(&api_key);
+    let client = ComposioClient::new(api_key);
     let config = state.config.load().map_err(|e| e.to_string())?;
-    let connected_account_id = composio_connected_account_for_toolkit(&config, "github")?;
+    let connected_account_id =
+        ComposioClient::connected_account_for_toolkit(&config.composio.connections, "github")
+            .map_err(|e| e.to_string())?;
 
-    let readme = match composio_execute_tool(
-        &client,
-        GITHUB_README_TOOL,
-        &user_id,
-        &connected_account_id,
-        serde_json::json!({
-            "owner": owner,
-            "repo": repo,
-        }),
-    )
-    .await
+    let readme = match client
+        .execute_tool(
+            GITHUB_README_TOOL,
+            &user_id,
+            &connected_account_id,
+            serde_json::json!({
+                "owner": owner,
+                "repo": repo,
+            }),
+        )
+        .await
     {
-        Ok(tool_response) => extract_github_readme_markdown(&tool_response, None)?,
+        Ok(tool_response) => extract_github_readme_markdown(&tool_response, None)
+            .map_err(|e| e.to_string())?,
         Err(_) => {
-            let proxy_response = composio_proxy_request(
-                &client,
-                &connected_account_id,
-                &format!("/repos/{owner}/{repo}/readme"),
-                "GET",
-                vec![serde_json::json!({
-                    "name": "Accept",
-                    "in": "header",
-                    "value": "application/vnd.github.raw",
-                })],
-            )
-            .await?;
-            extract_proxy_text(&proxy_response)?
+            let proxy_response = client
+                .proxy_request(
+                    &connected_account_id,
+                    &format!("/repos/{owner}/{repo}/readme"),
+                    "GET",
+                    vec![serde_json::json!({
+                        "name": "Accept",
+                        "in": "header",
+                        "value": "application/vnd.github.raw",
+                    })],
+                )
+                .await
+                .map_err(|e| e.to_string())?;
+            extract_proxy_text(&proxy_response).map_err(|e| e.to_string())?
         }
     };
     let saved = state
@@ -919,24 +591,27 @@ pub async fn composio_sync_gmail(
 ) -> Result<usize, String> {
     let user_id = get_user_id(&state);
     let api_key = composio_api_key(&state)?;
-    let client = composio_client(&api_key);
+    let client = ComposioClient::new(api_key);
     let config = state.config.load().map_err(|e| e.to_string())?;
-    let connected_account_id = composio_connected_account_for_toolkit(&config, "gmail")?;
+    let connected_account_id =
+        ComposioClient::connected_account_for_toolkit(&config.composio.connections, "gmail")
+            .map_err(|e| e.to_string())?;
 
     let limit = max_results.unwrap_or(20).clamp(1, 50);
-    let response = composio_execute_tool(
-        &client,
-        GMAIL_FETCH_TOOL,
-        &user_id,
-        &connected_account_id,
-        serde_json::json!({
-            "max_results": limit,
-            "verbose": false,
-        }),
-    )
-    .await?;
+    let response = client
+        .execute_tool(
+            GMAIL_FETCH_TOOL,
+            &user_id,
+            &connected_account_id,
+            serde_json::json!({
+                "max_results": limit,
+                "verbose": false,
+            }),
+        )
+        .await
+        .map_err(|e| e.to_string())?;
 
-    let markdown = gmail_messages_to_markdown(composio_tool_payload(&response));
+    let markdown = gmail_messages_to_markdown(tool_payload(&response));
     let saved = state
         .memory_vault
         .ingest_composio_gmail_readonly(

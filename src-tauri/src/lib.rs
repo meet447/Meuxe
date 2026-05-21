@@ -121,6 +121,8 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             commands::config::config_get,
             commands::config::config_save,
+            commands::config::config_reset_all,
+            commands::config::config_list_llm_models,
             commands::config::config_test_llm,
             commands::characters::characters_list,
             commands::characters::characters_get,

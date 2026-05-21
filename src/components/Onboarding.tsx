@@ -6,15 +6,10 @@ import {
   testLlm,
   previewVoice,
   listModels,
-  getComposioStatus,
-  saveComposioConfig,
-  authorizeComposioToolkit,
-  refreshComposioToolkit,
 } from "../api/tauri";
-import { ComposioToolkitPicker } from "./ComposioToolkitPicker";
-import { DEFAULT_ENABLED_COMPOSIO_TOOLKITS } from "../lib/composioToolkits";
+import { ComposioIntegrationsPanel } from "./ComposioIntegrationsPanel";
+import { LlmModelField } from "./LlmModelField";
 import { LLM_PRESETS, llmPresetEntries } from "../lib/llmPresets";
-import type { ComposioToolkitStatus } from "../types";
 
 interface TTSPreset {
   name: string;
@@ -186,10 +181,6 @@ export function Onboarding({ onComplete }: { onComplete: () => void }) {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [personalityTouched, setPersonalityTouched] = useState(false);
-  const [composioApiKey, setComposioApiKey] = useState("");
-  const [composioToolkits, setComposioToolkits] = useState<string[]>(DEFAULT_ENABLED_COMPOSIO_TOOLKITS);
-  const [composioStatus, setComposioStatus] = useState<ComposioToolkitStatus[]>([]);
-  const [composioRedirectUrl, setComposioRedirectUrl] = useState<string | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   const llmPresets = LLM_PRESETS;
@@ -214,9 +205,6 @@ export function Onboarding({ onComplete }: { onComplete: () => void }) {
     listModels()
       .then((data) => setModels(data as Model[]))
       .catch(console.error);
-    void getComposioStatus()
-      .then((data) => setComposioStatus((data as ComposioToolkitStatus[]) || []))
-      .catch(() => setComposioStatus([]));
   }, []);
 
   useEffect(() => {
@@ -278,6 +266,7 @@ export function Onboarding({ onComplete }: { onComplete: () => void }) {
         base_url: form.llm.base_url,
         api_key: form.llm.api_key || "",
         model: form.llm.model,
+        provider: form.llm.provider,
       });
       setTestResult({ success: true, message: "Connected successfully!" });
     } catch (err: any) {
@@ -379,10 +368,6 @@ export function Onboarding({ onComplete }: { onComplete: () => void }) {
         active_character: charId,
         onboarding_complete: true,
       });
-
-      if (composioApiKey.trim() || composioToolkits.length > 0) {
-        await saveComposioConfig(composioApiKey.trim() || null, composioToolkits);
-      }
 
       setStep(6);
       setTimeout(onComplete, 2200);
@@ -521,16 +506,14 @@ export function Onboarding({ onComplete }: { onComplete: () => void }) {
                       </>
                     )}
 
-                    <label className={labelClass}>Model</label>
-                    <input
-                      type="text"
+                    <LlmModelField
                       value={form.llm.model}
-                      onChange={(e) => {
-                        updateForm("llm", "model", e.target.value);
-                        setTestResult(null);
-                      }}
-                      placeholder="e.g. gpt-4o"
-                      className={inputClass}
+                      onChange={(model) => updateForm("llm", "model", model)}
+                      baseUrl={form.llm.base_url}
+                      apiKey={form.llm.api_key}
+                      providerId={form.llm.provider}
+                      needsKey={llmPresets[form.llm.provider]?.needs_key !== false}
+                      onInvalidateTest={() => setTestResult(null)}
                     />
 
                     {form.llm.provider === "custom" && (
@@ -651,58 +634,7 @@ export function Onboarding({ onComplete }: { onComplete: () => void }) {
                   Link services through Composio if you want GitHub READMEs, Gmail context, or other toolkits available in chat later. You can skip this and configure integrations anytime in Settings.
                 </p>
 
-                <label className={labelClass}>Composio API Key</label>
-                <input
-                  type="password"
-                  value={composioApiKey}
-                  onChange={(e) => setComposioApiKey(e.target.value)}
-                  placeholder="Optional — paste your Composio API key"
-                  className={inputClass}
-                />
-
-                <ComposioToolkitPicker
-                  enabledToolkits={composioToolkits}
-                  statuses={composioStatus}
-                  compact
-                  onToggle={(slug) =>
-                    setComposioToolkits((prev) =>
-                      prev.includes(slug) ? prev.filter((item) => item !== slug) : [...prev, slug],
-                    )
-                  }
-                  onConnect={async (slug) => {
-                    try {
-                      const result: any = await authorizeComposioToolkit(slug);
-                      setComposioRedirectUrl(result.redirect_url || null);
-                      const data = await getComposioStatus();
-                      setComposioStatus((data as ComposioToolkitStatus[]) || []);
-                    } catch (err) {
-                      console.error("Composio authorize failed:", err);
-                    }
-                  }}
-                  onRefresh={async (slug) => {
-                    try {
-                      await refreshComposioToolkit(slug);
-                      const data = await getComposioStatus();
-                      setComposioStatus((data as ComposioToolkitStatus[]) || []);
-                    } catch (err) {
-                      console.error("Composio refresh failed:", err);
-                    }
-                  }}
-                />
-
-                {composioRedirectUrl && (
-                  <div className="mt-6 rounded-2xl border border-blue-100 bg-blue-50 px-4 py-3">
-                    <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-blue-700">Connect link ready</div>
-                    <p className="mt-2 text-sm text-blue-700">Open this link, finish OAuth, then return and press Refresh on the service card.</p>
-                    <button
-                      type="button"
-                      onClick={() => window.open(composioRedirectUrl, "_blank", "noopener,noreferrer")}
-                      className="mt-3 rounded-full bg-blue-600 px-4 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-white"
-                    >
-                      Open Connect Link
-                    </button>
-                  </div>
-                )}
+                <ComposioIntegrationsPanel />
               </div>
             )}
 

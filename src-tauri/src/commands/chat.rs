@@ -527,10 +527,17 @@ async fn run_chat_stream(
         max_tokens: 1024,
     };
 
-    // 4. Sync search config and get tools JSON for the LLM
+    // 4. Sync search + Composio runtime state and get tools JSON for the LLM
     state
         .tool_registry
         .update_search_config(config.search.clone());
+    state.tool_registry.update_composio_state(
+        meux_core::composio::ComposioToolState {
+            api_key: config.composio.api_key.clone(),
+            user_id: user_id.clone(),
+            connections: config.composio.connections.clone(),
+        },
+    );
     let tools_json = state
         .tool_registry
         .openai_tools_json_filtered(&config.disabled_tools);

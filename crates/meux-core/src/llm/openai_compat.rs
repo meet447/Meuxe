@@ -7,7 +7,7 @@ use serde_json::json;
 
 use crate::error::{MeuxError, Result};
 
-use super::types::*;
+use super::types::{ModelsListResponse, *};
 
 pub struct OpenAiCompatClient {
     client: Client,
@@ -240,6 +240,26 @@ impl OpenAiCompatClient {
         })
     }
 
+    /// List models from an OpenAI-compatible `GET /v1/models` endpoint.
+    pub async fn list_models(&self, base_url: &str, api_key: &str) -> Result<Vec<String>> {
+        let url = format!("{}/models", base_url.trim_end_matches('/'));
+        let mut request = self.client.get(&url).header("Content-Type", "application/json");
+        if !api_key.is_empty() {
+            request = request.header("Authorization", format!("Bearer {api_key}"));
+        }
+
+        let response = request.send().await.map_err(MeuxError::Http)?;
+
+        if !response.status().is_success() {
+            let status = response.status();
+            let text = response.text().await.unwrap_or_default();
+            return Err(MeuxError::Llm(format!("HTTP {status}: {text}")));
+        }
+
+        let body = response.text().await.map_err(MeuxError::Http)?;
+        parse_models_list_body(&body)
+    }
+
     /// Non-streaming chat completion with retry (up to 2 retries).
     pub async fn chat(
         &self,
@@ -292,8 +312,52 @@ impl OpenAiCompatClient {
     }
 }
 
+fn parse_models_list_body(body: &str) -> Result<Vec<String>> {
+    if let Ok(parsed) = serde_json::from_str::<ModelsListResponse>(body) {
+        let mut ids: Vec<String> = parsed.data.into_iter().map(|m| m.id).collect();
+        ids.sort();
+        ids.dedup();
+        if !ids.is_empty() {
+            return Ok(ids);
+        }
+    }
+
+    // Some providers return a bare array of model objects.
+    if let Ok(entries) = serde_json::from_str::<Vec<ModelListEntry>>(body) {
+        let mut ids: Vec<String> = entries.into_iter().map(|m| m.id).collect();
+        ids.sort();
+        ids.dedup();
+        if !ids.is_empty() {
+            return Ok(ids);
+        }
+    }
+
+    Err(MeuxError::Llm(
+        "Models endpoint returned no recognizable model IDs".to_string(),
+    ))
+}
+
 impl Default for OpenAiCompatClient {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parses_openai_models_envelope() {
+        let body = r#"{"object":"list","data":[{"id":"gpt-4o"},{"id":"gpt-4o-mini"}]}"#;
+        let ids = parse_models_list_body(body).unwrap();
+        assert_eq!(ids, vec!["gpt-4o", "gpt-4o-mini"]);
+    }
+
+    #[test]
+    fn parses_bare_model_array() {
+        let body = r#"[{"id":"llama3.2"},{"id":"llama3"}]"#;
+        let ids = parse_models_list_body(body).unwrap();
+        assert_eq!(ids, vec!["llama3", "llama3.2"]);
     }
 }

@@ -557,6 +557,16 @@ function App() {
               onConversationCleared={async () => {
                 await clearMessages(selectedCharId);
               }}
+              onResetAll={() => {
+                setSettingsOpen(false);
+                setOnboardingComplete(false);
+                setCharacters([]);
+                setSelectedCharId("");
+                setMessages([]);
+                clearQueue();
+                setExpressionsConfigured(null);
+                setCurrentExpression("neutral");
+              }}
               onClose={() => {
                 setSettingsOpen(false);
                 refreshCharacters();

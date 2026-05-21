@@ -49,6 +49,12 @@ impl CharacterLoader {
         }
     }
 
+    pub fn clear_cache(&self) {
+        if let Ok(mut cache) = self.cache.write() {
+            cache.clear();
+        }
+    }
+
     /// List all available characters (summary only).
     pub fn list_characters(&self) -> Result<Vec<CharacterSummary>> {
         let sources = self.iter_character_sources()?;

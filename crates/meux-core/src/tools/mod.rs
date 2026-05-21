@@ -11,6 +11,7 @@ use std::sync::{Arc, RwLock};
 use async_trait::async_trait;
 use serde_json::json;
 
+use crate::composio::tools::{composio_tool_available, ComposioGmailFetchTool, ComposioGithubReadmeTool, ComposioToolState, ComposioToolStateHandle};
 use crate::config::types::SearchConfig;
 use crate::error::{MeuxError, Result};
 
@@ -28,6 +29,7 @@ pub trait Tool: Send + Sync {
 pub struct ToolRegistry {
     tools: HashMap<String, Box<dyn Tool>>,
     search_config: Arc<RwLock<SearchConfig>>,
+    composio_state: ComposioToolStateHandle,
 }
 
 impl ToolRegistry {
@@ -35,12 +37,14 @@ impl ToolRegistry {
         Self {
             tools: HashMap::new(),
             search_config: Arc::new(RwLock::new(SearchConfig::default())),
+            composio_state: Arc::new(RwLock::new(ComposioToolState::default())),
         }
     }
 
     /// Create a registry with all built-in tools registered.
     pub fn with_defaults(base_dir: std::path::PathBuf) -> Self {
         let mut registry = Self::new();
+        let composio_state = Arc::clone(&registry.composio_state);
         // File tools
         registry.register(Box::new(file_ops::ReadFileTool));
         registry.register(Box::new(file_ops::WriteFileTool));
@@ -61,6 +65,12 @@ impl ToolRegistry {
         registry.register(Box::new(web_search::WebSearchTool::with_config(
             Arc::clone(&registry.search_config),
         )));
+        registry.register(Box::new(ComposioGmailFetchTool::new(Arc::clone(
+            &composio_state,
+        ))));
+        registry.register(Box::new(ComposioGithubReadmeTool::new(Arc::clone(
+            &composio_state,
+        ))));
         registry
     }
 
@@ -77,9 +87,32 @@ impl ToolRegistry {
     /// Format tool definitions as the OpenAI `tools` array for the API request.
     /// Excludes tools listed in `disabled`.
     pub fn openai_tools_json_filtered(&self, disabled: &[String]) -> Vec<serde_json::Value> {
+        let composio = self
+            .composio_state
+            .read()
+            .ok()
+            .map(|state| state.clone());
+        self.openai_tools_json_filtered_with_composio(disabled, composio.as_ref())
+    }
+
+    pub fn openai_tools_json_filtered_with_composio(
+        &self,
+        disabled: &[String],
+        composio: Option<&ComposioToolState>,
+    ) -> Vec<serde_json::Value> {
         self.tools
             .values()
-            .filter(|tool| !disabled.contains(&tool.definition().name))
+            .filter(|tool| {
+                let name = tool.definition().name;
+                if disabled.contains(&name) {
+                    return false;
+                }
+                if name.starts_with("composio_") {
+                    return composio
+                        .is_some_and(|state| composio_tool_available(&name, state));
+                }
+                true
+            })
             .map(|tool| {
                 let def = tool.definition();
                 json!({
@@ -128,6 +161,12 @@ impl ToolRegistry {
     pub fn update_search_config(&self, config: SearchConfig) {
         if let Ok(mut cfg) = self.search_config.write() {
             *cfg = config;
+        }
+    }
+
+    pub fn update_composio_state(&self, state: ComposioToolState) {
+        if let Ok(mut slot) = self.composio_state.write() {
+            *slot = state;
         }
     }
 }

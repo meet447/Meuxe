@@ -5,19 +5,14 @@ import { MemoryStatePanel } from "./MemoryStatePanel";
 import {
   getConfig,
   saveConfig,
+  resetAllAppData,
   testLlm,
   getVoices,
   listTools,
-  getComposioStatus,
-  saveComposioConfig,
-  authorizeComposioToolkit,
-  refreshComposioToolkit,
 } from "../api/tauri";
-import { ComposioToolkitPicker } from "./ComposioToolkitPicker";
-import { DEFAULT_ENABLED_COMPOSIO_TOOLKITS } from "../lib/composioToolkits";
+import { ComposioIntegrationsPanel } from "./ComposioIntegrationsPanel";
 import { LLM_PRESETS, llmPresetEntries } from "../lib/llmPresets";
-import type { ComposioToolkitStatus } from "../types";
-
+import { LlmModelField } from "./LlmModelField";
 interface Voice {
   id: string;
   name: string;
@@ -249,13 +244,14 @@ function PrivacyCard({ title, items, tone }: { title: string; items: string[]; t
   );
 }
 
-export function Settings({ onClose, characterId, characterName, modelId, onPreviewExpression, onConversationCleared }: {
+export function Settings({ onClose, characterId, characterName, modelId, onPreviewExpression, onConversationCleared, onResetAll }: {
   onClose: () => void;
   characterId?: string;
   characterName: string;
   modelId?: string;
   onPreviewExpression?: (expr: string) => void;
   onConversationCleared?: () => void;
+  onResetAll?: () => void;
 }) {
   const [page, setPage] = useState<SettingsPage>(null);
   const [config, setConfig] = useState<any>(null);
@@ -283,10 +279,9 @@ export function Settings({ onClose, characterId, characterName, modelId, onPrevi
   const [searchProvider, setSearchProvider] = useState("duckduckgo");
   const [serpApiKey, setSerpApiKey] = useState("");
   const [exaApiKey, setExaApiKey] = useState("");
-  const [composioApiKey, setComposioApiKey] = useState("");
-  const [composioToolkits, setComposioToolkits] = useState<string[]>(DEFAULT_ENABLED_COMPOSIO_TOOLKITS);
-  const [composioStatus, setComposioStatus] = useState<ComposioToolkitStatus[]>([]);
-  const [composioRedirectUrl, setComposioRedirectUrl] = useState<string | null>(null);
+  const [confirmReset, setConfirmReset] = useState(false);
+  const [resetting, setResetting] = useState(false);
+  const [resetError, setResetError] = useState<string | null>(null);
 
   const deriveConfigured = (cfg: any) => {
     // Derive which providers are configured from stored config
@@ -340,13 +335,6 @@ export function Settings({ onClose, characterId, characterName, modelId, onPrevi
         setSearchProvider(cfg.search?.provider || "duckduckgo");
         setSerpApiKey("");
         setExaApiKey("");
-        setComposioApiKey("");
-        setComposioToolkits(
-          cfg.composio?.enabled_toolkits?.length
-            ? cfg.composio.enabled_toolkits
-            : DEFAULT_ENABLED_COMPOSIO_TOOLKITS,
-        );
-        void getComposioStatus().then((data: any) => setComposioStatus(data || [])).catch(() => setComposioStatus([]));
       })
       .catch((err) => console.error("Failed to load config:", err));
   }, []);
@@ -383,6 +371,7 @@ export function Settings({ onClose, characterId, characterName, modelId, onPrevi
         base_url: llmBaseUrl,
         api_key: llmApiKey || "",
         model: llmModel,
+        provider: llmProvider,
       });
       setTestResult({ success: true });
     } catch (err: any) {
@@ -418,55 +407,6 @@ export function Settings({ onClose, characterId, characterName, modelId, onPrevi
     setSaving(false);
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
-  };
-
-  const handleSaveComposio = async () => {
-    setSaving(true);
-    try {
-      await saveComposioConfig(composioApiKey.trim() || null, composioToolkits);
-      const freshConfig: any = await getConfig();
-      setConfig(freshConfig);
-      void getComposioStatus().then((data: any) => setComposioStatus(data || []));
-      setComposioApiKey("");
-      setSaved(true);
-      setTimeout(() => setSaved(false), 2000);
-    } catch (err) {
-      console.error("Failed to save Composio config:", err);
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const refreshComposioStatuses = async () => {
-    const data: any = await getComposioStatus();
-    setComposioStatus(data || []);
-  };
-
-  const handleAuthorizeComposio = async (toolkit: string) => {
-    setSaving(true);
-    try {
-      const result: any = await authorizeComposioToolkit(toolkit);
-      setComposioRedirectUrl(result.redirect_url || null);
-      await refreshComposioStatuses();
-      setSaved(true);
-      setTimeout(() => setSaved(false), 2000);
-    } catch (err) {
-      console.error("Failed to authorize Composio toolkit:", err);
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const handleRefreshComposio = async (toolkit: string) => {
-    setSaving(true);
-    try {
-      await refreshComposioToolkit(toolkit);
-      await refreshComposioStatuses();
-    } catch (err) {
-      console.error("Failed to refresh Composio toolkit:", err);
-    } finally {
-      setSaving(false);
-    }
   };
 
   if (!config) return <div className="p-8 text-slate-400">Loading settings...</div>;
@@ -668,13 +608,17 @@ export function Settings({ onClose, characterId, characterName, modelId, onPrevi
               </div>
             )}
 
-            <label className={labelClass}>Model</label>
-            <input
-              type="text"
+            <LlmModelField
               value={llmModel}
-              onChange={(e) => { setLlmModel(e.target.value); setTestResult(null); }}
-              placeholder="e.g. gpt-4o"
-              className={inputClass}
+              onChange={(model) => {
+                setLlmModel(model);
+                setTestResult(null);
+              }}
+              baseUrl={llmBaseUrl}
+              apiKey={llmApiKey}
+              providerId={llmProvider}
+              needsKey={LLM_PRESETS[llmProvider]?.needs_key !== false}
+              onInvalidateTest={() => setTestResult(null)}
             />
 
             {llmProvider === "custom" && (
@@ -883,66 +827,44 @@ export function Settings({ onClose, characterId, characterName, modelId, onPrevi
 
   // ========== TOOLS PAGE ==========
   if (page === "integrations") {
-    const toggleToolkit = (slug: string) => {
-      setComposioToolkits((prev) =>
-        prev.includes(slug) ? prev.filter((item) => item !== slug) : [...prev, slug],
-      );
-    };
-
     return (
       <div className="flex-1 overflow-y-auto p-6 scrollbar-thin scrollbar-thumb-slate-200 scrollbar-track-transparent">
         <SubHeader title="Integrations" />
         <LocalFirstNotice variant="amber" />
 
-        <div className="mb-6 rounded-[1.75rem] border border-slate-200 bg-white px-5 py-5 shadow-sm">
+        <div className="mb-6 min-w-0 rounded-[1.75rem] border border-slate-200 bg-white px-5 py-5 shadow-sm">
           <div className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500">Composio</div>
           <h3 className="mt-2 text-lg font-bold text-slate-800">OAuth and connected sources</h3>
-          <p className="mt-2 text-sm leading-relaxed text-slate-500">
-            Composio is optional. Enable the services you want, connect them with OAuth, and sync read-only GitHub or Gmail context into the local memory vault through authenticated Composio tools.
-          </p>
-
-          <label className={`${labelClass} mt-5`}>Composio API Key</label>
-          <input
-            type="password"
-            value={composioApiKey}
-            onChange={(e) => setComposioApiKey(e.target.value)}
-            placeholder="Paste Composio API key (blank to keep current)"
-            className={inputClass}
+          <ComposioIntegrationsPanel
+            optionalHint="Composio is optional. Save your API key first, then connect services with OAuth. Connected Gmail and GitHub accounts can be used live in chat (for example, “check my mail”)."
           />
-
-          <label className={labelClass}>Connected Services</label>
-          <div className="mb-6">
-            <ComposioToolkitPicker
-              enabledToolkits={composioToolkits}
-              statuses={composioStatus}
-              onToggle={toggleToolkit}
-              onConnect={(slug) => void handleAuthorizeComposio(slug)}
-              onRefresh={(slug) => void handleRefreshComposio(slug)}
-            />
-          </div>
-
-          {composioRedirectUrl && (
-            <div className="mb-6 rounded-2xl border border-blue-100 bg-blue-50 px-4 py-3">
-              <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-blue-700">Connect link ready</div>
-              <p className="mt-2 text-sm text-blue-700">Open this link, finish OAuth in the browser, then return here and press Refresh.</p>
-              <button
-                onClick={() => window.open(composioRedirectUrl, "_blank", "noopener,noreferrer")}
-                className="mt-3 rounded-full bg-blue-600 px-4 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-white"
-              >
-                Open Connect Link
-              </button>
-            </div>
-          )}
-
-          <button onClick={handleSaveComposio} disabled={saving} className={buttonClass}>
-            {saving ? "Saving..." : saved ? "Saved!" : "Save Integrations"}
-          </button>
         </div>
       </div>
     );
   }
 
   if (page === "privacy") {
+    const handleResetAll = async () => {
+      if (!confirmReset) {
+        setConfirmReset(true);
+        setResetError(null);
+        return;
+      }
+
+      setResetting(true);
+      setResetError(null);
+      try {
+        await resetAllAppData();
+        onResetAll?.();
+      } catch (err) {
+        console.error("Reset failed:", err);
+        setResetError(err instanceof Error ? err.message : "Reset failed. Please try again.");
+        setConfirmReset(false);
+      } finally {
+        setResetting(false);
+      }
+    };
+
     return (
       <div className="flex-1 overflow-y-auto p-6 scrollbar-thin scrollbar-thumb-slate-200 scrollbar-track-transparent">
         <SubHeader title="Local-First Privacy" />
@@ -950,6 +872,40 @@ export function Settings({ onClose, characterId, characterName, modelId, onPrevi
           <PrivacyCard title="Always local" items={["SQLite memory vault", "Markdown vault projection", "Character files", "Session history", "Relationship state", "Imported notes/transcripts"]} tone="emerald" />
           <PrivacyCard title="Leaves only when enabled" items={["LLM prompts and retrieved memory snippets", "TTS text sent for speech generation", "Search queries sent to selected search provider", "Composio toolkit requests for connected sources"]} tone="blue" />
           <PrivacyCard title="Never store in plaintext intentionally" items={["API keys are masked in settings reads", "Blank key fields preserve existing values", "Generated exports are local files you control"]} tone="amber" />
+
+          <section className="rounded-[1.75rem] border border-red-200 bg-red-50 px-5 py-5 text-red-800">
+            <h3 className="text-lg font-bold">Reset everything</h3>
+            <p className="mt-2 text-sm leading-relaxed text-red-700/90">
+              Deletes your profile, companions, chat history, memory vault, API keys, integrations, and settings, then returns you to onboarding. Imported Live2D and VRM models stay on disk.
+            </p>
+            {resetError && (
+              <p className="mt-3 rounded-2xl border border-red-300 bg-white/70 px-4 py-3 text-sm font-medium text-red-700">
+                {resetError}
+              </p>
+            )}
+            <div className="mt-4 flex flex-col gap-2 sm:flex-row">
+              <button
+                type="button"
+                onClick={handleResetAll}
+                disabled={resetting}
+                className="rounded-2xl bg-red-600 px-5 py-3 text-sm font-semibold text-white shadow-sm shadow-red-600/20 transition-all hover:bg-red-700 disabled:opacity-50"
+              >
+                {resetting ? "Resetting..." : confirmReset ? "Yes, reset everything" : "Reset and start over"}
+              </button>
+              {confirmReset && !resetting && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setConfirmReset(false);
+                    setResetError(null);
+                  }}
+                  className="rounded-2xl border border-red-200 bg-white px-5 py-3 text-sm font-semibold text-red-700 transition-all hover:bg-red-100/50"
+                >
+                  Cancel
+                </button>
+              )}
+            </div>
+          </section>
         </div>
       </div>
     );

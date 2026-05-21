@@ -17,12 +17,25 @@ export async function saveConfig(config: unknown) {
   return invoke("config_save", { config });
 }
 
+export async function resetAllAppData() {
+  return invoke("config_reset_all");
+}
+
 export async function testLlm(provider: {
   base_url: string;
   api_key: string;
   model: string;
+  provider?: string;
 }) {
   return invoke<string>("config_test_llm", { provider });
+}
+
+export async function listLlmModels(provider: {
+  base_url: string;
+  api_key?: string;
+  provider?: string;
+}) {
+  return invoke<string[]>("config_list_llm_models", { provider });
 }
 
 // Characters
@@ -173,8 +186,14 @@ export async function getComposioStatus() {
   return invoke("composio_status");
 }
 
-export async function saveComposioConfig(apiKey: string | null, enabledToolkits: string[]) {
-  return invoke("composio_save_config", { apiKey, enabledToolkits });
+export async function saveComposioConfig(
+  apiKey: string | null,
+  enabledToolkits?: string[],
+) {
+  return invoke("composio_save_config", {
+    apiKey,
+    enabledToolkits: enabledToolkits ?? [],
+  });
 }
 
 export async function authorizeComposioToolkit(toolkit: string) {

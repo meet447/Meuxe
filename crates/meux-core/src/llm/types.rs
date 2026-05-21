@@ -144,3 +144,17 @@ pub struct ResponseMessage {
     pub content: Option<String>,
     pub tool_calls: Option<Vec<ToolCallMessage>>,
 }
+
+// ---------------------------------------------------------------------------
+// Models list (GET /v1/models)
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Deserialize)]
+pub struct ModelsListResponse {
+    pub data: Vec<ModelListEntry>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct ModelListEntry {
+    pub id: String,
+}
