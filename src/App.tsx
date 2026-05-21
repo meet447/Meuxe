@@ -21,7 +21,7 @@ import {
   clearChat,
   toAssetUrl,
 } from "./api/tauri";
-import type { Character, ModelInfo, ChatMessage } from "./types";
+import type { Character, ModelInfo } from "./types";
 
 const Live2DCanvas = lazy(() =>
   import("./components/Live2DCanvas").then((m) => ({ default: m.Live2DCanvas }))
@@ -132,25 +132,13 @@ function App() {
   const [onboardingComplete, setOnboardingComplete] = useState<boolean | null>(null);
   const [userTyping, setUserTyping] = useState(false);
 
-  const { messages, setMessages, isStreaming, streamingText, send, setOnSentence, setOnAudio, toolCalls, handleConfirm } =
+  const { setMessages, timeline, isStreaming, streamingText, send, setOnSentence, setOnAudio, toolCalls, handleConfirm } =
     useChat();
   const { listening, startListening, stopListening } = useVoice();
   const { speaking, addSentence, addAudio, clearQueue, getAudioLevels, setOnExpressionChange, setNeutralExpression } =
     useAudioQueue();
 
   const selectedCharRef = useRef<Character | undefined>(undefined);
-
-  // Map internal messages (content field) to ChatMessage type (text field) for ChatPanel
-  const chatMessages = useMemo<ChatMessage[]>(
-    () =>
-      messages.map((m) => ({
-        role: m.role,
-        text: m.content,
-        expression: m.expression,
-      })),
-    [messages]
-  );
-
 
   const loadHistory = useCallback(
     async (characterId: string) => {
@@ -269,9 +257,8 @@ function App() {
   const modelType = selectedModel?.type ?? "live2d";
   const modelMapping = selectedModel?.mapping ?? null;
 
-  // The model ID for expression lookups: use the selectedModel ID if available,
-  // otherwise fall back to the character's live2d_model field directly
-  const expressionModelId = selectedModel?.id ?? selectedChar?.live2d_model ?? null;
+  // Match chat backend: expression files are keyed by character.live2d_model.
+  const expressionModelId = selectedChar?.live2d_model || selectedModel?.id || null;
 
   const refreshExpressionConfiguration = useCallback(async () => {
     if (!expressionModelId) {
@@ -286,7 +273,7 @@ function App() {
       ]);
 
       const hasModelExpressions = modelExpressions.length > 0;
-      const hasMapping = Object.keys(mapping).length > 0;
+      const hasMapping = Object.values(mapping).some((value) => value.trim().length > 0);
 
       setExpressionsConfigured(!hasModelExpressions || hasMapping);
       if (mapping["neutral"]) {
@@ -303,7 +290,22 @@ function App() {
     refreshExpressionConfiguration();
   }, [refreshExpressionConfiguration]);
 
-
+  const handleSettingsClose = useCallback(() => {
+    setSettingsOpen(false);
+    refreshCharacters();
+    if (selectedCharId) {
+      loadHistory(selectedCharId);
+    }
+    if (expressionModelId) {
+      refreshExpressionConfiguration().catch(console.error);
+    }
+  }, [
+    refreshCharacters,
+    selectedCharId,
+    loadHistory,
+    expressionModelId,
+    refreshExpressionConfiguration,
+  ]);
 
   const handleSend = useCallback(
     async (text: string) => {
@@ -519,7 +521,7 @@ function App() {
           <div className="text-slate-300">|</div>
 
           <button
-            onClick={() => setSettingsOpen(!settingsOpen)}
+            onClick={() => (settingsOpen ? handleSettingsClose() : setSettingsOpen(true))}
             className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
               settingsOpen
                 ? "bg-blue-100 text-blue-700"
@@ -552,8 +554,11 @@ function App() {
             <Settings
               characterId={selectedCharId}
               characterName={charName}
-              modelId={selectedModel?.id || expressionModelId || ""}
+              modelId={expressionModelId || ""}
               onPreviewExpression={(expr) => setCurrentExpression(expr)}
+              onExpressionsSaved={() => {
+                refreshExpressionConfiguration().catch(console.error);
+              }}
               onConversationCleared={async () => {
                 await clearMessages(selectedCharId);
               }}
@@ -567,16 +572,7 @@ function App() {
                 setExpressionsConfigured(null);
                 setCurrentExpression("neutral");
               }}
-              onClose={() => {
-                setSettingsOpen(false);
-                refreshCharacters();
-                if (selectedCharId) {
-                  loadHistory(selectedCharId);
-                }
-                if (expressionModelId) {
-                  refreshExpressionConfiguration().catch(console.error);
-                }
-              }}
+              onClose={handleSettingsClose}
             />
           ) : expressionsConfigured === null ? (
             <div className="flex-1 flex items-center justify-center">
@@ -605,7 +601,7 @@ function App() {
             </div>
           ) : (
             <ChatPanel
-              messages={chatMessages}
+              timeline={timeline}
               loading={isStreaming}
               streamingText={streamingText}
               characterName={charName}
@@ -613,7 +609,6 @@ function App() {
               onTypingChange={handleTypingChange}
               listening={listening}
               onMicToggle={handleMicToggle}
-              toolCalls={toolCalls}
               onToolConfirm={handleConfirm}
               inputRef={fullChatInputRef}
             />

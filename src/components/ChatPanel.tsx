@@ -1,13 +1,12 @@
 import { useState, useRef, useEffect, useCallback, memo } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import type { ChatMessage } from "../types";
+import type { ChatMessage, ChatTimelineItem } from "../types";
 import { MicButton } from "./MicButton";
 import { ToolCallBubble } from "./ToolCallBubble";
-import type { ToolCallStatus } from "./ToolCallBubble";
 
 interface Props {
-  messages: ChatMessage[];
+  timeline: ChatTimelineItem[];
   loading: boolean;
   streamingText: string;
   characterName: string;
@@ -17,7 +16,6 @@ interface Props {
   onMicToggle: () => void;
   ttsLoading?: boolean;
   speaking?: boolean;
-  toolCalls?: ToolCallStatus[];
   onToolConfirm?: (requestId: string, approved: boolean) => void;
   inputRef?: React.RefObject<HTMLInputElement | null>;
 }
@@ -245,8 +243,16 @@ const ChatInput = memo(function ChatInput({
   );
 });
 
+function timelineItemToMessage(item: ChatTimelineItem): ChatMessage | null {
+  if (item.kind === "tool") return null;
+  if (item.kind === "user") {
+    return { role: "user", text: item.text };
+  }
+  return { role: "assistant", text: item.text, expression: item.expression };
+}
+
 export function ChatPanel({
-  messages,
+  timeline,
   loading,
   streamingText,
   characterName,
@@ -256,7 +262,6 @@ export function ChatPanel({
   onMicToggle,
   ttsLoading = false,
   speaking = false,
-  toolCalls = [],
   onToolConfirm,
   inputRef: externalInputRef,
 }: Props) {
@@ -266,15 +271,18 @@ export function ChatPanel({
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, streamingText, toolCalls]);
+  }, [timeline, streamingText]);
 
   const isProcessing = loading || ttsLoading;
+  const hasRunningTool = timeline.some(
+    (item) => item.kind === "tool" && item.call.status === "running",
+  );
 
   return (
     <div className="flex-1 flex flex-col bg-transparent relative h-full">
       {/* Messages */}
       <div className="flex-1 overflow-y-auto p-5 space-y-4 scrollbar-thin scrollbar-thumb-slate-200 scrollbar-track-transparent">
-        {messages.length === 0 && !streamingText && (
+        {timeline.length === 0 && !streamingText && (
           <div className="text-slate-400 text-center mt-16 flex flex-col items-center">
             <div className="w-14 h-14 bg-gradient-to-br from-blue-50 to-indigo-50 text-blue-300 rounded-2xl flex items-center justify-center mb-4 shadow-sm">
               <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -286,11 +294,23 @@ export function ChatPanel({
           </div>
         )}
 
-        {messages.map((msg, i) => (
-          <MessageBubble key={i} msg={msg} characterName={characterName} />
-        ))}
+        {timeline.map((item) => {
+          if (item.kind === "tool") {
+            return (
+              <ToolCallBubble
+                key={item.id}
+                call={item.call}
+                onConfirm={onToolConfirm}
+              />
+            );
+          }
 
-        {/* Streaming text */}
+          const msg = timelineItemToMessage(item);
+          if (!msg) return null;
+          return <MessageBubble key={item.id} msg={msg} characterName={characterName} />;
+        })}
+
+        {/* Streaming text — always the latest assistant turn */}
         {streamingText && (
           <div className="flex flex-col items-start animate-in fade-in duration-150">
             <div className="max-w-[88%] rounded-3xl rounded-tl-lg px-5 py-3 bg-white border border-slate-100 shadow-sm text-slate-700">
@@ -311,18 +331,8 @@ export function ChatPanel({
           </div>
         )}
 
-        {/* Tool call bubbles */}
-        {toolCalls.length > 0 &&
-          toolCalls.map((tc) => (
-            <ToolCallBubble
-              key={tc.requestId}
-              call={tc}
-              onConfirm={onToolConfirm}
-            />
-          ))}
-
-        {/* Loading indicator - thinking */}
-        {loading && !streamingText && (
+        {/* Loading indicator — after tools finish, before the next assistant reply */}
+        {loading && !streamingText && !hasRunningTool && (
           <div className="flex justify-start animate-in fade-in duration-200">
             <div className="bg-white border border-slate-100 shadow-sm rounded-3xl rounded-tl-lg px-5 py-4">
               <div className="flex items-center gap-3 text-slate-400">
@@ -331,7 +341,9 @@ export function ChatPanel({
                   <span className="w-2 h-2 rounded-full bg-blue-400/60 animate-bounce [animation-delay:-0.15s]" />
                   <span className="w-2 h-2 rounded-full bg-blue-400/60 animate-bounce" />
                 </div>
-                <span className="text-xs font-semibold uppercase tracking-wide">Thinking</span>
+                <span className="text-xs font-semibold uppercase tracking-wide">
+                  {timeline.some((item) => item.kind === "tool") ? "Continuing" : "Thinking"}
+                </span>
               </div>
             </div>
           </div>

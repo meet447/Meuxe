@@ -9,6 +9,7 @@ import {
 interface Props {
   modelId: string;
   onPreviewExpression: (expr: string) => void;
+  onSaved?: () => void;
   onClose: () => void;
 }
 
@@ -30,6 +31,7 @@ const FALLBACK_EXPRESSIONS = [
 export const ModelSettings = memo(function ModelSettings({
   modelId,
   onPreviewExpression,
+  onSaved,
   onClose,
 }: Props) {
   const [globalExpressions, setGlobalExpressions] = useState<string[]>([]);
@@ -82,6 +84,7 @@ export const ModelSettings = memo(function ModelSettings({
     setSaving(true);
     try {
       await saveExpressions(modelId, mapping);
+      onSaved?.();
     } catch (err) {
       console.error("Failed to save expressions:", err);
     }

@@ -1,7 +1,7 @@
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useMemo } from "react";
 import { listen, UnlistenFn } from "@tauri-apps/api/event";
 import { sendChat, confirmToolCall } from "../api/tauri";
-import type { ToolCallStatus } from "../components/ToolCallBubble";
+import type { ChatTimelineItem, ToolCallStatus } from "../types";
 
 interface Message {
   role: "user" | "assistant";
@@ -17,7 +17,7 @@ interface SentencePayload {
 
 interface AudioPayload {
   index: number;
-  data: string; // base64-encoded audio
+  data: string;
 }
 
 interface DonePayload {
@@ -44,38 +44,110 @@ interface ToolConfirmPayload {
   description: string;
 }
 
+const cleanExpressionTags = (text: string) =>
+  text
+    .replace(/<<\/?[^>]*>>\s*/g, "")
+    .replace(/\[(?:expression:\s*)?[a-zA-Z0-9_\-]+\]\s*/g, "");
+
+function timelineToMessages(items: ChatTimelineItem[]): Message[] {
+  return items.flatMap((item) => {
+    if (item.kind === "tool") return [];
+    return [
+      {
+        role: item.kind,
+        content: item.text,
+        expression: item.kind === "assistant" ? item.expression : undefined,
+      },
+    ];
+  });
+}
+
+function messagesToTimeline(messages: Message[]): ChatTimelineItem[] {
+  return messages.map((message, index) => {
+    if (message.role === "user") {
+      return { id: `user-${index}`, kind: "user", text: message.content };
+    }
+    return {
+      id: `assistant-${index}`,
+      kind: "assistant",
+      text: message.content,
+      expression: message.expression,
+    };
+  });
+}
+
 export function useChat() {
-  const [messages, setMessages] = useState<Message[]>([]);
+  const [timeline, setTimeline] = useState<ChatTimelineItem[]>([]);
   const [streamingText, setStreamingText] = useState("");
   const [isStreaming, setIsStreaming] = useState(false);
-  const [toolCalls, setToolCalls] = useState<ToolCallStatus[]>([]);
+
+  const displayTextRef = useRef("");
+  const lastExpressionRef = useRef("neutral");
+  const segmentCounterRef = useRef(0);
 
   const onSentenceRef = useRef<((data: SentencePayload) => void) | null>(null);
-  const onAudioRef = useRef<
-    ((index: number, data: string) => void) | null
-  >(null);
+  const onAudioRef = useRef<((index: number, data: string) => void) | null>(null);
   const onDoneRef = useRef<((data: DonePayload) => void) | null>(null);
   const unlistenersRef = useRef<UnlistenFn[]>([]);
 
-  const cleanExpressionTags = (text: string) =>
-    text
-      .replace(/<<\/?[^>]*>>\s*/g, "")
-      .replace(/\[(?:expression:\s*)?[a-zA-Z0-9_\-]+\]\s*/g, "");
+  const messages = useMemo(() => timelineToMessages(timeline), [timeline]);
+
+  const toolCalls = useMemo(
+    () =>
+      timeline
+        .filter((item): item is Extract<ChatTimelineItem, { kind: "tool" }> => item.kind === "tool")
+        .map((item) => item.call),
+    [timeline],
+  );
+
+  const commitStreamingSegment = useCallback(() => {
+    const text = cleanExpressionTags(displayTextRef.current).trim();
+    displayTextRef.current = "";
+    setStreamingText("");
+
+    if (!text) return;
+
+    const expression =
+      lastExpressionRef.current !== "neutral" ? lastExpressionRef.current : undefined;
+    const segmentId = segmentCounterRef.current++;
+    setTimeline((prev) => [
+      ...prev,
+      {
+        id: `assistant-${segmentId}`,
+        kind: "assistant",
+        text,
+        expression,
+      },
+    ]);
+  }, []);
+
+  const upsertToolCall = useCallback((call: ToolCallStatus) => {
+    setTimeline((prev) => {
+      const index = prev.findIndex((item) => item.kind === "tool" && item.id === call.requestId);
+      if (index === -1) {
+        return [...prev, { id: call.requestId, kind: "tool", call }];
+      }
+      const next = [...prev];
+      next[index] = { id: call.requestId, kind: "tool", call };
+      return next;
+    });
+  }, []);
 
   const handleConfirm = useCallback(
     async (requestId: string, approved: boolean) => {
       await confirmToolCall(requestId, approved);
-      // Update status from awaiting_confirmation
-      setToolCalls((prev) =>
-        prev.map((tc) =>
-          tc.requestId === requestId
-            ? {
-                ...tc,
-                status: approved ? ("running" as const) : ("failed" as const),
-                result: approved ? undefined : "User denied this action.",
-              }
-            : tc,
-        ),
+      setTimeline((prev) =>
+        prev.map((item) => {
+          if (item.kind !== "tool" || item.id !== requestId) return item;
+          return {
+            ...item,
+            call: {
+              ...item.call,
+              status: approved ? ("running" as const) : ("failed" as const),
+              result: approved ? undefined : "User denied this action.",
+            },
+          };
+        }),
       );
     },
     [],
@@ -84,13 +156,17 @@ export function useChat() {
   const send = useCallback(
     async (characterId: string, message: string) => {
       if (isStreaming) return;
-      setMessages((prev) => [...prev, { role: "user", content: message }]);
+
+      segmentCounterRef.current = 0;
+      displayTextRef.current = "";
+      lastExpressionRef.current = "neutral";
+
+      setTimeline((prev) => [
+        ...prev,
+        { id: `user-${Date.now()}`, kind: "user", text: message },
+      ]);
       setStreamingText("");
       setIsStreaming(true);
-      setToolCalls([]);
-
-      let displayText = "";
-      let lastExpression = "neutral";
 
       for (const unlisten of unlistenersRef.current) {
         unlisten();
@@ -100,42 +176,34 @@ export function useChat() {
       const unlistenText = await listen<{ text: string }>(
         "chat:text-chunk",
         (event) => {
-          displayText += event.payload.text;
-          setStreamingText(cleanExpressionTags(displayText));
+          displayTextRef.current += event.payload.text;
+          setStreamingText(cleanExpressionTags(displayTextRef.current));
         },
       );
 
       const unlistenSentence = await listen<SentencePayload>(
         "chat:sentence",
         (event) => {
-          console.log("[useChat] sentence event:", event.payload.index, event.payload.expression, event.payload.text?.slice(0, 50));
-          lastExpression = event.payload.expression;
+          lastExpressionRef.current = event.payload.expression;
           onSentenceRef.current?.(event.payload);
         },
       );
 
-      const unlistenAudio = await listen<AudioPayload>(
-        "chat:audio",
-        (event) => {
-          console.log("[useChat] audio event:", event.payload.index, "bytes:", event.payload.data?.length);
-          onAudioRef.current?.(event.payload.index, event.payload.data);
-        },
-      );
+      const unlistenAudio = await listen<AudioPayload>("chat:audio", (event) => {
+        onAudioRef.current?.(event.payload.index, event.payload.data);
+      });
 
-      // Tool events
       const unlistenToolStart = await listen<ToolCallStartPayload>(
         "chat:tool-call-start",
         (event) => {
           const { request_id, tool_name, arguments: args } = event.payload;
-          setToolCalls((prev) => [
-            ...prev,
-            {
-              requestId: request_id,
-              toolName: tool_name,
-              arguments: args,
-              status: "running",
-            },
-          ]);
+          commitStreamingSegment();
+          upsertToolCall({
+            requestId: request_id,
+            toolName: tool_name,
+            arguments: args,
+            status: "running",
+          });
         },
       );
 
@@ -143,16 +211,18 @@ export function useChat() {
         "chat:tool-call-result",
         (event) => {
           const { request_id, result, success } = event.payload;
-          setToolCalls((prev) =>
-            prev.map((tc) =>
-              tc.requestId === request_id
-                ? {
-                    ...tc,
-                    status: success ? "completed" : "failed",
-                    result,
-                  }
-                : tc,
-            ),
+          setTimeline((prev) =>
+            prev.map((item) => {
+              if (item.kind !== "tool" || item.id !== request_id) return item;
+              return {
+                ...item,
+                call: {
+                  ...item.call,
+                  status: success ? "completed" : "failed",
+                  result,
+                },
+              };
+            }),
           );
         },
       );
@@ -161,57 +231,39 @@ export function useChat() {
         "chat:tool-confirm",
         (event) => {
           const { request_id, tool_name, arguments: args } = event.payload;
-          setToolCalls((prev) => [
-            ...prev,
-            {
-              requestId: request_id,
-              toolName: tool_name,
-              arguments: args,
-              status: "awaiting_confirmation",
-            },
-          ]);
+          commitStreamingSegment();
+          upsertToolCall({
+            requestId: request_id,
+            toolName: tool_name,
+            arguments: args,
+            status: "awaiting_confirmation",
+          });
         },
       );
 
-      const unlistenDone = await listen<DonePayload>(
-        "chat:done",
-        (event) => {
-          const finalText = cleanExpressionTags(displayText);
-          setMessages((prev) => [
-            ...prev,
-            {
-              role: "assistant",
-              content: finalText,
-              expression: lastExpression,
-            },
-          ]);
-          setStreamingText("");
-          setIsStreaming(false);
-          onDoneRef.current?.(event.payload);
-          // Clean up most listeners, keep audio alive for late TTS
-          unlistenText();
-          unlistenSentence();
-          unlistenDone();
-          unlistenError();
-          unlistenToolStart();
-          unlistenToolResult();
-          unlistenToolConfirm();
-          // Keep only audio listener in the ref for cleanup on next send
-          unlistenersRef.current = [unlistenAudio];
-        },
-      );
+      const unlistenDone = await listen<DonePayload>("chat:done", (event) => {
+        commitStreamingSegment();
+        setIsStreaming(false);
+        onDoneRef.current?.(event.payload);
+        unlistenText();
+        unlistenSentence();
+        unlistenDone();
+        unlistenError();
+        unlistenToolStart();
+        unlistenToolResult();
+        unlistenToolConfirm();
+        unlistenersRef.current = [unlistenAudio];
+      });
 
-      const unlistenError = await listen<{ message: string }>(
-        "chat:error",
-        (event) => {
-          console.error("Chat error:", event.payload.message);
-          setIsStreaming(false);
-          for (const u of unlistenersRef.current) {
-            u();
-          }
-          unlistenersRef.current = [];
-        },
-      );
+      const unlistenError = await listen<{ message: string }>("chat:error", (event) => {
+        console.error("Chat error:", event.payload.message);
+        commitStreamingSegment();
+        setIsStreaming(false);
+        for (const u of unlistenersRef.current) {
+          u();
+        }
+        unlistenersRef.current = [];
+      });
 
       unlistenersRef.current = [
         unlistenText,
@@ -226,22 +278,22 @@ export function useChat() {
 
       await sendChat(characterId, message);
     },
-    [isStreaming],
+    [isStreaming, commitStreamingSegment, upsertToolCall],
   );
 
-  const setOnSentence = useCallback(
-    (cb: (data: SentencePayload) => void) => {
-      onSentenceRef.current = cb;
-    },
-    [],
-  );
+  const setMessages = useCallback((next: Message[]) => {
+    segmentCounterRef.current = next.length;
+    setTimeline(messagesToTimeline(next));
+    setStreamingText("");
+  }, []);
 
-  const setOnAudio = useCallback(
-    (cb: (index: number, data: string) => void) => {
-      onAudioRef.current = cb;
-    },
-    [],
-  );
+  const setOnSentence = useCallback((cb: (data: SentencePayload) => void) => {
+    onSentenceRef.current = cb;
+  }, []);
+
+  const setOnAudio = useCallback((cb: (index: number, data: string) => void) => {
+    onAudioRef.current = cb;
+  }, []);
 
   const setOnDone = useCallback((cb: (data: DonePayload) => void) => {
     onDoneRef.current = cb;
@@ -250,6 +302,7 @@ export function useChat() {
   return {
     messages,
     setMessages,
+    timeline,
     streamingText,
     isStreaming,
     send,

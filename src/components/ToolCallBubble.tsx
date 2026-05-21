@@ -1,14 +1,7 @@
 import { useState, memo } from "react";
 import { ComposioToolkitIcon, toolkitColorClasses } from "./ComposioToolkitIcon";
 import { resolveComposioToolMeta } from "../lib/composioToolMeta";
-
-interface ToolCallStatus {
-  requestId: string;
-  toolName: string;
-  arguments: Record<string, unknown>;
-  status: "running" | "completed" | "failed" | "awaiting_confirmation";
-  result?: string;
-}
+import type { ToolCallStatus } from "../types";
 
 interface ConfirmRequest {
   requestId: string;
@@ -222,4 +215,5 @@ function ToolCallLabel({
   );
 }
 
-export type { ToolCallStatus, ConfirmRequest };
+export type { ConfirmRequest };
+export type { ToolCallStatus } from "../types";

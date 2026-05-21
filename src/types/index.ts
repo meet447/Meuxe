@@ -13,6 +13,19 @@ export interface ChatMessage {
   expression?: string;
 }
 
+export interface ToolCallStatus {
+  requestId: string;
+  toolName: string;
+  arguments: Record<string, unknown>;
+  status: "running" | "completed" | "failed" | "awaiting_confirmation";
+  result?: string;
+}
+
+export type ChatTimelineItem =
+  | { id: string; kind: "user"; text: string }
+  | { id: string; kind: "assistant"; text: string; expression?: string }
+  | { id: string; kind: "tool"; call: ToolCallStatus };
+
 export interface MemoryRecord {
   id: string;
   ts: string;

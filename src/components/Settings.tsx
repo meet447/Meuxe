@@ -244,12 +244,13 @@ function PrivacyCard({ title, items, tone }: { title: string; items: string[]; t
   );
 }
 
-export function Settings({ onClose, characterId, characterName, modelId, onPreviewExpression, onConversationCleared, onResetAll }: {
+export function Settings({ onClose, characterId, characterName, modelId, onPreviewExpression, onExpressionsSaved, onConversationCleared, onResetAll }: {
   onClose: () => void;
   characterId?: string;
   characterName: string;
   modelId?: string;
   onPreviewExpression?: (expr: string) => void;
+  onExpressionsSaved?: () => void;
   onConversationCleared?: () => void;
   onResetAll?: () => void;
 }) {
@@ -927,6 +928,7 @@ export function Settings({ onClose, characterId, characterName, modelId, onPrevi
           <ModelSettings
             modelId={modelId}
             onPreviewExpression={onPreviewExpression || (() => {})}
+            onSaved={onExpressionsSaved}
             onClose={() => setPage(null)}
           />
         ) : (
