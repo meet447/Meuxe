@@ -13,14 +13,8 @@ import {
 } from "../api/tauri";
 import { ComposioToolkitPicker } from "./ComposioToolkitPicker";
 import { DEFAULT_ENABLED_COMPOSIO_TOOLKITS } from "../lib/composioToolkits";
+import { LLM_PRESETS, llmPresetEntries } from "../lib/llmPresets";
 import type { ComposioToolkitStatus } from "../types";
-
-interface LLMPreset {
-  name: string;
-  base_url: string;
-  needs_key: boolean;
-  default_model: string;
-}
 
 interface TTSPreset {
   name: string;
@@ -52,16 +46,6 @@ interface FormData {
     model_id: string;
   };
 }
-
-// Hardcoded presets (replaces fetch("/api/config/presets"))
-const LLM_PRESETS: Record<string, LLMPreset> = {
-  openai: { name: "OpenAI", base_url: "https://api.openai.com/v1", needs_key: true, default_model: "gpt-4o" },
-  groq: { name: "Groq", base_url: "https://api.groq.com/openai/v1", needs_key: true, default_model: "llama-3.3-70b-versatile" },
-  openrouter: { name: "OpenRouter", base_url: "https://openrouter.ai/api/v1", needs_key: true, default_model: "openai/gpt-4o" },
-  ollama: { name: "Ollama", base_url: "http://localhost:11434/v1", needs_key: false, default_model: "llama3" },
-  nectara: { name: "Nectara", base_url: "https://api-nectara.chipling.xyz/v1", needs_key: true, default_model: "auto" },
-  custom: { name: "Custom", base_url: "", needs_key: true, default_model: "" },
-};
 
 const TTS_PRESETS: Record<string, TTSPreset> = {
   tiktok: { name: "TikTok", needs_key: false },
@@ -209,6 +193,7 @@ export function Onboarding({ onComplete }: { onComplete: () => void }) {
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   const llmPresets = LLM_PRESETS;
+  const llmPresetList = llmPresetEntries();
   const ttsPresets = TTS_PRESETS;
 
   const [form, setForm] = useState<FormData>({
@@ -501,8 +486,8 @@ export function Onboarding({ onComplete }: { onComplete: () => void }) {
                 <h2 className={headingClass}>Connect the brain</h2>
                 <p className={descriptionClass}>Choose the model that will drive your companion. Local endpoints keep inference on-device; remote providers receive the prompt context needed to reply.</p>
 
-                <div className="grid grid-cols-2 gap-3 mb-6">
-                  {Object.entries(llmPresets).map(([id, preset]) => (
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mb-6 max-h-[280px] overflow-y-auto pr-1 scrollbar-thin scrollbar-thumb-slate-200">
+                  {llmPresetList.map(([id, preset]) => (
                     <button
                       key={id}
                       onClick={() => selectLLMPreset(id)}

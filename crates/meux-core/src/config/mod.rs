@@ -25,6 +25,7 @@ pub struct TtsPreset {
     pub needs_key: bool,
 }
 
+// Keep in sync with src/lib/llmPresets.ts
 pub const LLM_PRESETS: &[(&str, LlmPreset)] = &[
     (
         "openai",
@@ -51,6 +52,110 @@ pub const LLM_PRESETS: &[(&str, LlmPreset)] = &[
         },
     ),
     (
+        "together",
+        LlmPreset {
+            base_url: "https://api.together.ai/v1",
+            needs_key: true,
+            default_model: "meta-llama/Llama-3.3-70B-Instruct-Turbo",
+        },
+    ),
+    (
+        "fireworks",
+        LlmPreset {
+            base_url: "https://api.fireworks.ai/inference/v1",
+            needs_key: true,
+            default_model: "accounts/fireworks/models/llama-v3p1-8b-instruct",
+        },
+    ),
+    (
+        "baseten",
+        LlmPreset {
+            base_url: "https://inference.baseten.co/v1",
+            needs_key: true,
+            default_model: "deepseek-ai/DeepSeek-V3",
+        },
+    ),
+    (
+        "mistral",
+        LlmPreset {
+            base_url: "https://api.mistral.ai/v1",
+            needs_key: true,
+            default_model: "mistral-small-latest",
+        },
+    ),
+    (
+        "deepseek",
+        LlmPreset {
+            base_url: "https://api.deepseek.com/v1",
+            needs_key: true,
+            default_model: "deepseek-chat",
+        },
+    ),
+    (
+        "xai",
+        LlmPreset {
+            base_url: "https://api.x.ai/v1",
+            needs_key: true,
+            default_model: "grok-3-mini",
+        },
+    ),
+    (
+        "cerebras",
+        LlmPreset {
+            base_url: "https://api.cerebras.ai/v1",
+            needs_key: true,
+            default_model: "llama3.1-8b",
+        },
+    ),
+    (
+        "deepinfra",
+        LlmPreset {
+            base_url: "https://api.deepinfra.com/v1/openai",
+            needs_key: true,
+            default_model: "meta-llama/Meta-Llama-3.1-70B-Instruct",
+        },
+    ),
+    (
+        "perplexity",
+        LlmPreset {
+            base_url: "https://api.perplexity.ai",
+            needs_key: true,
+            default_model: "sonar",
+        },
+    ),
+    (
+        "hyperbolic",
+        LlmPreset {
+            base_url: "https://api.hyperbolic.xyz/v1",
+            needs_key: true,
+            default_model: "meta-llama/Meta-Llama-3.1-70B-Instruct",
+        },
+    ),
+    (
+        "novita",
+        LlmPreset {
+            base_url: "https://api.novita.ai/openai",
+            needs_key: true,
+            default_model: "meta/llama-3.1-70b-instruct",
+        },
+    ),
+    (
+        "siliconflow",
+        LlmPreset {
+            base_url: "https://api.siliconflow.com/v1",
+            needs_key: true,
+            default_model: "deepseek-ai/DeepSeek-V3",
+        },
+    ),
+    (
+        "nectara",
+        LlmPreset {
+            base_url: "https://api-nectara.chipling.xyz/v1",
+            needs_key: true,
+            default_model: "auto",
+        },
+    ),
+    (
         "ollama",
         LlmPreset {
             base_url: "http://localhost:11434/v1",
@@ -59,11 +164,11 @@ pub const LLM_PRESETS: &[(&str, LlmPreset)] = &[
         },
     ),
     (
-        "nectara",
+        "lmstudio",
         LlmPreset {
-            base_url: "https://api-nectara.chipling.xyz/v1",
-            needs_key: true,
-            default_model: "openai/gpt-oss-20b",
+            base_url: "http://localhost:1234/v1",
+            needs_key: false,
+            default_model: "local-model",
         },
     ),
     (

@@ -15,18 +15,12 @@ import {
 } from "../api/tauri";
 import { ComposioToolkitPicker } from "./ComposioToolkitPicker";
 import { DEFAULT_ENABLED_COMPOSIO_TOOLKITS } from "../lib/composioToolkits";
+import { LLM_PRESETS, llmPresetEntries } from "../lib/llmPresets";
 import type { ComposioToolkitStatus } from "../types";
 
 interface Voice {
   id: string;
   name: string;
-}
-
-interface LLMPreset {
-  name: string;
-  base_url: string;
-  needs_key: boolean;
-  default_model: string;
 }
 
 interface TTSPreset {
@@ -36,16 +30,7 @@ interface TTSPreset {
 
 type SettingsPage = null | "profile" | "llm" | "tts" | "search" | "integrations" | "privacy" | "tools" | "expressions" | "memory";
 
-// Hardcoded presets — the web app fetches these from /api/config/presets,
-// but the Rust backend exposes them as constants. Kept in sync manually.
-const LLM_PRESETS: Record<string, LLMPreset> = {
-  openai: { name: "OpenAI", base_url: "https://api.openai.com/v1", needs_key: true, default_model: "gpt-4o" },
-  anthropic: { name: "Anthropic", base_url: "https://api.anthropic.com/v1", needs_key: true, default_model: "claude-sonnet-4-20250514" },
-  groq: { name: "Groq", base_url: "https://api.groq.com/openai/v1", needs_key: true, default_model: "llama-3.3-70b-versatile" },
-  ollama: { name: "Ollama (Local)", base_url: "http://localhost:11434/v1", needs_key: false, default_model: "llama3.2" },
-  lmstudio: { name: "LM Studio", base_url: "http://localhost:1234/v1", needs_key: false, default_model: "local-model" },
-  custom: { name: "Custom", base_url: "", needs_key: true, default_model: "" },
-};
+const LLM_PRESET_LIST = llmPresetEntries();
 
 const TTS_PRESETS: Record<string, TTSPreset> = {
   tiktok: { name: "TikTok TTS", needs_key: false },
@@ -636,8 +621,8 @@ export function Settings({ onClose, characterId, characterName, modelId, onPrevi
         <LocalFirstNotice variant={LLM_PRESETS[llmProvider]?.needs_key === false ? "emerald" : "blue"} />
 
         <label className={labelClass}>Provider</label>
-        <div className="grid grid-cols-2 gap-2 mb-6">
-          {Object.entries(LLM_PRESETS).map(([id, preset]) => (
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mb-6 max-h-[280px] overflow-y-auto pr-1 scrollbar-thin scrollbar-thumb-slate-200">
+          {LLM_PRESET_LIST.map(([id, preset]) => (
             <button
               key={id}
               onClick={() => selectPreset(id)}
