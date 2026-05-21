@@ -531,13 +531,21 @@ async fn run_chat_stream(
     state
         .tool_registry
         .update_search_config(config.search.clone());
-    state.tool_registry.update_composio_state(
-        meux_core::composio::ComposioToolState {
-            api_key: config.composio.api_key.clone(),
-            user_id: user_id.clone(),
-            connections: config.composio.connections.clone(),
-        },
-    );
+    let enabled_toolkits = if config.composio.enabled_toolkits.is_empty() {
+        meux_core::composio_toolkits::default_enabled_toolkits()
+    } else {
+        config.composio.enabled_toolkits.clone()
+    };
+    state.tool_registry.update_composio_state(meux_core::composio::ComposioToolState {
+        api_key: config.composio.api_key.clone(),
+        user_id: user_id.clone(),
+        connections: config.composio.connections.clone(),
+        enabled_toolkits,
+        catalog: std::collections::HashMap::new(),
+    });
+    if let Err(err) = state.tool_registry.refresh_composio_catalog().await {
+        eprintln!("[composio] failed to load tool catalog: {err}");
+    }
     let tools_json = state
         .tool_registry
         .openai_tools_json_filtered(&config.disabled_tools);

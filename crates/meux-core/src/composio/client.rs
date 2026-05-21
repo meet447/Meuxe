@@ -136,6 +136,22 @@ impl ComposioClient {
         Ok((connected_account_id, redirect_url, status))
     }
 
+    pub async fn list_tools_for_toolkit(&self, toolkit_slug: &str, limit: usize) -> Result<Vec<Value>> {
+        let capped = limit.clamp(1, 100);
+        let response = self
+            .request_json(
+                self.http
+                    .get(format!("{COMPOSIO_BASE_URL}/api/v3/tools"))
+                    .query(&[
+                        ("toolkit_slug", toolkit_slug),
+                        ("limit", &capped.to_string()),
+                        ("include_deprecated", "false"),
+                    ]),
+            )
+            .await?;
+        Ok(items(&response))
+    }
+
     pub async fn execute_tool(
         &self,
         tool_slug: &str,
@@ -393,6 +409,90 @@ pub fn gmail_messages_to_markdown(data: &Value) -> String {
         }
         if !snippet.is_empty() {
             lines.push(String::new());
+            lines.push(snippet.to_string());
+        }
+        lines.push(String::new());
+    }
+    lines.join("\n")
+}
+
+pub fn gmail_message_to_markdown(data: &Value) -> String {
+    let message = data
+        .get("message")
+        .or_else(|| data.get("data"))
+        .unwrap_or(data);
+
+    let subject = message
+        .get("subject")
+        .or_else(|| {
+            message
+                .get("payload")
+                .and_then(|payload| payload.get("subject"))
+        })
+        .and_then(Value::as_str)
+        .unwrap_or("(no subject)");
+    let sender = message
+        .get("sender")
+        .or_else(|| message.get("from"))
+        .or_else(|| {
+            message
+                .get("payload")
+                .and_then(|payload| payload.get("from"))
+        })
+        .and_then(Value::as_str)
+        .unwrap_or("unknown sender");
+    let snippet = message
+        .get("snippet")
+        .or_else(|| message.get("preview"))
+        .or_else(|| message.get("messageText"))
+        .or_else(|| message.get("body"))
+        .and_then(Value::as_str)
+        .unwrap_or("");
+    let received = message
+        .get("messageTimestamp")
+        .or_else(|| message.get("internalDate"))
+        .or_else(|| message.get("date"))
+        .and_then(Value::as_str)
+        .unwrap_or("");
+
+    let mut lines = vec![format!("# {subject}"), format!("- From: {sender}")];
+    if !received.is_empty() {
+        lines.push(format!("- Received: {received}"));
+    }
+    if !snippet.is_empty() {
+        lines.push(String::new());
+        lines.push(snippet.to_string());
+    }
+    lines.join("\n")
+}
+
+pub fn gmail_threads_to_markdown(data: &Value) -> String {
+    let threads = data
+        .get("threads")
+        .and_then(Value::as_array)
+        .cloned()
+        .or_else(|| {
+            data.get("data")
+                .and_then(|inner| inner.get("threads"))
+                .and_then(Value::as_array)
+                .cloned()
+        })
+        .unwrap_or_default();
+
+    if threads.is_empty() {
+        return "No Gmail threads matched the query.".to_string();
+    }
+
+    let mut lines = vec!["# Gmail threads".to_string(), String::new()];
+    for (index, thread) in threads.iter().take(25).enumerate() {
+        let id = thread
+            .get("id")
+            .or_else(|| thread.get("threadId"))
+            .and_then(Value::as_str)
+            .unwrap_or("(unknown id)");
+        let snippet = thread.get("snippet").and_then(Value::as_str).unwrap_or("");
+        lines.push(format!("## {index}. Thread {id}"));
+        if !snippet.is_empty() {
             lines.push(snippet.to_string());
         }
         lines.push(String::new());
