@@ -13,6 +13,7 @@ pub const GMAIL_FETCH_TOOL: &str = "GMAIL_FETCH_EMAILS";
 
 pub struct ComposioClient {
     http: Client,
+    #[allow(dead_code)]
     api_key: String,
 }
 
