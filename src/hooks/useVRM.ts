@@ -405,11 +405,17 @@ export function useVRM(canvasRef: React.RefObject<HTMLCanvasElement | null>) {
             })
           );
 
+        clockRef.current = new THREE.Clock();
+
+        availableExpressionsRef.current = Object.keys(vrm.expressionManager?.expressionMap || {});
+        availableMotionGroupsRef.current = [...clipsRef.current.keys()];
+
+        if (clipsRef.current.size > 0) {
           // Play idle animation if available
           const idleNames = ["idle", "breathingidle", "breathing_idle", "standing", "default"];
           let matchFound = false;
           for (const name of idleNames) {
-            for (const k of clipsRef.current.keys()) {
+            for (const k of availableMotionGroupsRef.current) {
               if (k.toLowerCase().includes(name)) {
                 playAnimation(k);
                 matchFound = true;
@@ -419,15 +425,10 @@ export function useVRM(canvasRef: React.RefObject<HTMLCanvasElement | null>) {
             if (matchFound) break;
           }
           // If no idle found, play the first animation
-          if (!currentActionRef.current && clipsRef.current.size > 0) {
-            playAnimation(clipsRef.current.keys().next().value!);
+          if (!currentActionRef.current) {
+            playAnimation(availableMotionGroupsRef.current[0]);
           }
         }
-
-        clockRef.current = new THREE.Clock();
-
-        availableExpressionsRef.current = Object.keys(vrm.expressionManager?.expressionMap || {});
-        availableMotionGroupsRef.current = [...clipsRef.current.keys()];
 
         console.log("[VRM] Model loaded:", modelPath);
         console.log("[VRM] Expressions:", availableExpressionsRef.current);
@@ -470,7 +471,7 @@ export function useVRM(canvasRef: React.RefObject<HTMLCanvasElement | null>) {
     }
 
     // Try to play matching animation if available
-    for (const k of clipsRef.current.keys()) {
+    for (const k of availableMotionGroupsRef.current) {
       if (k.toLowerCase().includes(expressionName.toLowerCase())) {
         playAnimation(k);
         break;
@@ -487,7 +488,7 @@ export function useVRM(canvasRef: React.RefObject<HTMLCanvasElement | null>) {
     if (getAudioLevels) audioLevelsGetterRef.current = getAudioLevels;
 
     // Play talking animation if available
-    for (const k of clipsRef.current.keys()) {
+    for (const k of availableMotionGroupsRef.current) {
       if (k.toLowerCase().includes("talk")) {
         playAnimation(k);
         break;
@@ -505,7 +506,7 @@ export function useVRM(canvasRef: React.RefObject<HTMLCanvasElement | null>) {
     const idleNames = ["idle", "breathingidle", "breathing_idle", "standing", "default"];
     let matchFound = false;
     for (const name of idleNames) {
-      for (const k of clipsRef.current.keys()) {
+      for (const k of availableMotionGroupsRef.current) {
         if (k.toLowerCase().includes(name)) {
           playAnimation(k);
           matchFound = true;
