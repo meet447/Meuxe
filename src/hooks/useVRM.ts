@@ -404,6 +404,7 @@ export function useVRM(canvasRef: React.RefObject<HTMLCanvasElement | null>) {
               }
             })
           );
+        }
 
         clockRef.current = new THREE.Clock();
 
