@@ -536,13 +536,15 @@ async fn run_chat_stream(
     } else {
         config.composio.enabled_toolkits.clone()
     };
-    state.tool_registry.update_composio_state(meux_core::composio::ComposioToolState {
-        api_key: config.composio.api_key.clone(),
-        user_id: user_id.clone(),
-        connections: config.composio.connections.clone(),
-        enabled_toolkits,
-        catalog: std::collections::HashMap::new(),
-    });
+    state
+        .tool_registry
+        .update_composio_state(meux_core::composio::ComposioToolState {
+            api_key: config.composio.api_key.clone(),
+            user_id: user_id.clone(),
+            connections: config.composio.connections.clone(),
+            enabled_toolkits,
+            catalog: std::collections::HashMap::new(),
+        });
     if let Err(err) = state.tool_registry.refresh_composio_catalog().await {
         eprintln!("[composio] failed to load tool catalog: {err}");
     }

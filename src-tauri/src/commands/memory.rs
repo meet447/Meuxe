@@ -7,7 +7,6 @@ use meux_core::composio::{
 };
 use meux_core::composio_toolkits::{default_enabled_toolkits, toolkit_display_name};
 use meux_core::config::types::ComposioConnectionConfig;
-use serde_json::Value;
 use std::sync::Arc;
 use tauri::{AppHandle, Emitter, State};
 
@@ -438,7 +437,10 @@ pub async fn composio_authorize_toolkit(
     let user_id = get_user_id(&state);
     let api_key = composio_api_key(&state)?;
     let client = ComposioClient::new(api_key);
-    let auth_config_id = client.find_or_create_auth_config(&toolkit).await.map_err(|e| e.to_string())?;
+    let auth_config_id = client
+        .find_or_create_auth_config(&toolkit)
+        .await
+        .map_err(|e| e.to_string())?;
     let (connected_account_id, redirect_url, link_status) = client
         .link_toolkit(&user_id, &auth_config_id)
         .await
@@ -557,8 +559,9 @@ pub async fn composio_sync_github_readme(
         )
         .await
     {
-        Ok(tool_response) => extract_github_readme_markdown(&tool_response, None)
-            .map_err(|e| e.to_string())?,
+        Ok(tool_response) => {
+            extract_github_readme_markdown(&tool_response, None).map_err(|e| e.to_string())?
+        }
         Err(_) => {
             let proxy_response = client
                 .proxy_request(

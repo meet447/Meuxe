@@ -6,8 +6,8 @@ use crate::error::{MeuxError, Result};
 use crate::tools::{PermissionLevel, ToolDefinition, ToolResult};
 
 use super::client::{
-    gmail_message_to_markdown, gmail_messages_to_markdown, gmail_threads_to_markdown,
-    tool_payload, value_string, ComposioClient,
+    gmail_message_to_markdown, gmail_messages_to_markdown, gmail_threads_to_markdown, tool_payload,
+    value_string, ComposioClient,
 };
 use super::tools::ComposioToolState;
 
@@ -68,15 +68,7 @@ pub fn permission_for_slug(slug: &str) -> PermissionLevel {
         "PERMANENTLY",
     ];
     const CAUTIOUS: &[&str] = &[
-        "CREATE",
-        "ADD_",
-        "UPDATE",
-        "PATCH",
-        "MODIFY",
-        "WRITE",
-        "SAVE",
-        "UPLOAD",
-        "INSERT",
+        "CREATE", "ADD_", "UPDATE", "PATCH", "MODIFY", "WRITE", "SAVE", "UPLOAD", "INSERT",
     ];
     if DANGEROUS.iter().any(|needle| upper.contains(needle)) {
         PermissionLevel::Dangerous
@@ -146,10 +138,14 @@ fn parse_tool_item(item: &Value, toolkit: &str) -> Option<ComposioCatalogEntry> 
     })
 }
 
-pub async fn build_catalog(state: &ComposioToolState) -> Result<HashMap<String, ComposioCatalogEntry>> {
-    let api_key = state.api_key.as_ref().filter(|k| !k.trim().is_empty()).ok_or_else(|| {
-        MeuxError::Tool("Composio API key is not configured.".to_string())
-    })?;
+pub async fn build_catalog(
+    state: &ComposioToolState,
+) -> Result<HashMap<String, ComposioCatalogEntry>> {
+    let api_key = state
+        .api_key
+        .as_ref()
+        .filter(|k| !k.trim().is_empty())
+        .ok_or_else(|| MeuxError::Tool("Composio API key is not configured.".to_string()))?;
     let client = ComposioClient::new(api_key.clone());
 
     let mut catalog = HashMap::new();
