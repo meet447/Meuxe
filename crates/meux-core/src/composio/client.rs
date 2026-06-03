@@ -13,6 +13,7 @@ pub const GMAIL_FETCH_TOOL: &str = "GMAIL_FETCH_EMAILS";
 
 pub struct ComposioClient {
     http: Client,
+    #[allow(dead_code)]
     api_key: String,
 }
 
@@ -132,11 +133,16 @@ impl ComposioClient {
             })?;
         let redirect_url = value_string(&response, &["redirect_url", "redirectUrl"])
             .ok_or_else(|| MeuxError::Llm("Composio did not return a redirect URL".to_string()))?;
-        let status = value_string(&response, &["status"]).unwrap_or_else(|| "initiated".to_string());
+        let status =
+            value_string(&response, &["status"]).unwrap_or_else(|| "initiated".to_string());
         Ok((connected_account_id, redirect_url, status))
     }
 
-    pub async fn list_tools_for_toolkit(&self, toolkit_slug: &str, limit: usize) -> Result<Vec<Value>> {
+    pub async fn list_tools_for_toolkit(
+        &self,
+        toolkit_slug: &str,
+        limit: usize,
+    ) -> Result<Vec<Value>> {
         let capped = limit.clamp(1, 100);
         let response = self
             .request_json(
@@ -200,7 +206,9 @@ impl ComposioClient {
             )
             .await?;
         if let Some(error) = tool_error(&response) {
-            return Err(MeuxError::Llm(format!("Composio proxy request failed: {error}")));
+            return Err(MeuxError::Llm(format!(
+                "Composio proxy request failed: {error}"
+            )));
         }
         Ok(response)
     }
@@ -314,9 +322,9 @@ pub fn extract_proxy_text(value: &Value) -> Result<String> {
             .and_then(Value::as_str)
             .is_some_and(|encoding| encoding.eq_ignore_ascii_case("base64"))
         {
-            let decoded = BASE64
-                .decode(content)
-                .map_err(|e| MeuxError::Tool(format!("Failed to decode base64 proxy content: {e}")))?;
+            let decoded = BASE64.decode(content).map_err(|e| {
+                MeuxError::Tool(format!("Failed to decode base64 proxy content: {e}"))
+            })?;
             return String::from_utf8(decoded)
                 .map_err(|e| MeuxError::Tool(format!("Proxy content was not valid UTF-8: {e}")));
         }
