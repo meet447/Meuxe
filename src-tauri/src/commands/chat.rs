@@ -704,9 +704,7 @@ async fn run_chat_stream(
                         name,
                         arguments,
                     } => {
-                        println!(
-                            "[agent] tool call received: {name} id={id} args={arguments}"
-                        );
+                        println!("[agent] tool call received: {name} id={id} args={arguments}");
                         tool_calls.push((id, name, arguments));
                     }
 
@@ -781,9 +779,7 @@ async fn run_chat_stream(
 
         // If no tool calls, we're done
         if finish_reason != "tool_calls" || tool_calls.is_empty() {
-            println!(
-                "[agent] no tool calls, exiting loop after iteration {iteration}"
-            );
+            println!("[agent] no tool calls, exiting loop after iteration {iteration}");
             break;
         }
 
