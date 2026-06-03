@@ -17,3 +17,7 @@
 ## 2024-05-18 - String Concatenation Overhead for Large Binary Arrays
 **Learning:** Appending characters one by one via `binary += String.fromCharCode(bytes[i])` for large TypedArrays (like audio PCM data) causes severe O(N^2) memory reallocation overhead because strings are immutable in JavaScript. For a 60-second audio clip, this can block the main thread for over 1.5 seconds.
 **Action:** Use a chunked approach with `String.fromCharCode.apply(null, chunk)` and a chunk size around `0x8000` to avoid Maximum Call Stack errors while significantly reducing string reallocation (e.g., dropping encoding time from 1.5s to 160ms).
+
+## 2026-10-30 - Defeated React.memo via Object Recreation in Maps
+**Learning:** When rendering list items, mapping a timeline object to a new object on every render (e.g. `const msg = timelineItemToMessage(item)`) and passing it as a prop defeats `React.memo`'s shallow comparison, causing components to re-render constantly (e.g. during rapid text streaming).
+**Action:** Always pass primitive values extracted from the generated object, or pass the original stable item directly to memoized child components to ensure `React.memo` behaves efficiently and prevents O(N) re-renders.
