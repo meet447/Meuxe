@@ -109,14 +109,21 @@ const MarkdownContent = memo(({ content }: { content: string }) => (
   </ReactMarkdown>
 ));
 
+// ⚡ Bolt: Destructuring props to primitives ensures React.memo's shallow comparison
+// works properly. Previously, passing a newly created `msg` object on every render
+// defeated memoization, causing O(N) re-renders of the chat history on every token.
 const MessageBubble = memo(function MessageBubble({
-  msg,
+  role,
+  text,
+  expression,
   characterName,
 }: {
-  msg: ChatMessage;
+  role: "user" | "assistant";
+  text: string;
+  expression?: string;
   characterName: string;
 }) {
-  const isUser = msg.role === "user";
+  const isUser = role === "user";
 
   return (
     <div className={`flex flex-col ${isUser ? "items-end" : "items-start"} animate-in fade-in slide-in-from-bottom-1 duration-200`}>
@@ -137,18 +144,18 @@ const MessageBubble = memo(function MessageBubble({
             <span className="text-[11px] text-blue-500 font-semibold tracking-wide uppercase">
               {characterName}
             </span>
-            {msg.expression && msg.expression !== "neutral" && (
+            {expression && expression !== "neutral" && (
               <span className="text-[10px] text-slate-400 font-normal capitalize bg-slate-50 px-2 py-0.5 rounded-full">
-                {msg.expression}
+                {expression}
               </span>
             )}
           </div>
         )}
         <div className={`text-[14px] leading-relaxed break-words ${isUser ? "text-white/95" : "text-slate-700"}`}>
           {isUser ? (
-            <p>{msg.text}</p>
+            <p>{text}</p>
           ) : (
-            <MarkdownContent content={msg.text} />
+            <MarkdownContent content={text} />
           )}
         </div>
       </div>
@@ -307,7 +314,15 @@ export function ChatPanel({
 
           const msg = timelineItemToMessage(item);
           if (!msg) return null;
-          return <MessageBubble key={item.id} msg={msg} characterName={characterName} />;
+          return (
+            <MessageBubble
+              key={item.id}
+              role={msg.role}
+              text={msg.text}
+              expression={msg.expression}
+              characterName={characterName}
+            />
+          );
         })}
 
         {/* Streaming text — always the latest assistant turn */}

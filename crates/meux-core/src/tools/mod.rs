@@ -101,11 +101,7 @@ impl ToolRegistry {
 
     /// Get all tool definitions.
     pub fn definitions(&self) -> Vec<ToolDefinition> {
-        let mut defs: Vec<ToolDefinition> = self
-            .tools
-            .values()
-            .map(|t| t.definition())
-            .collect();
+        let mut defs: Vec<ToolDefinition> = self.tools.values().map(|t| t.definition()).collect();
         for entry in self.composio_catalog_entries() {
             defs.push(entry.to_definition());
         }
@@ -116,11 +112,7 @@ impl ToolRegistry {
     /// Format tool definitions as the OpenAI `tools` array for the API request.
     /// Excludes tools listed in `disabled`.
     pub fn openai_tools_json_filtered(&self, disabled: &[String]) -> Vec<serde_json::Value> {
-        let composio = self
-            .composio_state
-            .read()
-            .ok()
-            .map(|state| state.clone());
+        let composio = self.composio_state.read().ok().map(|state| state.clone());
         self.openai_tools_json_filtered_with_composio(disabled, composio.as_ref())
     }
 
@@ -150,7 +142,11 @@ impl ToolRegistry {
             .collect();
 
         if let Some(state) = composio {
-            if state.api_key.as_ref().is_some_and(|key| !key.trim().is_empty()) {
+            if state
+                .api_key
+                .as_ref()
+                .is_some_and(|key| !key.trim().is_empty())
+            {
                 let mut composio_tools: Vec<_> = state.catalog.values().collect();
                 composio_tools.sort_by(|a, b| a.llm_name.cmp(&b.llm_name));
                 for entry in composio_tools {

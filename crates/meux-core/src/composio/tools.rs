@@ -4,8 +4,8 @@ use std::sync::{Arc, RwLock};
 use crate::composio_toolkits::default_enabled_toolkits;
 use crate::error::{MeuxError, Result};
 
-use super::client::{is_composio_connected, ComposioClient};
 use super::catalog::{build_catalog, ComposioCatalogEntry};
+use super::client::{is_composio_connected, ComposioClient};
 use crate::config::types::ComposioConnectionConfig;
 
 #[derive(Clone, Default)]
@@ -50,8 +50,14 @@ impl ComposioToolState {
     }
 }
 
-pub async fn refresh_catalog_for(state: &ComposioToolState) -> Result<HashMap<String, ComposioCatalogEntry>> {
-    if state.api_key.as_ref().is_none_or(|key| key.trim().is_empty()) {
+pub async fn refresh_catalog_for(
+    state: &ComposioToolState,
+) -> Result<HashMap<String, ComposioCatalogEntry>> {
+    if state
+        .api_key
+        .as_ref()
+        .is_none_or(|key| key.trim().is_empty())
+    {
         return Ok(HashMap::new());
     }
     let mut fetch_state = state.clone();
@@ -61,7 +67,11 @@ pub async fn refresh_catalog_for(state: &ComposioToolState) -> Result<HashMap<St
 }
 
 pub fn composio_tool_available(name: &str, state: &ComposioToolState) -> bool {
-    if state.api_key.as_ref().is_none_or(|key| key.trim().is_empty()) {
+    if state
+        .api_key
+        .as_ref()
+        .is_none_or(|key| key.trim().is_empty())
+    {
         return false;
     }
     state.catalog.contains_key(name)

@@ -243,7 +243,10 @@ impl OpenAiCompatClient {
     /// List models from an OpenAI-compatible `GET /v1/models` endpoint.
     pub async fn list_models(&self, base_url: &str, api_key: &str) -> Result<Vec<String>> {
         let url = format!("{}/models", base_url.trim_end_matches('/'));
-        let mut request = self.client.get(&url).header("Content-Type", "application/json");
+        let mut request = self
+            .client
+            .get(&url)
+            .header("Content-Type", "application/json");
         if !api_key.is_empty() {
             request = request.header("Authorization", format!("Bearer {api_key}"));
         }

@@ -1,6 +1,6 @@
 use crate::AppState;
-use meux_core::config::types::AppConfig;
 use meux_core::config::resolve_llm_api_key;
+use meux_core::config::types::AppConfig;
 use meux_core::llm::types::{ChatMessage, LlmStreamConfig};
 use meux_core::reset;
 use std::sync::Arc;
@@ -27,10 +27,7 @@ pub fn config_reset_all(state: State<Arc<AppState>>) -> Result<(), String> {
 
     reset::reset_app_data(&state.data_dir).map_err(|e| e.to_string())?;
     state.characters.clear_cache();
-    state
-        .config
-        .reset_to_default()
-        .map_err(|e| e.to_string())
+    state.config.reset_to_default().map_err(|e| e.to_string())
 }
 
 fn provider_fields(provider: &serde_json::Value) -> (String, String, Option<String>) {

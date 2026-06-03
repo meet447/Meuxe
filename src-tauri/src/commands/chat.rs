@@ -317,7 +317,7 @@ fn spawn_tts_for_sentence(
                 let _ = app_tts.emit("chat:audio", AudioEvent { index, data: b64 });
             }
             Err(e) => {
-                eprintln!("TTS error for sentence {}: {}", index, e);
+                eprintln!("TTS error for sentence {index}: {e}");
             }
         }
     });
@@ -536,13 +536,15 @@ async fn run_chat_stream(
     } else {
         config.composio.enabled_toolkits.clone()
     };
-    state.tool_registry.update_composio_state(meux_core::composio::ComposioToolState {
-        api_key: config.composio.api_key.clone(),
-        user_id: user_id.clone(),
-        connections: config.composio.connections.clone(),
-        enabled_toolkits,
-        catalog: std::collections::HashMap::new(),
-    });
+    state
+        .tool_registry
+        .update_composio_state(meux_core::composio::ComposioToolState {
+            api_key: config.composio.api_key.clone(),
+            user_id: user_id.clone(),
+            connections: config.composio.connections.clone(),
+            enabled_toolkits,
+            catalog: std::collections::HashMap::new(),
+        });
     if let Err(err) = state.tool_registry.refresh_composio_catalog().await {
         eprintln!("[composio] failed to load tool catalog: {err}");
     }
@@ -567,7 +569,7 @@ async fn run_chat_stream(
 
     for iteration in 0..MAX_AGENT_ITERATIONS {
         if cancel.is_cancelled() {
-            println!("[agent] cancelled before iteration {}", iteration);
+            println!("[agent] cancelled before iteration {iteration}");
             return Ok(());
         }
 
@@ -631,7 +633,7 @@ async fn run_chat_stream(
                     Err(e) => {
                         let err_str = e.to_string();
                         if meux_core::retry::is_retryable_llm_error(&e) && stream_attempt < 5 {
-                            eprintln!("[agent] stream error (retryable): {}", err_str);
+                            eprintln!("[agent] stream error (retryable): {err_str}");
                             stream_error = true;
                             break;
                         }
@@ -702,10 +704,7 @@ async fn run_chat_stream(
                         name,
                         arguments,
                     } => {
-                        println!(
-                            "[agent] tool call received: {} id={} args={}",
-                            name, id, arguments
-                        );
+                        println!("[agent] tool call received: {name} id={id} args={arguments}");
                         tool_calls.push((id, name, arguments));
                     }
 
@@ -780,10 +779,7 @@ async fn run_chat_stream(
 
         // If no tool calls, we're done
         if finish_reason != "tool_calls" || tool_calls.is_empty() {
-            println!(
-                "[agent] no tool calls, exiting loop after iteration {}",
-                iteration
-            );
+            println!("[agent] no tool calls, exiting loop after iteration {iteration}");
             break;
         }
 
@@ -845,8 +841,7 @@ async fn run_chat_stream(
                         {
                             Ok(result) => result,
                             Err(_) => Err(meux_core::MeuxError::Tool(format!(
-                                "{} timed out after 60s",
-                                tool_name
+                                "{tool_name} timed out after 60s"
                             ))),
                         }
                     }
@@ -860,7 +855,7 @@ async fn run_chat_stream(
                 let (tc_id, tc_name, args) = &safe_calls[i];
                 let (content, success) = match result {
                     Ok(tool_result) => (tool_result.content, tool_result.success),
-                    Err(e) => (format!("Tool error: {}", e), false),
+                    Err(e) => (format!("Tool error: {e}"), false),
                 };
 
                 let _ = app.emit(
@@ -895,7 +890,7 @@ async fn run_chat_stream(
                     request_id: tc_id.clone(),
                     tool_name: tc_name.clone(),
                     arguments: args.clone(),
-                    description: format!("Allow {} to execute?", tc_name),
+                    description: format!("Allow {tc_name} to execute?"),
                 },
             );
 
@@ -949,8 +944,8 @@ async fn run_chat_stream(
             .await;
             let (content, success) = match result {
                 Ok(Ok(tool_result)) => (tool_result.content, tool_result.success),
-                Ok(Err(e)) => (format!("Tool error: {}", e), false),
-                Err(_) => (format!("Tool {} timed out after 60s", tc_name), false),
+                Ok(Err(e)) => (format!("Tool error: {e}"), false),
+                Err(_) => (format!("Tool {tc_name} timed out after 60s"), false),
             };
 
             let _ = app.emit(
