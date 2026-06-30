@@ -37,6 +37,7 @@ export function useVRM(canvasRef: React.RefObject<HTMLCanvasElement | null>) {
   // Debug cache
   const availableExpressionsRef = useRef<string[]>([]);
   const availableMotionGroupsRef = useRef<string[]>([]);
+  const lastErrorRef = useRef("");
 
   // Blinking
   const lastBlinkTimeRef = useRef(Date.now());
@@ -304,6 +305,7 @@ export function useVRM(canvasRef: React.RefObject<HTMLCanvasElement | null>) {
         animFrameRef.current = 0;
       }
 
+      lastErrorRef.current = "";
       // Clean up previous
       if (vrmRef.current) {
         vrmRef.current.scene.removeFromParent();
@@ -435,6 +437,7 @@ export function useVRM(canvasRef: React.RefObject<HTMLCanvasElement | null>) {
 
         startAnimationLoop();
       } catch (err) {
+        lastErrorRef.current = err instanceof Error ? err.message : String(err);
         console.error("[VRM] Failed to load model:", err);
       }
     },
@@ -552,7 +555,7 @@ export function useVRM(canvasRef: React.RefObject<HTMLCanvasElement | null>) {
     mappingEmotions: [],
     availableExpressions: availableExpressionsRef.current,
     availableMotionGroups: availableMotionGroupsRef.current,
-    lastError: "",
+    lastError: lastErrorRef.current,
   }), []);
 
   return {

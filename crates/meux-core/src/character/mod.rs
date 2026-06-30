@@ -366,7 +366,7 @@ fn load_from_directory(id: &str, dir: &Path) -> Result<Character> {
     let yaml: CharacterYaml = serde_yaml::from_str(&raw)?;
 
     let name = yaml.name.unwrap_or_else(|| id.to_string());
-    let live2d_model = yaml.live2d_model.unwrap_or_default();
+    let live2d_model = yaml.live2d_model.or(yaml.vrm_model).unwrap_or_default();
     let voice = yaml.voice.unwrap_or_default();
     let default_emotion = yaml
         .default_emotion
@@ -411,7 +411,7 @@ fn load_from_markdown(id: &str, path: &Path) -> Result<Character> {
     let yaml: CharacterYaml = serde_yaml::from_str(&frontmatter)?;
 
     let name = yaml.name.unwrap_or_else(|| id.to_string());
-    let live2d_model = yaml.live2d_model.unwrap_or_default();
+    let live2d_model = yaml.live2d_model.or(yaml.vrm_model).unwrap_or_default();
     let voice = yaml.voice.unwrap_or_default();
     let default_emotion = yaml
         .default_emotion
@@ -530,30 +530,55 @@ fn build_prompt_sections_body(name: &str, sections: &PromptSections) -> String {
 /// List available Live2D and VRM models on disk.
 pub fn list_models(data_dir: &Path) -> Result<Vec<ModelInfo>> {
     let mut models = Vec::new();
-    let models_dir = data_dir.join("models");
+    let mut seen = std::collections::HashSet::new();
 
-    // Scan live2d models
+    let mut scan_roots = vec![data_dir.join("models")];
+    for fallback in [PathBuf::from("models"), PathBuf::from("../models")] {
+        if fallback.exists() {
+            scan_roots.push(fallback);
+        }
+    }
+
+    for models_dir in scan_roots {
+        scan_models_dir(&models_dir, &mut models, &mut seen);
+    }
+
+    models.sort_by(|a, b| a.id.cmp(&b.id));
+    Ok(models)
+}
+
+fn scan_models_dir(
+    models_dir: &Path,
+    models: &mut Vec<ModelInfo>,
+    seen: &mut std::collections::HashSet<(String, String)>,
+) {
     let live2d_dir = models_dir.join("live2d");
     if live2d_dir.exists() {
         if let Ok(entries) = fs::read_dir(&live2d_dir) {
             for entry in entries.flatten() {
                 let path = entry.path();
-                if path.is_dir() {
-                    let id = path.file_name().unwrap().to_string_lossy().to_string();
-                    let model_file =
-                        find_model3_json(&path).unwrap_or_else(|| format!("{id}.model3.json"));
-                    models.push(ModelInfo {
-                        id: id.clone(),
-                        model_type: "live2d".to_string(),
-                        model_file: model_file.clone(),
-                        path: format!("models/live2d/{id}/{model_file}"),
-                    });
+                if !path.is_dir() {
+                    continue;
                 }
+                let id = path.file_name().unwrap().to_string_lossy().to_string();
+                let key = (id.clone(), "live2d".to_string());
+                if seen.contains(&key) {
+                    continue;
+                }
+                let Some(model_file) = find_model3_json(&path) else {
+                    continue;
+                };
+                seen.insert(key);
+                models.push(ModelInfo {
+                    id: id.clone(),
+                    model_type: "live2d".to_string(),
+                    model_file: model_file.clone(),
+                    path: format!("models/live2d/{id}/{model_file}"),
+                });
             }
         }
     }
 
-    // Scan vrm models
     let vrm_dir = models_dir.join("vrm");
     if vrm_dir.exists() {
         if let Ok(entries) = fs::read_dir(&vrm_dir) {
@@ -561,15 +586,28 @@ pub fn list_models(data_dir: &Path) -> Result<Vec<ModelInfo>> {
                 let path = entry.path();
                 if path.is_dir() {
                     let id = path.file_name().unwrap().to_string_lossy().to_string();
+                    let key = (id.clone(), "vrm".to_string());
+                    if seen.contains(&key) {
+                        continue;
+                    }
+                    let Some(model_file) = find_vrm_file(&path) else {
+                        continue;
+                    };
+                    seen.insert(key);
                     models.push(ModelInfo {
                         id: id.clone(),
                         model_type: "vrm".to_string(),
-                        model_file: "model.vrm".to_string(),
-                        path: format!("models/vrm/{id}/model.vrm"),
+                        model_file: model_file.clone(),
+                        path: format!("models/vrm/{id}/{model_file}"),
                     });
-                } else if path.extension().is_some_and(|e| e == "vrm") {
+                } else if is_vrm_extension(path.extension()) {
                     let id = path.file_stem().unwrap().to_string_lossy().to_string();
                     let fname = path.file_name().unwrap().to_string_lossy().to_string();
+                    let key = (id.clone(), "vrm".to_string());
+                    if seen.contains(&key) {
+                        continue;
+                    }
+                    seen.insert(key);
                     models.push(ModelInfo {
                         id: id.clone(),
                         model_type: "vrm".to_string(),
@@ -580,9 +618,6 @@ pub fn list_models(data_dir: &Path) -> Result<Vec<ModelInfo>> {
             }
         }
     }
-
-    models.sort_by(|a, b| a.id.cmp(&b.id));
-    Ok(models)
 }
 
 /// Read the available expression names from a Live2D model's model3.json file
@@ -618,12 +653,8 @@ pub fn get_model_expressions(data_dir: &Path, model_id: &str) -> Result<Vec<Stri
 
     // Try VRM
     let vrm_dir = models_dir.join("vrm").join(model_id);
-    if vrm_dir.exists()
-        || models_dir
-            .join("vrm")
-            .join(format!("{model_id}.vrm"))
-            .exists()
-    {
+    let flat_vrm = models_dir.join("vrm").join(format!("{model_id}.vrm"));
+    if (vrm_dir.exists() && find_vrm_file(&vrm_dir).is_some()) || flat_vrm.exists() {
         // VRM models have standard blend shape expressions
         return Ok(vec![
             "happy".to_string(),
@@ -635,6 +666,23 @@ pub fn get_model_expressions(data_dir: &Path, model_id: &str) -> Result<Vec<Stri
     }
 
     Ok(Vec::new())
+}
+
+fn is_vrm_extension(ext: Option<&std::ffi::OsStr>) -> bool {
+    ext.and_then(|value| value.to_str())
+        .is_some_and(|value| value.eq_ignore_ascii_case("vrm"))
+}
+
+fn find_vrm_file(dir: &Path) -> Option<String> {
+    if let Ok(entries) = fs::read_dir(dir) {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.is_file() && is_vrm_extension(path.extension()) {
+                return Some(path.file_name().unwrap().to_string_lossy().to_string());
+            }
+        }
+    }
+    None
 }
 
 fn find_model3_json(dir: &Path) -> Option<String> {
@@ -776,5 +824,61 @@ mod tests {
         assert!(fm.contains("name: Luna"));
         assert!(fm.contains("voice: en-GB"));
         assert!(body.contains("Body content here."));
+    }
+
+    #[test]
+    fn test_list_vrm_models_detects_various_layouts() {
+        let tmp = TempDir::new().unwrap();
+        let models_root = tmp.path().join("models").join("vrm");
+        fs::create_dir_all(models_root.join("imported")).unwrap();
+        fs::write(models_root.join("imported/model.vrm"), b"vrm").unwrap();
+
+        fs::create_dir_all(models_root.join("custom_name")).unwrap();
+        fs::write(models_root.join("custom_name/avatar.vrm"), b"vrm").unwrap();
+
+        fs::write(models_root.join("flat_model.vrm"), b"vrm").unwrap();
+
+        let models = list_models(tmp.path()).unwrap();
+        let vrm_ids: Vec<&str> = models
+            .iter()
+            .filter(|model| model.model_type == "vrm")
+            .map(|model| model.id.as_str())
+            .collect();
+
+        assert_eq!(vrm_ids, vec!["custom_name", "flat_model", "imported"]);
+        assert_eq!(
+            models
+                .iter()
+                .find(|model| model.id == "custom_name")
+                .map(|model| model.model_file.as_str()),
+            Some("avatar.vrm")
+        );
+    }
+
+    #[test]
+    fn test_list_vrm_ignores_empty_directories() {
+        let tmp = TempDir::new().unwrap();
+        let models_root = tmp.path().join("models").join("vrm");
+        fs::create_dir_all(models_root.join("empty_folder")).unwrap();
+
+        let models = list_models(tmp.path()).unwrap();
+        assert!(models.iter().all(|model| model.model_type != "vrm"));
+    }
+
+    #[test]
+    fn test_load_character_uses_vrm_model_field() {
+        let tmp = TempDir::new().unwrap();
+        let loader = CharacterLoader::new(tmp.path());
+        let char_dir = tmp.path().join("characters").join("luna");
+        fs::create_dir_all(&char_dir).unwrap();
+        fs::write(
+            char_dir.join("character.yaml"),
+            "name: Luna\nvrm_model: my_avatar\nvoice: en-GB-1\ndefault_emotion: happy\n",
+        )
+        .unwrap();
+        fs::write(char_dir.join("soul.md"), "Soul").unwrap();
+
+        let character = loader.load_character("luna").unwrap();
+        assert_eq!(character.live2d_model, "my_avatar");
     }
 }
