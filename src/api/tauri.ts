@@ -1,11 +1,30 @@
-import { invoke } from "@tauri-apps/api/core";
+import { invoke, convertFileSrc } from "@tauri-apps/api/core";
 
-// Asset paths — serves files from app data directory
-// In dev mode: Vite middleware serves from /static/
-// In production: TODO — use Tauri asset protocol or embed
+// Asset paths — in the Tauri app, resolve to convertFileSrc URLs via the backend.
+// In browser-only dev (npm run dev), fall back to Vite /static/ middleware.
 export function toAssetUrl(relativePath: string): string {
   const clean = relativePath.replace(/^\/+/, "");
   return `/static/${clean}`;
+}
+
+export async function resolveAssetUrl(relativePath: string): Promise<string> {
+  const clean = relativePath.replace(/^\/+/, "");
+  try {
+    const [absolutePath, dataDir] = await Promise.all([
+      invoke<string>("resolve_asset_path", { path: clean }),
+      invoke<string>("get_data_dir"),
+    ]);
+    const normalizedDataDir = dataDir.replace(/\\/g, "/").replace(/\/$/, "");
+    const normalizedAbsolute = absolutePath.replace(/\\/g, "/");
+    if (normalizedAbsolute.startsWith(`${normalizedDataDir}/`)) {
+      return convertFileSrc(absolutePath);
+    }
+    console.warn("[assets] Model is outside app data; using /static/ fallback:", clean);
+    return toAssetUrl(clean);
+  } catch (err) {
+    console.warn("[assets] Falling back to /static/ URL for", clean, err);
+    return toAssetUrl(clean);
+  }
 }
 
 // Config

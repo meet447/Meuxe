@@ -24,44 +24,57 @@ function resolveAppDataDir() {
 
 function appDataStaticPlugin() {
   const appDataDir = resolveAppDataDir();
+  const workspaceRoot = process.cwd();
+
+  const serveFile = (filePath: string, req: any, res: any) => {
+    const stat = fs.statSync(filePath);
+    const ext = path.extname(filePath).toLowerCase();
+    const mimeTypes: Record<string, string> = {
+      ".json": "application/json",
+      ".moc3": "application/octet-stream",
+      ".png": "image/png",
+      ".jpg": "image/jpeg",
+      ".jpeg": "image/jpeg",
+      ".mp3": "audio/mpeg",
+      ".vrm": "application/octet-stream",
+      ".glb": "application/octet-stream",
+      ".gltf": "application/json",
+      ".fbx": "application/octet-stream",
+    };
+    res.setHeader("Content-Type", mimeTypes[ext] || "application/octet-stream");
+    res.setHeader("Content-Length", stat.size);
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    res.setHeader("Access-Control-Allow-Methods", "GET, OPTIONS");
+    res.setHeader("Access-Control-Allow-Headers", "*");
+    res.setHeader("Cache-Control", "no-cache");
+    if (req.method === "OPTIONS") {
+      res.statusCode = 204;
+      res.end();
+      return;
+    }
+    fs.createReadStream(filePath).pipe(res);
+  };
 
   return {
     name: "serve-appdata",
     configureServer(server: any) {
       server.middlewares.use("/static", (req: any, res: any, next: any) => {
-        // Strip query string from URL before resolving file path
         const urlPath = (req.url || "").split("?")[0];
-        const filePath = path.join(appDataDir, decodeURIComponent(urlPath));
-        if (fs.existsSync(filePath) && fs.statSync(filePath).isFile()) {
-          const stat = fs.statSync(filePath);
-          const ext = path.extname(filePath).toLowerCase();
-          const mimeTypes: Record<string, string> = {
-            ".json": "application/json",
-            ".moc3": "application/octet-stream",
-            ".png": "image/png",
-            ".jpg": "image/jpeg",
-            ".jpeg": "image/jpeg",
-            ".mp3": "audio/mpeg",
-            ".vrm": "application/octet-stream",
-            ".glb": "application/octet-stream",
-            ".gltf": "application/json",
-            ".fbx": "application/octet-stream",
-          };
-          res.setHeader("Content-Type", mimeTypes[ext] || "application/octet-stream");
-          res.setHeader("Content-Length", stat.size);
-          res.setHeader("Access-Control-Allow-Origin", "*");
-          res.setHeader("Access-Control-Allow-Methods", "GET, OPTIONS");
-          res.setHeader("Access-Control-Allow-Headers", "*");
-          res.setHeader("Cache-Control", "no-cache");
-          if (req.method === "OPTIONS") {
-            res.statusCode = 204;
-            res.end();
+        const decoded = decodeURIComponent(urlPath);
+        const candidates = [
+          path.join(appDataDir, decoded),
+          path.join(workspaceRoot, decoded),
+          path.join(workspaceRoot, "..", decoded),
+        ];
+
+        for (const filePath of candidates) {
+          if (fs.existsSync(filePath) && fs.statSync(filePath).isFile()) {
+            serveFile(filePath, req, res);
             return;
           }
-          fs.createReadStream(filePath).pipe(res);
-        } else {
-          next();
         }
+
+        next();
       });
     },
   };

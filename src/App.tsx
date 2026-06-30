@@ -19,7 +19,7 @@ import {
   getModelExpressions,
   getChatHistory,
   clearChat,
-  toAssetUrl,
+  resolveAssetUrl,
 } from "./api/tauri";
 import type { Character, ModelInfo } from "./types";
 
@@ -253,8 +253,35 @@ function App() {
     return models.find((m) => m.id === selectedChar.live2d_model) ?? null;
   }, [selectedChar, models]);
 
-  const modelPath = selectedModel?.path ? toAssetUrl(selectedModel.path) : null;
-  const modelType = selectedModel?.type ?? "live2d";
+  const [resolvedModelPath, setResolvedModelPath] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!selectedModel?.path) {
+      setResolvedModelPath(null);
+      return;
+    }
+
+    let cancelled = false;
+    resolveAssetUrl(selectedModel.path)
+      .then((url) => {
+        if (!cancelled) {
+          setResolvedModelPath(url);
+        }
+      })
+      .catch((err) => {
+        console.error("[App] Failed to resolve model asset URL:", err);
+        if (!cancelled) {
+          setResolvedModelPath(null);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedModel?.path]);
+
+  const modelPath = resolvedModelPath;
+  const modelType = selectedModel?.type === "vrm" ? "vrm" : "live2d";
   const modelMapping = selectedModel?.mapping ?? null;
 
   // Match chat backend: expression files are keyed by character.live2d_model.

@@ -5,6 +5,7 @@ import * as tauriApi from './tauri';
 // Mock the invoke function from @tauri-apps/api/core
 vi.mock('@tauri-apps/api/core', () => ({
   invoke: vi.fn(),
+  convertFileSrc: vi.fn((filePath: string) => `asset://localhost/${encodeURIComponent(filePath)}`),
 }));
 
 describe('tauri api utilities', () => {
@@ -17,6 +18,44 @@ describe('tauri api utilities', () => {
       expect(tauriApi.toAssetUrl('/my-asset.png')).toBe('/static/my-asset.png');
       expect(tauriApi.toAssetUrl('my-asset.png')).toBe('/static/my-asset.png');
       expect(tauriApi.toAssetUrl('///deep/path.png')).toBe('/static/deep/path.png');
+    });
+  });
+
+  describe('resolveAssetUrl', () => {
+    it('uses convertFileSrc for files inside app data', async () => {
+      vi.mocked(invoke).mockImplementation(async (command: string) => {
+        if (command === 'resolve_asset_path') {
+          return '/data/com.meuxcompanion.app/models/vrm/demo/model.vrm';
+        }
+        if (command === 'get_data_dir') {
+          return '/data/com.meuxcompanion.app';
+        }
+        return null;
+      });
+
+      const url = await tauriApi.resolveAssetUrl('models/vrm/demo/model.vrm');
+      expect(url).toContain('asset://localhost');
+    });
+
+    it('falls back to /static/ for files outside app data', async () => {
+      vi.mocked(invoke).mockImplementation(async (command: string) => {
+        if (command === 'resolve_asset_path') {
+          return '/workspace/models/vrm/demo/model.vrm';
+        }
+        if (command === 'get_data_dir') {
+          return '/data/com.meuxcompanion.app';
+        }
+        return null;
+      });
+
+      const url = await tauriApi.resolveAssetUrl('models/vrm/demo/model.vrm');
+      expect(url).toBe('/static/models/vrm/demo/model.vrm');
+    });
+
+    it('falls back to /static/ when resolve_asset_path fails', async () => {
+      vi.mocked(invoke).mockRejectedValueOnce(new Error('missing'));
+      const url = await tauriApi.resolveAssetUrl('models/vrm/demo/model.vrm');
+      expect(url).toBe('/static/models/vrm/demo/model.vrm');
     });
   });
 

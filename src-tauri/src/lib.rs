@@ -48,12 +48,19 @@ fn get_data_dir(state: tauri::State<Arc<AppState>>) -> String {
 #[tauri::command]
 fn resolve_asset_path(state: tauri::State<Arc<AppState>>, path: String) -> Result<String, String> {
     let clean = path.trim_start_matches('/');
-    let full_path = state.data_dir.join(clean);
-    if full_path.exists() {
-        Ok(full_path.to_string_lossy().to_string())
-    } else {
-        Err(format!("Asset not found: {}", full_path.display()))
+    let candidates = [
+        state.data_dir.join(clean),
+        PathBuf::from(clean),
+        PathBuf::from("..").join(clean),
+    ];
+
+    for full_path in candidates {
+        if full_path.exists() && full_path.is_file() {
+            return Ok(full_path.to_string_lossy().to_string());
+        }
     }
+
+    Err(format!("Asset not found: {clean}"))
 }
 
 fn load_whisper_model(data_dir: &Path) -> Option<Arc<WhisperContext>> {

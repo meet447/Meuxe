@@ -154,6 +154,9 @@ export const VRMCanvas = memo(function VRMCanvas({
             <button onClick={() => setShowDebug(false)} className="text-slate-400 hover:text-slate-600 ml-4 hover:bg-slate-100 rounded-full w-5 h-5 flex items-center justify-center transition-colors">x</button>
           </div>
           <Row label="Model" value={debugInfo.modelLoaded ? "loaded (VRM)" : "none"} ok={debugInfo.modelLoaded} />
+          {!debugInfo.modelLoaded && debugInfo.lastError ? (
+            <Row label="Load Error" value={debugInfo.lastError} />
+          ) : null}
           <Row label="Lip Sync" value={debugInfo.lipSyncActive ? "ON" : "off"} ok={debugInfo.lipSyncActive} />
           <Row label="Mouth Value" value={String(debugInfo.mouthValue)} />
           <div className="pt-1">

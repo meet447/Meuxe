@@ -22,7 +22,18 @@
       }
     ],
     "security": {
-      "csp": null
+      "csp": null,
+      "assetProtocol": {
+        "enable": true,
+        "scope": {
+          "allow": [
+            "$APPDATA/**",
+            "$APPLOCALDATA/**",
+            "$RESOURCE/**"
+          ],
+          "requireLiteralLeadingDot": false
+        }
+      }
     },
     "macOSPrivateApi": true
   },
