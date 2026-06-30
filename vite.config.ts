@@ -8,11 +8,22 @@ import { homedir } from "os";
 const host = process.env.TAURI_DEV_HOST;
 
 // Serve files from app data directory under /static/ path in dev mode
+function resolveAppDataDir() {
+  const home = homedir();
+  if (process.platform === "darwin") {
+    return path.join(home, "Library/Application Support/com.meuxcompanion.app");
+  }
+  if (process.platform === "win32") {
+    return path.join(
+      process.env.APPDATA || path.join(home, "AppData", "Roaming"),
+      "com.meuxcompanion.app",
+    );
+  }
+  return path.join(home, ".local/share/com.meuxcompanion.app");
+}
+
 function appDataStaticPlugin() {
-  const appDataDir = path.join(
-    homedir(),
-    "Library/Application Support/com.meuxcompanion.app"
-  );
+  const appDataDir = resolveAppDataDir();
 
   return {
     name: "serve-appdata",
