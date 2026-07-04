@@ -21,3 +21,7 @@
 ## 2026-10-30 - Defeated React.memo via Object Recreation in Maps
 **Learning:** When rendering list items, mapping a timeline object to a new object on every render (e.g. `const msg = timelineItemToMessage(item)`) and passing it as a prop defeats `React.memo`'s shallow comparison, causing components to re-render constantly (e.g. during rapid text streaming).
 **Action:** Always pass primitive values extracted from the generated object, or pass the original stable item directly to memoized child components to ensure `React.memo` behaves efficiently and prevents O(N) re-renders.
+
+## 2024-05-18 - React Array Scanning During Rapid Renders
+**Learning:** Performing inline O(N) array operations (like `.some()`, `.every()`, or `.filter()`) inside the main body of a React functional component causes massive performance bottlenecks if the component renders frequently (e.g., during rapid text streaming token updates). If the array reference doesn't change, the CPU cycles are completely wasted.
+**Action:** Always wrap heavy list traversals/scans in `useMemo` hooks, keyed to the underlying data structure reference (e.g., `[timeline]`), to ensure they are only executed when the array actually changes, not on every render cycle.
