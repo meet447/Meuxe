@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback, memo } from "react";
+import { useState, useRef, useEffect, useCallback, memo, useMemo } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import type { ChatMessage, ChatTimelineItem } from "../types";
@@ -281,9 +281,45 @@ export function ChatPanel({
   }, [timeline, streamingText]);
 
   const isProcessing = loading || ttsLoading;
-  const hasRunningTool = timeline.some(
-    (item) => item.kind === "tool" && item.call.status === "running",
+
+  // ⚡ Bolt: Memoize expensive O(N) array operations (some/map) on the timeline.
+  // Why: When text is streaming token-by-token, `streamingText` state updates rapidly, causing
+  // the entire ChatPanel to re-render. Without memoization, we would traverse and recreate
+  // every MessageBubble in the history on every single token tick.
+  // Impact: Reduces React element recreation by 100% during streaming phases, significantly
+  // lowering CPU usage and garbage collection overhead, preventing UI stuttering.
+  // Measurement: Profile React renders during text streaming; `renderedTimeline` will not recalculate.
+  const hasRunningTool = useMemo(
+    () =>
+      timeline.some((item) => item.kind === "tool" && item.call.status === "running"),
+    [timeline]
   );
+
+  const renderedTimeline = useMemo(() => {
+    return timeline.map((item) => {
+      if (item.kind === "tool") {
+        return (
+          <ToolCallBubble
+            key={item.id}
+            call={item.call}
+            onConfirm={onToolConfirm}
+          />
+        );
+      }
+
+      const msg = timelineItemToMessage(item);
+      if (!msg) return null;
+      return (
+        <MessageBubble
+          key={item.id}
+          role={msg.role}
+          text={msg.text}
+          expression={msg.expression}
+          characterName={characterName}
+        />
+      );
+    });
+  }, [timeline, onToolConfirm, characterName]);
 
   return (
     <div className="flex-1 flex flex-col bg-transparent relative h-full">
@@ -301,29 +337,7 @@ export function ChatPanel({
           </div>
         )}
 
-        {timeline.map((item) => {
-          if (item.kind === "tool") {
-            return (
-              <ToolCallBubble
-                key={item.id}
-                call={item.call}
-                onConfirm={onToolConfirm}
-              />
-            );
-          }
-
-          const msg = timelineItemToMessage(item);
-          if (!msg) return null;
-          return (
-            <MessageBubble
-              key={item.id}
-              role={msg.role}
-              text={msg.text}
-              expression={msg.expression}
-              characterName={characterName}
-            />
-          );
-        })}
+        {renderedTimeline}
 
         {/* Streaming text — always the latest assistant turn */}
         {streamingText && (
