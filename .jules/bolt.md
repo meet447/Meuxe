@@ -21,3 +21,7 @@
 ## 2026-10-30 - Defeated React.memo via Object Recreation in Maps
 **Learning:** When rendering list items, mapping a timeline object to a new object on every render (e.g. `const msg = timelineItemToMessage(item)`) and passing it as a prop defeats `React.memo`'s shallow comparison, causing components to re-render constantly (e.g. during rapid text streaming).
 **Action:** Always pass primitive values extracted from the generated object, or pass the original stable item directly to memoized child components to ensure `React.memo` behaves efficiently and prevents O(N) re-renders.
+
+## 2023-11-10 - O(N) Array Operations in React Render Phase
+**Learning:** Performing `Array.prototype.map` and `Array.prototype.some` operations on potentially large arrays (like a chat timeline) during every render cycle causes significant performance drops, especially during rapid streaming events (like per-token LLM output).
+**Action:** Always wrap `map`, `filter`, and `some` calls on large lists in `useMemo` hooks, keyed specifically to the list and any other dependencies required to generate the mapped components or boolean flags.
