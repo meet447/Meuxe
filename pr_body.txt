@@ -1,0 +1,4 @@
+💡 What: Wrapped `timeline.map()` and `timeline.some()` array operations inside `useMemo` hooks in `ChatPanel.tsx` (keyed by the `timeline` reference).
+🎯 Why: During text generation, `streamingText` updates rapidly, triggering renders. The previous implementation recreated the entire message history JSX elements array and iterated over it on every keystroke, defeating React diffing optimizations and creating CPU overhead.
+📊 Impact: Skips the O(N) array recreation and React tree diffing for historical messages entirely during stream updates. Re-renders during streaming are now O(1) relative to chat history length.
+🔬 Measurement: Watch the React Profiler during streaming text generation with a long chat history; the `ChatPanel` render time per frame will drop significantly compared to before.
