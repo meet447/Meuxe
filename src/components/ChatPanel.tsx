@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback, memo } from "react";
+import { useState, useRef, useEffect, useCallback, memo, useMemo } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import type { ChatMessage, ChatTimelineItem } from "../types";
@@ -281,9 +281,39 @@ export function ChatPanel({
   }, [timeline, streamingText]);
 
   const isProcessing = loading || ttsLoading;
-  const hasRunningTool = timeline.some(
+
+  // ⚡ Bolt: Memoize the running tool check to avoid O(N) traversal on every streaming update
+  const hasRunningTool = useMemo(() => timeline.some(
     (item) => item.kind === "tool" && item.call.status === "running",
-  );
+  ), [timeline]);
+
+  // ⚡ Bolt: Memoize the tool continuation check to avoid O(N) traversal on every streaming update
+  const isContinuing = useMemo(() => timeline.some((item) => item.kind === "tool"), [timeline]);
+
+  // ⚡ Bolt: Memoize the timeline mapping to prevent O(N) recreation of React elements on every text stream tick
+  const renderedTimeline = useMemo(() => timeline.map((item) => {
+    if (item.kind === "tool") {
+      return (
+        <ToolCallBubble
+          key={item.id}
+          call={item.call}
+          onConfirm={onToolConfirm}
+        />
+      );
+    }
+
+    const msg = timelineItemToMessage(item);
+    if (!msg) return null;
+    return (
+      <MessageBubble
+        key={item.id}
+        role={msg.role}
+        text={msg.text}
+        expression={msg.expression}
+        characterName={characterName}
+      />
+    );
+  }), [timeline, characterName, onToolConfirm]);
 
   return (
     <div className="flex-1 flex flex-col bg-transparent relative h-full">
@@ -301,29 +331,7 @@ export function ChatPanel({
           </div>
         )}
 
-        {timeline.map((item) => {
-          if (item.kind === "tool") {
-            return (
-              <ToolCallBubble
-                key={item.id}
-                call={item.call}
-                onConfirm={onToolConfirm}
-              />
-            );
-          }
-
-          const msg = timelineItemToMessage(item);
-          if (!msg) return null;
-          return (
-            <MessageBubble
-              key={item.id}
-              role={msg.role}
-              text={msg.text}
-              expression={msg.expression}
-              characterName={characterName}
-            />
-          );
-        })}
+        {renderedTimeline}
 
         {/* Streaming text — always the latest assistant turn */}
         {streamingText && (
@@ -357,7 +365,7 @@ export function ChatPanel({
                   <span className="w-2 h-2 rounded-full bg-blue-400/60 animate-bounce" />
                 </div>
                 <span className="text-xs font-semibold uppercase tracking-wide">
-                  {timeline.some((item) => item.kind === "tool") ? "Continuing" : "Thinking"}
+                  {isContinuing ? "Continuing" : "Thinking"}
                 </span>
               </div>
             </div>
