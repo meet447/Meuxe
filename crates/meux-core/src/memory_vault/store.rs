@@ -545,7 +545,11 @@ impl MemoryVault {
             .read()
             .map_err(|e| MeuxError::Memory(format!("Lock poisoned: {e}")))?;
         let conn = self.connection(user_id)?;
-        let mut memories = search_memories_tx(&conn, character_id, user_id, query, limit * 4)?;
+        let mut memories = if extractor::contains_cjk(query) {
+            list_memories_tx(&conn, character_id, user_id, None, usize::MAX)?
+        } else {
+            search_memories_tx(&conn, character_id, user_id, query, limit * 4)?
+        };
         if memories.is_empty() {
             memories = list_memories_tx(&conn, character_id, user_id, None, usize::MAX)?;
         }
@@ -1122,17 +1126,36 @@ fn update_relationship_from_exchange_tx(
     ];
     let attachment = ["remember", "miss", "stay", "together", "companion", "care"];
 
-    if positive.iter().any(|t| user_tokens.contains(*t)) {
+    let positive_chinese = ["谢谢", "感谢", "帮到我", "有帮助", "太好了", "喜欢你"];
+    let negative_chinese = ["难过", "焦虑", "生气", "沮丧", "挫败", "受挫"];
+    let attachment_chinese = [
+        "记得",
+        "想你",
+        "陪我",
+        "陪伴",
+        "在一起",
+        "关心",
+        "信任",
+        "理解",
+    ];
+
+    if positive.iter().any(|t| user_tokens.contains(*t))
+        || contains_any(user_message, &positive_chinese)
+    {
         state.trust += 0.04;
         state.affection += 0.05;
         state.mood = "warm".to_string();
     }
-    if negative.iter().any(|t| user_tokens.contains(*t)) {
+    if negative.iter().any(|t| user_tokens.contains(*t))
+        || contains_any(user_message, &negative_chinese)
+    {
         state.trust -= 0.01;
         state.energy = f64::max(0.35, state.energy - 0.03);
         state.mood = "concerned".to_string();
     }
-    if attachment.iter().any(|t| user_tokens.contains(*t)) {
+    if attachment.iter().any(|t| user_tokens.contains(*t))
+        || contains_any(user_message, &attachment_chinese)
+    {
         state.trust += 0.02;
         state.affection += 0.03;
     }
@@ -1296,18 +1319,36 @@ fn token_set(value: &str) -> HashSet<String> {
     extractor::extract_tokens(value)
 }
 
+fn contains_any(value: &str, candidates: &[&str]) -> bool {
+    candidates.iter().any(|candidate| value.contains(candidate))
+}
+
 fn rank_memories(query: &str, memories: &mut [VaultMemory]) {
     let query_tokens = token_set(query);
     memories.sort_by(|a, b| {
-        score_memory(&query_tokens, b)
-            .partial_cmp(&score_memory(&query_tokens, a))
-            .unwrap_or(Ordering::Equal)
+        b.pinned
+            .cmp(&a.pinned)
+            .then_with(|| {
+                score_memory(&query_tokens, b)
+                    .partial_cmp(&score_memory(&query_tokens, a))
+                    .unwrap_or(Ordering::Equal)
+            })
+            .then_with(|| {
+                b.importance
+                    .partial_cmp(&a.importance)
+                    .unwrap_or(Ordering::Equal)
+            })
+            .then_with(|| b.ts.cmp(&a.ts))
+            .then_with(|| a.id.cmp(&b.id))
     });
 }
 
 fn score_memory(query_tokens: &HashSet<String>, memory: &VaultMemory) -> f64 {
     let memory_tokens = token_set(&memory.summary);
-    let overlap = query_tokens.intersection(&memory_tokens).count() as f64;
+    let overlap = query_tokens
+        .intersection(&memory_tokens)
+        .map(|token| if token.starts_with("cjk:") { 2.0 } else { 1.0 })
+        .sum::<f64>();
     let tag_overlap = memory
         .tags
         .iter()
@@ -1414,7 +1455,11 @@ fn search_memories_tx(
 }
 
 fn fts_query(query: &str) -> String {
-    extractor::extract_tokens(query)
+    let mut tokens = extractor::extract_tokens(query)
+        .into_iter()
+        .collect::<Vec<_>>();
+    tokens.sort();
+    tokens
         .into_iter()
         .take(12)
         .map(|token| format!("\"{}\"", token.replace('"', "\"\"")))
@@ -1539,5 +1584,23 @@ mod tests {
             .unwrap()
             .iter()
             .any(|memory| memory.id == memory_id));
+    }
+
+    #[test]
+    fn chinese_distress_updates_relationship_to_concerned() {
+        let tmp = tempfile::tempdir().unwrap();
+        let vault = MemoryVault::new(tmp.path());
+        vault
+            .ingest_chat_exchange(
+                "rika",
+                "user1",
+                "我今天很难过，请先听我说。",
+                "我在这里陪你。",
+            )
+            .unwrap();
+
+        let state = vault.get_relationship("rika", "user1").unwrap();
+        assert_eq!(state.mood, "concerned");
+        assert!(state.energy < 0.7);
     }
 }
