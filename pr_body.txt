@@ -1,0 +1,4 @@
+💡 **What:** Added `useMemo` hooks to cache O(N) array operations (`timeline.some`, `timeline.map`) inside `ChatPanel.tsx`.
+🎯 **Why:** The `ChatPanel` component receives `streamingText` which updates very rapidly (token-by-token) during text generation. Previously, this caused the component to re-evaluate the entire chat history and recreate all React elements on every single keystroke/token, leading to unnecessary re-renders.
+📊 **Impact:** Prevents O(N) re-renders of the chat history elements during text generation, resulting in smoother UI performance.
+🔬 **Measurement:** Verify by running the application, engaging in a long chat session with streaming responses, and using React Developer Tools Profiler to observe that the timeline message bubbles do not re-render during the generation phase. Tests pass successfully via `npm install --no-save vitest typescript && npx vitest run`.
