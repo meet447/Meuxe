@@ -104,8 +104,8 @@ export async function importVRMModel() {
 }
 
 // Chat
-export async function sendChat(characterId: string, message: string) {
-  return invoke("chat_send", { characterId, message });
+export async function sendChat(characterId: string, message: string, requestId: string) {
+  return invoke("chat_send", { characterId, message, requestId });
 }
 
 export async function getChatHistory(characterId: string) {

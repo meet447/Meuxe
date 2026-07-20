@@ -10,18 +10,33 @@ interface Message {
 }
 
 interface SentencePayload {
+  request_id: string;
   index: number;
   text: string;
   expression: string;
 }
 
 interface AudioPayload {
+  request_id: string;
   index: number;
   data: string;
 }
 
 interface DonePayload {
+  request_id: string;
   state_update: unknown;
+}
+
+interface AudioFailedPayload {
+  request_id: string;
+  index: number;
+  reason: "provider_error" | "timeout";
+  message: string;
+}
+
+interface ChatErrorPayload {
+  request_id: string;
+  message: string;
 }
 
 interface ToolCallStartPayload {
@@ -86,8 +101,10 @@ export function useChat() {
   const segmentCounterRef = useRef(0);
 
   const onSentenceRef = useRef<((data: SentencePayload) => void) | null>(null);
-  const onAudioRef = useRef<((index: number, data: string) => void) | null>(null);
+  const onAudioRef = useRef<((data: AudioPayload) => void) | null>(null);
+  const onAudioFailedRef = useRef<((data: AudioFailedPayload) => void) | null>(null);
   const onDoneRef = useRef<((data: DonePayload) => void) | null>(null);
+  const onErrorRef = useRef<((requestId: string) => void) | null>(null);
   const unlistenersRef = useRef<UnlistenFn[]>([]);
 
   const messages = useMemo(() => timelineToMessages(timeline), [timeline]);
@@ -154,7 +171,7 @@ export function useChat() {
   );
 
   const send = useCallback(
-    async (characterId: string, message: string) => {
+    async (characterId: string, message: string, requestId: string) => {
       if (isStreaming) return;
 
       segmentCounterRef.current = 0;
@@ -190,8 +207,15 @@ export function useChat() {
       );
 
       const unlistenAudio = await listen<AudioPayload>("chat:audio", (event) => {
-        onAudioRef.current?.(event.payload.index, event.payload.data);
+        onAudioRef.current?.(event.payload);
       });
+
+      const unlistenAudioFailed = await listen<AudioFailedPayload>(
+        "chat:audio-failed",
+        (event) => {
+          onAudioFailedRef.current?.(event.payload);
+        },
+      );
 
       const unlistenToolStart = await listen<ToolCallStartPayload>(
         "chat:tool-call-start",
@@ -242,6 +266,7 @@ export function useChat() {
       );
 
       const unlistenDone = await listen<DonePayload>("chat:done", (event) => {
+        if (event.payload.request_id !== requestId) return;
         commitStreamingSegment();
         setIsStreaming(false);
         onDoneRef.current?.(event.payload);
@@ -252,11 +277,13 @@ export function useChat() {
         unlistenToolStart();
         unlistenToolResult();
         unlistenToolConfirm();
-        unlistenersRef.current = [unlistenAudio];
+        unlistenersRef.current = [unlistenAudio, unlistenAudioFailed];
       });
 
-      const unlistenError = await listen<{ message: string }>("chat:error", (event) => {
+      const unlistenError = await listen<ChatErrorPayload>("chat:error", (event) => {
+        if (event.payload.request_id !== requestId) return;
         console.error("Chat error:", event.payload.message);
+        onErrorRef.current?.(requestId);
         commitStreamingSegment();
         setIsStreaming(false);
         for (const u of unlistenersRef.current) {
@@ -269,6 +296,7 @@ export function useChat() {
         unlistenText,
         unlistenSentence,
         unlistenAudio,
+        unlistenAudioFailed,
         unlistenDone,
         unlistenError,
         unlistenToolStart,
@@ -276,7 +304,7 @@ export function useChat() {
         unlistenToolConfirm,
       ];
 
-      await sendChat(characterId, message);
+      await sendChat(characterId, message, requestId);
     },
     [isStreaming, commitStreamingSegment, upsertToolCall],
   );
@@ -291,12 +319,20 @@ export function useChat() {
     onSentenceRef.current = cb;
   }, []);
 
-  const setOnAudio = useCallback((cb: (index: number, data: string) => void) => {
+  const setOnAudio = useCallback((cb: (data: AudioPayload) => void) => {
     onAudioRef.current = cb;
+  }, []);
+
+  const setOnAudioFailed = useCallback((cb: (data: AudioFailedPayload) => void) => {
+    onAudioFailedRef.current = cb;
   }, []);
 
   const setOnDone = useCallback((cb: (data: DonePayload) => void) => {
     onDoneRef.current = cb;
+  }, []);
+
+  const setOnError = useCallback((cb: (requestId: string) => void) => {
+    onErrorRef.current = cb;
   }, []);
 
   return {
@@ -308,7 +344,9 @@ export function useChat() {
     send,
     setOnSentence,
     setOnAudio,
+    setOnAudioFailed,
     setOnDone,
+    setOnError,
     toolCalls,
     handleConfirm,
   };
