@@ -1,0 +1,7 @@
+💡 What: Wrapped `timeline.map` and `timeline.some` in `useMemo` hooks inside `ChatPanel.tsx`. Added inline documentation for the hooks and logged the learning to the `.jules/bolt.md` journal.
+
+🎯 Why: During rapid state updates like LLM token streaming, traversing a long history array to check for active tools or to recreate React elements causes massive O(N) re-renders, wasting CPU cycles and leading to UI jank. Even with `React.memo` on children, recreating the JSX array forces React to perform expensive reconciliation.
+
+📊 Impact: Drastically reduces main thread CPU usage and prevents unnecessary memory allocations/garbage collection during text streaming, making the UI noticeably smoother, especially in long chat sessions.
+
+🔬 Measurement: Tests and typing successfully passed using `tsc` and `vitest`. Start the app locally with `npm run dev` and chat with the AI; observe profiling in React DevTools to confirm that `MessageBubble` elements are not being unnecessarily re-evaluated and that render time per token is significantly lower.

@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback, memo } from "react";
+import { useState, useRef, useEffect, useCallback, memo, useMemo } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import type { ChatMessage, ChatTimelineItem } from "../types";
@@ -281,9 +281,43 @@ export function ChatPanel({
   }, [timeline, streamingText]);
 
   const isProcessing = loading || ttsLoading;
-  const hasRunningTool = timeline.some(
-    (item) => item.kind === "tool" && item.call.status === "running",
-  );
+
+  // ⚡ Bolt: Memoized to prevent O(N) traversal of the timeline array
+  // on every single streaming text update.
+  const hasRunningTool = useMemo(() => {
+    return timeline.some(
+      (item) => item.kind === "tool" && item.call.status === "running",
+    );
+  }, [timeline]);
+
+  // ⚡ Bolt: Memoized the mapping of the timeline to JSX elements.
+  // This prevents recreating all message and tool bubble elements on every rapid
+  // token update during streaming, avoiding massive unnecessary render overhead.
+  const renderedTimeline = useMemo(() => {
+    return timeline.map((item) => {
+      if (item.kind === "tool") {
+        return (
+          <ToolCallBubble
+            key={item.id}
+            call={item.call}
+            onConfirm={onToolConfirm}
+          />
+        );
+      }
+
+      const msg = timelineItemToMessage(item);
+      if (!msg) return null;
+      return (
+        <MessageBubble
+          key={item.id}
+          role={msg.role}
+          text={msg.text}
+          expression={msg.expression}
+          characterName={characterName}
+        />
+      );
+    });
+  }, [timeline, onToolConfirm, characterName]);
 
   return (
     <div className="flex-1 flex flex-col bg-transparent relative h-full">
@@ -301,29 +335,7 @@ export function ChatPanel({
           </div>
         )}
 
-        {timeline.map((item) => {
-          if (item.kind === "tool") {
-            return (
-              <ToolCallBubble
-                key={item.id}
-                call={item.call}
-                onConfirm={onToolConfirm}
-              />
-            );
-          }
-
-          const msg = timelineItemToMessage(item);
-          if (!msg) return null;
-          return (
-            <MessageBubble
-              key={item.id}
-              role={msg.role}
-              text={msg.text}
-              expression={msg.expression}
-              characterName={characterName}
-            />
-          );
-        })}
+        {renderedTimeline}
 
         {/* Streaming text — always the latest assistant turn */}
         {streamingText && (
