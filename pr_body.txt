@@ -1,0 +1,11 @@
+💡 **What**: The optimization implemented
+Wrapped expensive O(N) array operations (like `timeline.some` and `timeline.map`) inside `ChatPanel.tsx` in `useMemo` hooks keyed to the timeline.
+
+🎯 **Why**: The performance problem it solves
+In chat interfaces, `streamingText` is updated extremely frequently (often on every token received). Because `ChatPanel` re-renders on every `streamingText` update, all inline array traversals and mapping operations were executing on every single token. As the timeline grew, this O(N) traversal and React element re-allocation became a significant bottleneck, causing UI stutter.
+
+📊 **Impact**: Expected performance improvement
+Significantly reduces main thread blocking and memory allocations during active text streaming. Prevented constant re-traversals of the entire chat history.
+
+🔬 **Measurement**: How to verify the improvement
+Start streaming a long response from the assistant. Open Chrome DevTools Performance tab and record a trace. You should observe fewer script execution spikes on every token update, as the timeline mapping logic is now skipped since `timeline` remains referentially stable during token generation.
