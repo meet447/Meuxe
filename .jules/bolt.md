@@ -21,3 +21,6 @@
 ## 2026-10-30 - Defeated React.memo via Object Recreation in Maps
 **Learning:** When rendering list items, mapping a timeline object to a new object on every render (e.g. `const msg = timelineItemToMessage(item)`) and passing it as a prop defeats `React.memo`'s shallow comparison, causing components to re-render constantly (e.g. during rapid text streaming).
 **Action:** Always pass primitive values extracted from the generated object, or pass the original stable item directly to memoized child components to ensure `React.memo` behaves efficiently and prevents O(N) re-renders.
+## 2025-03-02 - React Chat Component Render Optimization
+**Learning:** In highly dynamic React components like `ChatPanel` where `streamingText` is updated continuously (often token-by-token), relying on inline `.map()` and `.some()` operations on large state arrays (like message `timeline` history) forces O(N) array traversals and React element reconciliations on every single render cycle. This is a massive hidden cost in AI chat interfaces.
+**Action:** Always wrap derived datasets or JSX element arrays derived from historical message lists in `useMemo` keyed exclusively to the timeline dependency when the component also handles high-frequency state updates like streaming text or token generation.
