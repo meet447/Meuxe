@@ -366,38 +366,50 @@ fn spawn_tts_for_sentence(
     });
 }
 
-fn emit_sentence_chunk(
-    app: &AppHandle,
-    state: &Arc<AppState>,
-    model_id: &str,
-    current_expression: &mut String,
-    tts_config: &meuxe_core::config::types::TtsConfig,
-    request_id: &str,
-    cancel: &CancellationToken,
-    sentence_index: &mut u32,
-    raw_text: &str,
-) {
-    let without_tag = peel_expression_prefix(raw_text, current_expression);
+struct EmitSentenceChunkParams<'a> {
+    app: &'a AppHandle,
+    state: &'a Arc<AppState>,
+    model_id: &'a str,
+    current_expression: &'a mut String,
+    tts_config: &'a meuxe_core::config::types::TtsConfig,
+    request_id: &'a str,
+    cancel: &'a CancellationToken,
+    sentence_index: &'a mut u32,
+    raw_text: &'a str,
+}
+
+fn emit_sentence_chunk(params: EmitSentenceChunkParams<'_>) {
+    let without_tag = peel_expression_prefix(params.raw_text, params.current_expression);
     let clean = clean_text(&without_tag).trim().to_string();
     if clean.is_empty() {
         return;
     }
 
-    let resolved = state.expressions.resolve(model_id, current_expression);
-    let idx = *sentence_index;
+    let resolved = params
+        .state
+        .expressions
+        .resolve(params.model_id, params.current_expression);
+    let idx = *params.sentence_index;
 
-    let _ = app.emit(
+    let _ = params.app.emit(
         "chat:sentence",
         SentenceEvent {
-            request_id: request_id.to_string(),
+            request_id: params.request_id.to_string(),
             index: idx,
             text: clean.clone(),
             expression: resolved,
         },
     );
 
-    spawn_tts_for_sentence(app, tts_config, request_id, cancel.clone(), idx, clean);
-    *sentence_index += 1;
+    spawn_tts_for_sentence(
+        params.app,
+        params.tts_config,
+        params.request_id,
+        params.cancel.clone(),
+        idx,
+        clean,
+    );
+    *params.sentence_index += 1;
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -417,7 +429,7 @@ pub(crate) fn drain_buffer_sentences(
 
     while let Some(boundary) = find_sentence_boundary(&working, allow_end_boundary) {
         let sentence = working[..boundary].to_string();
-        emit_sentence_chunk(
+        emit_sentence_chunk(EmitSentenceChunkParams {
             app,
             state,
             model_id,
@@ -426,8 +438,8 @@ pub(crate) fn drain_buffer_sentences(
             request_id,
             cancel,
             sentence_index,
-            &sentence,
-        );
+            raw_text: &sentence,
+        });
         working = working[boundary..].trim_start().to_string();
     }
 
@@ -529,22 +541,21 @@ async fn run_chat_stream(
         persona_context.push_str(&prompt_result.memory_prompt);
     }
 
-    let acp_prompt =
-        build_acp_agent_prompt(&persona_context, &prompt_result.messages, &message);
+    let acp_prompt = build_acp_agent_prompt(&persona_context, &prompt_result.messages, &message);
 
-    crate::acp::run_acp_chat_stream(
+    crate::acp::run_acp_chat_stream(crate::acp::RunAcpChatStreamParams {
         app,
         state,
         character_id,
-        message,
-        acp_prompt,
+        user_message: message,
+        agent_prompt: acp_prompt,
         request_id,
         cancel,
         persona_context,
         model_id,
-        config.tts.clone(),
-        config.agent.clone(),
-    )
+        tts_config: config.tts.clone(),
+        agent_config: config.agent.clone(),
+    })
     .await
 }
 

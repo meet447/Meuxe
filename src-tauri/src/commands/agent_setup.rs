@@ -213,7 +213,7 @@ pub async fn check_preset(data_dir: &Path, preset: &str) -> AgentPresetSetupStat
 
 async fn run_npm_install(prefix: &Path, package: &str) -> Result<(), String> {
     let prefix_str = prefix.to_string_lossy().to_string();
-    let mut child = AsyncCommand::new("npm")
+    let child = AsyncCommand::new("npm")
         .args([
             "install",
             "--global",
@@ -250,12 +250,14 @@ async fn run_npm_install(prefix: &Path, package: &str) -> Result<(), String> {
     }
 }
 
-pub async fn install_preset(data_dir: &Path, preset: &str) -> Result<AgentSetupStatusResponse, String> {
+pub async fn install_preset(
+    data_dir: &Path,
+    preset: &str,
+) -> Result<AgentSetupStatusResponse, String> {
     let prerequisites = check_prerequisites().await;
     if !prerequisites.node_available {
         return Err(
-            "Node.js is required. Install it from https://nodejs.org (LTS), then try again."
-                .into(),
+            "Node.js is required. Install it from https://nodejs.org (LTS), then try again.".into(),
         );
     }
 

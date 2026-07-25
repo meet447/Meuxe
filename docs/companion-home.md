@@ -61,7 +61,7 @@ Optional daily markdown the companion maintains (reflections, “dream” summar
 
 ### `workspace/`
 
-Default **working directory** for `AgentLaunchConfig.working_directory` when spawning an ACP agent (`src-tauri/src/acp/mod.rs`). Agents may create files here; Meuxe does not treat this tree as canonical memory unless ingested through normal memory pipelines.
+Default **working directory** when spawning an ACP agent session (`companion_home_dir` / `ensure_companion_home` in `src-tauri/src/acp/run.rs`). Agents may create files here; Meuxe does not treat this tree as canonical memory unless ingested through normal memory pipelines.
 
 ## Session context bundle (target)
 

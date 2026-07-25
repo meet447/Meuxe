@@ -4,18 +4,32 @@ use std::sync::Arc;
 use agent_client_protocol::util::MatchDispatch;
 use agent_client_protocol::{AcpAgent, Agent, Client, ConnectionTo, SessionMessage};
 
-use agent_client_protocol::schema::ProtocolVersion;
 use agent_client_protocol::schema::v1::{
     ContentBlock, ContentChunk, InitializeRequest, RequestPermissionOutcome,
     RequestPermissionRequest, RequestPermissionResponse, SelectedPermissionOutcome,
     SessionNotification, SessionUpdate, StopReason,
 };
+use agent_client_protocol::schema::ProtocolVersion;
 use meuxe_core::config::types::AgentConfig;
 use tauri::{AppHandle, Emitter};
 use tokio_util::sync::CancellationToken;
 
-use crate::AppState;
 use crate::commands::chat::ChatDoneEvent;
+use crate::AppState;
+
+pub struct RunAcpChatStreamParams {
+    pub app: AppHandle,
+    pub state: Arc<AppState>,
+    pub character_id: String,
+    pub user_message: String,
+    pub agent_prompt: String,
+    pub request_id: String,
+    pub cancel: CancellationToken,
+    pub persona_context: String,
+    pub model_id: String,
+    pub tts_config: meuxe_core::config::types::TtsConfig,
+    pub agent_config: AgentConfig,
+}
 
 pub fn companion_home_dir(data_dir: &Path) -> std::path::PathBuf {
     data_dir.join("companion-home")
@@ -29,7 +43,10 @@ pub fn ensure_companion_home(data_dir: &Path) -> std::io::Result<()> {
     Ok(())
 }
 
-fn write_companion_home_context(companion_home: &Path, persona_context: &str) -> std::io::Result<()> {
+fn write_companion_home_context(
+    companion_home: &Path,
+    persona_context: &str,
+) -> std::io::Result<()> {
     let agents_md = format!(
         "# Meuxe companion session\n\n\
 You are the user's AI companion in **Meuxe** — not OpenCode, not Codex, and not a generic coding assistant.\n\
@@ -39,14 +56,19 @@ Follow all expression-tag rules in the persona for avatar reactions.\n\n\
         persona = persona_context.trim()
     );
     std::fs::write(companion_home.join("AGENTS.md"), agents_md)?;
-    std::fs::write(companion_home.join("persona").join("context.md"), persona_context)?;
+    std::fs::write(
+        companion_home.join("persona").join("context.md"),
+        persona_context,
+    )?;
     Ok(())
 }
 
 pub fn resolve_acp_agent(config: &AgentConfig, data_dir: &Path) -> Result<AcpAgent, String> {
     match config.preset.as_str() {
         "opencode" => {
-            if let Some(managed) = crate::commands::agent_setup::resolve_managed_bin(data_dir, "opencode") {
+            if let Some(managed) =
+                crate::commands::agent_setup::resolve_managed_bin(data_dir, "opencode")
+            {
                 let path = managed.to_string_lossy().into_owned();
                 AcpAgent::from_args([path, "acp".to_string()]).map_err(|e| e.to_string())
             } else {
@@ -64,7 +86,9 @@ pub fn resolve_acp_agent(config: &AgentConfig, data_dir: &Path) -> Result<AcpAge
             }
         }
         "codex" => {
-            if let Some(managed) = crate::commands::agent_setup::resolve_managed_bin(data_dir, "codex-acp") {
+            if let Some(managed) =
+                crate::commands::agent_setup::resolve_managed_bin(data_dir, "codex-acp")
+            {
                 let path = managed.to_string_lossy().into_owned();
                 AcpAgent::from_args([path]).map_err(|e| e.to_string())
             } else {
@@ -83,19 +107,19 @@ pub fn resolve_acp_agent(config: &AgentConfig, data_dir: &Path) -> Result<AcpAge
     }
 }
 
-pub async fn run_acp_chat_stream(
-    app: AppHandle,
-    state: Arc<AppState>,
-    character_id: String,
-    user_message: String,
-    agent_prompt: String,
-    request_id: String,
-    cancel: CancellationToken,
-    persona_context: String,
-    model_id: String,
-    tts_config: meuxe_core::config::types::TtsConfig,
-    agent_config: AgentConfig,
-) -> Result<(), String> {
+pub async fn run_acp_chat_stream(params: RunAcpChatStreamParams) -> Result<(), String> {
+    let app = params.app;
+    let state = params.state;
+    let character_id = params.character_id;
+    let user_message = params.user_message;
+    let agent_prompt = params.agent_prompt;
+    let request_id = params.request_id;
+    let cancel = params.cancel;
+    let persona_context = params.persona_context;
+    let model_id = params.model_id;
+    let tts_config = params.tts_config;
+    let agent_config = params.agent_config;
+
     let companion_home = companion_home_dir(&state.data_dir);
     ensure_companion_home(&state.data_dir).map_err(|e| e.to_string())?;
     write_companion_home_context(&companion_home, &persona_context).map_err(|e| e.to_string())?;
@@ -242,13 +266,7 @@ pub async fn run_acp_chat_stream(
 
                         state
                             .sessions
-                            .append_message(
-                                &character_id,
-                                &user_id,
-                                "user",
-                                &user_message,
-                                None,
-                            )
+                            .append_message(&character_id, &user_id, "user", &user_message, None)
                             .map_err(|e| {
                                 agent_client_protocol::Error::internal_error().data(e.to_string())
                             })?;

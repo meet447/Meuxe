@@ -1287,9 +1287,7 @@ fn rank_memories(query: &str, memories: &mut [VaultMemory]) {
 
 fn score_memory(query_tokens: &HashSet<String>, memory: &VaultMemory) -> f64 {
     let memory_tokens = token_set(&memory.summary);
-    let overlap = query_tokens
-        .intersection(&memory_tokens)
-        .count() as f64;
+    let overlap = query_tokens.intersection(&memory_tokens).count() as f64;
     let tag_overlap = memory
         .tags
         .iter()
