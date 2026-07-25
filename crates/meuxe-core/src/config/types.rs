@@ -24,6 +24,41 @@ pub struct AppConfig {
     pub active_character: String,
     #[serde(default)]
     pub onboarding_complete: bool,
+    #[serde(default)]
+    pub agent: AgentConfig,
+}
+
+fn default_agent_backend() -> String {
+    "legacy".to_string()
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AgentConfig {
+    /// `legacy` (built-in LLM loop) or `acp` (external CLI agent via Agent Client Protocol).
+    #[serde(default = "default_agent_backend")]
+    pub backend: String,
+    /// Preset id: `claude`, `codex`, `gemini`, or `custom`.
+    #[serde(default = "default_agent_preset")]
+    pub preset: String,
+    #[serde(default)]
+    pub program: String,
+    #[serde(default)]
+    pub args: Vec<String>,
+}
+
+fn default_agent_preset() -> String {
+    "claude".to_string()
+}
+
+impl Default for AgentConfig {
+    fn default() -> Self {
+        Self {
+            backend: default_agent_backend(),
+            preset: default_agent_preset(),
+            program: String::new(),
+            args: Vec::new(),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

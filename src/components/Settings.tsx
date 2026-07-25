@@ -280,6 +280,10 @@ export function Settings({ onClose, characterId, characterName, modelId, onPrevi
   const [searchProvider, setSearchProvider] = useState("duckduckgo");
   const [serpApiKey, setSerpApiKey] = useState("");
   const [exaApiKey, setExaApiKey] = useState("");
+  const [agentBackend, setAgentBackend] = useState<"legacy" | "acp">("legacy");
+  const [agentPreset, setAgentPreset] = useState("claude");
+  const [agentProgram, setAgentProgram] = useState("");
+  const [agentArgs, setAgentArgs] = useState("");
   const [confirmReset, setConfirmReset] = useState(false);
   const [resetting, setResetting] = useState(false);
   const [resetError, setResetError] = useState<string | null>(null);
@@ -336,6 +340,10 @@ export function Settings({ onClose, characterId, characterName, modelId, onPrevi
         setSearchProvider(cfg.search?.provider || "duckduckgo");
         setSerpApiKey("");
         setExaApiKey("");
+        setAgentBackend(cfg.agent?.backend === "acp" ? "acp" : "legacy");
+        setAgentPreset(cfg.agent?.preset || "claude");
+        setAgentProgram(cfg.agent?.program || "");
+        setAgentArgs((cfg.agent?.args || []).join(" "));
       })
       .catch((err) => console.error("Failed to load config:", err));
   }, []);
@@ -388,6 +396,12 @@ export function Settings({ onClose, characterId, characterName, modelId, onPrevi
       llm: { provider: llmProvider, base_url: llmBaseUrl, model: llmModel },
       tts: { provider: ttsProvider, voice: ttsVoice },
       search: { provider: searchProvider },
+      agent: {
+        backend: agentBackend,
+        preset: agentPreset,
+        program: agentProgram,
+        args: agentArgs.trim() ? agentArgs.trim().split(/\s+/) : [],
+      },
     };
     if (llmApiKey) update.llm.api_key = llmApiKey;
     if (ttsApiKey) update.tts.api_key = ttsApiKey;
@@ -558,7 +572,84 @@ export function Settings({ onClose, characterId, characterName, modelId, onPrevi
   if (page === "llm") {
     return (
       <div className="flex-1 overflow-y-auto p-6 scrollbar-thin scrollbar-thumb-slate-200 scrollbar-track-transparent">
-        <SubHeader title="LLM Provider" />
+        <SubHeader title="AI Connection" />
+
+        <div className="mb-8 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+          <label className={labelClass}>How replies are generated</label>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
+            <button
+              type="button"
+              onClick={() => setAgentBackend("legacy")}
+              className={`px-4 py-3 rounded-2xl text-left border transition-all ${
+                agentBackend === "legacy"
+                  ? "border-blue-400 bg-blue-50 text-blue-800"
+                  : "border-slate-200 bg-slate-50 text-slate-600 hover:border-slate-300"
+              }`}
+            >
+              <span className="block text-sm font-semibold">Built-in (API)</span>
+              <span className="block text-xs mt-1 text-slate-500">Uses the model provider below with Meuxe memory and tools.</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setAgentBackend("acp")}
+              className={`px-4 py-3 rounded-2xl text-left border transition-all ${
+                agentBackend === "acp"
+                  ? "border-violet-400 bg-violet-50 text-violet-900"
+                  : "border-slate-200 bg-slate-50 text-slate-600 hover:border-slate-300"
+              }`}
+            >
+              <span className="block text-sm font-semibold">CLI agent (ACP)</span>
+              <span className="block text-xs mt-1 text-slate-500">Claude Code, Codex, or a custom agent on your machine.</span>
+            </button>
+          </div>
+
+          {agentBackend === "acp" && (
+            <div className="space-y-4 animate-in fade-in duration-200">
+              <label className={labelClass}>Agent preset</label>
+              <div className="flex flex-wrap gap-2 mb-2">
+                {(["claude", "codex", "custom"] as const).map((id) => (
+                  <button
+                    key={id}
+                    type="button"
+                    onClick={() => setAgentPreset(id)}
+                    className={`px-4 py-2 rounded-xl text-sm font-semibold border ${
+                      agentPreset === id
+                        ? "border-violet-400 bg-violet-50 text-violet-800"
+                        : "border-slate-200 text-slate-600"
+                    }`}
+                  >
+                    {id === "claude" ? "Claude Code" : id === "codex" ? "Codex" : "Custom command"}
+                  </button>
+                ))}
+              </div>
+              {agentPreset === "custom" && (
+                <>
+                  <label className={labelClass}>Command</label>
+                  <input
+                    type="text"
+                    value={agentProgram}
+                    onChange={(e) => setAgentProgram(e.target.value)}
+                    placeholder="e.g. python my_agent.py"
+                    className={inputClass}
+                  />
+                  <label className={labelClass}>Arguments (optional)</label>
+                  <input
+                    type="text"
+                    value={agentArgs}
+                    onChange={(e) => setAgentArgs(e.target.value)}
+                    placeholder="space-separated flags"
+                    className={inputClass}
+                  />
+                </>
+              )}
+              <p className="text-xs text-slate-500 leading-relaxed">
+                Persona and memory context are written to companion-home before each turn. Install the CLI agent and sign in on your machine first.
+              </p>
+            </div>
+          )}
+        </div>
+
+        <h3 className="text-sm font-bold text-slate-700 mb-3">Model provider (built-in mode)</h3>
         <LocalFirstNotice variant={LLM_PRESETS[llmProvider]?.needs_key === false ? "emerald" : "blue"} />
 
         <label className={labelClass}>Provider</label>

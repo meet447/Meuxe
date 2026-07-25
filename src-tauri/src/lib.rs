@@ -101,6 +101,9 @@ pub fn run() {
                 .app_data_dir()
                 .expect("Failed to get app data directory");
             std::fs::create_dir_all(&data_dir).expect("Failed to create data directory");
+            if let Err(err) = acp::ensure_companion_home(&data_dir) {
+                eprintln!("[acp] failed to create companion-home: {err}");
+            }
 
             let whisper_ctx = load_whisper_model(&data_dir);
 

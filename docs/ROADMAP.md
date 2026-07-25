@@ -8,7 +8,7 @@ Phases are ordered; later work assumes earlier product polish unless noted.
 - [x] Consumer-first onboarding order (you → companion → voice → AI)
 - [x] Remove Composio from first-run path
 - [x] README vision aligned with companion product
-- [x] ACP module scaffold in Rust (no runtime yet)
+- [x] ACP module scaffold in Rust (runtime wired behind `agent.backend`)
 - [x] Settings: group “Advanced” (integrations, agent tools, web search)
 
 ## Phase 1 — Feel like a shipped app
@@ -21,22 +21,22 @@ Phases are ordered; later work assumes earlier product polish unless noted.
 
 ## Phase 2 — ACP companion session (spike → replace)
 
-- [ ] `meuxe-desktop`: spawn configured ACP agent subprocess
-- [ ] Map ACP stream events → existing chat UI + avatar states
-- [ ] Companion context bundle: persona files + memory brief + relationship snapshot per session
-- [ ] Companion home directory layout documented and created on first run
-- [ ] Feature flag: `agent.backend = legacy | acp` for dogfooding
+- [x] `meuxe-desktop`: spawn configured ACP agent subprocess
+- [x] Map ACP stream events → existing chat UI + avatar states
+- [x] Companion context bundle: persona files + memory brief + relationship snapshot per session
+- [x] Companion home directory layout documented and created on first run
+- [x] Feature flag: `agent.backend = legacy | acp` for dogfooding
 
 ## Phase 3 — Consolidate backend
 
-- [ ] Route default chat through ACP when configured
+- [x] Route default chat through ACP when configured
 - [ ] Deprecate in-app tool registry for default users (Settings advanced only)
 - [ ] Composio optional plugin, not onboarding
 - [ ] Delete dead code paths in `chat.rs` / `meuxe-core` tools after parity
 
 ## Phase 4 — Ecosystem
 
-- [ ] Agent picker (command + args) with validated presets (Claude, Codex, Gemini ACP)
+- [x] Agent picker (command + args) with validated presets (Claude, Codex, Gemini ACP)
 - [ ] Optional Meuxe MCP server for memory/relationship tools
 - [ ] Character packs (file-only distribution)
 

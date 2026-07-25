@@ -77,9 +77,9 @@ struct AudioFailedEvent {
 }
 
 #[derive(Clone, serde::Serialize)]
-struct ChatDoneEvent {
-    request_id: String,
-    state_update: serde_json::Value,
+pub(crate) struct ChatDoneEvent {
+    pub(crate) request_id: String,
+    pub(crate) state_update: serde_json::Value,
 }
 
 #[derive(Clone, serde::Serialize)]
@@ -132,6 +132,10 @@ fn derive_user_id(config: &meuxe_core::config::types::AppConfig) -> String {
 }
 
 /// Strip expression tags (<<tag>>, [expression:tag], or [tag]) from text.
+pub(crate) fn clean_text_for_memory(text: &str) -> String {
+    clean_text(text)
+}
+
 fn clean_text(text: &str) -> String {
     expression_clean_re().replace_all(text, "").to_string()
 }
@@ -489,7 +493,7 @@ fn emit_ready_sentences(
 }
 
 #[allow(clippy::too_many_arguments)]
-fn drain_buffer_sentences(
+pub(crate) fn drain_buffer_sentences(
     app: &AppHandle,
     state: &Arc<AppState>,
     model_id: &str,
@@ -621,6 +625,31 @@ async fn run_chat_stream(
             memory_limit: None,
         })
         .map_err(|e| e.to_string())?;
+
+    if config.agent.backend == "acp" {
+        let mut persona_context = prompt_result.system_prompt.clone();
+        if !prompt_result.relationship_prompt.is_empty() {
+            persona_context.push_str("\n\n");
+            persona_context.push_str(&prompt_result.relationship_prompt);
+        }
+        if !prompt_result.memory_prompt.is_empty() {
+            persona_context.push_str("\n\n");
+            persona_context.push_str(&prompt_result.memory_prompt);
+        }
+        return crate::acp::run_acp_chat_stream(
+            app,
+            state,
+            character_id,
+            message,
+            request_id,
+            cancel,
+            persona_context,
+            model_id,
+            config.tts.clone(),
+            config.agent.clone(),
+        )
+        .await;
+    }
 
     // 3. Create LlmStreamConfig
     let llm_config = LlmStreamConfig {
