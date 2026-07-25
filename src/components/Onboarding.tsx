@@ -12,17 +12,13 @@ import {
   type AcpAgentPresetId,
 } from "../lib/agentPresets";
 import { COMPANION_VIBE_PACKS } from "../lib/companionVibes";
+import { DEFAULT_TTS_PROVIDER, TTS_PRESETS_UI } from "../lib/ttsPresets";
 import { AgentPresetCard } from "./agents/AgentPresetCard";
 import { AgentSetupPanel } from "./agents/AgentSetupPanel";
 import { CompanionAvatarPreview } from "./onboarding/CompanionAvatarPreview";
 import { ModelPicker } from "./onboarding/ModelPicker";
 import { OnboardingShell } from "./onboarding/OnboardingShell";
 import { MeuxeMark } from "./ui/MeuxeMark";
-
-interface TTSPreset {
-  name: string;
-  needs_key: boolean;
-}
 
 interface Voice {
   id: string;
@@ -53,18 +49,6 @@ interface FormData {
     model_id: string;
   };
 }
-
-const TTS_PRESETS: Record<string, TTSPreset> = {
-  tiktok: { name: "Built-in", needs_key: false },
-  elevenlabs: { name: "ElevenLabs", needs_key: true },
-  openai_tts: { name: "OpenAI", needs_key: true },
-};
-
-const VOICE_PROVIDER_HINT: Record<string, string> = {
-  tiktok: "Free — no account needed",
-  elevenlabs: "Natural studio voices",
-  openai_tts: "OpenAI speech",
-};
 
 const VIBE_DESCRIPTIONS: Record<string, string> = {
   Cheerful: "They bring bright energy, celebrate small wins, and want the user to feel more alive after talking to them.",
@@ -145,12 +129,12 @@ export function Onboarding({ onComplete }: { onComplete: () => void }) {
   const [agentSetup, setAgentSetup] = useState<AgentSetupStatusResponse | null>(null);
   const [agentSetupLoading, setAgentSetupLoading] = useState(false);
 
-  const ttsPresets = TTS_PRESETS;
+  const ttsPresets = TTS_PRESETS_UI;
 
   const [form, setForm] = useState<FormData>({
     user: { name: "", about: "" },
     agent: { preset: "opencode", program: "", args: "" },
-    tts: { provider: "tiktok", api_key: "", voice: "jp_001" },
+    tts: { provider: DEFAULT_TTS_PROVIDER, api_key: "", voice: "jp_001" },
     companion: {
       name: "",
       personality: "",
@@ -476,7 +460,7 @@ export function Onboarding({ onComplete }: { onComplete: () => void }) {
                     {preset.name}
                   </div>
                   <div className={`text-xs mt-0.5 ${selected ? "text-indigo-600/80" : "text-slate-400"}`}>
-                    {VOICE_PROVIDER_HINT[id]}
+                    {ttsPresets[id]?.hint}
                   </div>
                 </button>
               );

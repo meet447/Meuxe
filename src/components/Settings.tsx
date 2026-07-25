@@ -10,6 +10,7 @@ import {
   getVoices,
 } from "../api/tauri";
 import { ACP_AGENT_PRESET_IDS, ACP_AGENT_PRESETS } from "../lib/agentPresets";
+import { DEFAULT_TTS_PROVIDER, TTS_PRESETS_UI } from "../lib/ttsPresets";
 import { AgentPresetCard } from "./agents/AgentPresetCard";
 import { AgentPresetIcon } from "./agents/AgentPresetIcon";
 import { AgentSetupPanel } from "./agents/AgentSetupPanel";
@@ -20,16 +21,11 @@ interface Voice {
   name: string;
 }
 
-interface TTSPreset {
-  name: string;
-  needs_key: boolean;
-}
-
 type SettingsPage = null | "profile" | "llm" | "tts" | "privacy" | "expressions" | "memory";
 
-const TTS_PRESETS: Record<string, TTSPreset> = {
-  tiktok: { name: "TikTok TTS", needs_key: false },
-  elevenlabs: { name: "ElevenLabs", needs_key: true },
+const SETTINGS_TTS_PRESETS: Record<string, { name: string; needs_key: boolean }> = {
+  tiktok: TTS_PRESETS_UI.tiktok,
+  elevenlabs: TTS_PRESETS_UI.elevenlabs,
 };
 
 const ProfileIcon = () => (
@@ -120,7 +116,7 @@ export function Settings({ onClose, characterId, characterName, modelId, onPrevi
 
   const [userName, setUserName] = useState("");
   const [userAbout, setUserAbout] = useState("");
-  const [ttsProvider, setTtsProvider] = useState("tiktok");
+  const [ttsProvider, setTtsProvider] = useState(DEFAULT_TTS_PROVIDER);
   const [ttsApiKey, setTtsApiKey] = useState("");
   const [ttsVoice, setTtsVoice] = useState("jp_001");
   const [agentPreset, setAgentPreset] = useState("opencode");
@@ -158,7 +154,7 @@ export function Settings({ onClose, characterId, characterName, modelId, onPrevi
 
         setUserName(cfg.user?.name || "");
         setUserAbout(cfg.user?.about || "");
-        setTtsProvider(cfg.tts?.provider || "tiktok");
+        setTtsProvider(cfg.tts?.provider || DEFAULT_TTS_PROVIDER);
         setTtsApiKey("");
         setTtsVoice(cfg.tts?.voice || "jp_001");
         setAgentPreset(cfg.agent?.preset || "opencode");
@@ -257,7 +253,7 @@ export function Settings({ onClose, characterId, characterName, modelId, onPrevi
               <div className="min-w-0">
                 <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Voice</div>
                 <div className="text-sm font-bold text-slate-800 truncate">
-                  {TTS_PRESETS[config.tts?.provider]?.name || config.tts?.provider || "—"}
+                  {TTS_PRESETS_UI[config.tts?.provider]?.name || config.tts?.provider || "—"}
                 </div>
               </div>
             </div>
@@ -418,11 +414,11 @@ export function Settings({ onClose, characterId, characterName, modelId, onPrevi
     return (
       <div className="flex-1 overflow-y-auto p-6 scrollbar-thin scrollbar-thumb-slate-200 scrollbar-track-transparent">
         <SubHeader title="Voice & TTS" />
-        <LocalFirstNotice variant={TTS_PRESETS[ttsProvider]?.needs_key ? "blue" : "emerald"} />
+        <LocalFirstNotice variant={SETTINGS_TTS_PRESETS[ttsProvider]?.needs_key ? "blue" : "emerald"} />
 
         <label className={labelClass}>Provider</label>
         <div className="flex flex-wrap gap-2 mb-6">
-          {Object.entries(TTS_PRESETS).map(([id, preset]) => (
+          {Object.entries(SETTINGS_TTS_PRESETS).map(([id, preset]) => (
             <button
               key={id}
               onClick={() => setTtsProvider(id)}
@@ -446,7 +442,7 @@ export function Settings({ onClose, characterId, characterName, modelId, onPrevi
         </div>
 
         <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
-          {TTS_PRESETS[ttsProvider]?.needs_key && (
+          {SETTINGS_TTS_PRESETS[ttsProvider]?.needs_key && (
             <>
               <label className={labelClass}>API Key</label>
               <input
@@ -458,9 +454,9 @@ export function Settings({ onClose, characterId, characterName, modelId, onPrevi
               />
             </>
           )}
-          {!TTS_PRESETS[ttsProvider]?.needs_key && (
+          {!SETTINGS_TTS_PRESETS[ttsProvider]?.needs_key && (
             <div className="mb-5 rounded-2xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
-              This voice option does not require a key. Audio generation may still use the selected provider implementation when you ask the companion to speak.
+              Meuxe TTS is built in — no API key required.
             </div>
           )}
 

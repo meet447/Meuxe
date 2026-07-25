@@ -72,7 +72,7 @@ npm run tauri build
 You choose which remote services to use, if any:
 
 - **LLM** — OpenAI-compatible HTTP APIs (OpenAI, Groq, Ollama, OpenRouter, and similar). Configure endpoints and keys in the app; nothing is sent until you set this up.
-- **TTS** — includes options such as local-friendly TikTok TTS (no key), ElevenLabs, and OpenAI TTS, depending on your configuration.
+- **TTS** — built-in Meuxe TTS (no key), plus ElevenLabs and OpenAI TTS when configured.
 
 ## Project structure
 
