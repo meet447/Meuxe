@@ -10,7 +10,8 @@ pub struct AgentLaunchConfig {
     pub working_directory: String,
 }
 
-/// Placeholder until Phase 2 implements JSON-RPC over stdio.
+//! Placeholder until Phase 2 implements JSON-RPC over stdio.
+#[allow(dead_code)]
 pub fn default_launch_config(home_dir: &std::path::Path) -> AgentLaunchConfig {
     AgentLaunchConfig {
         program: "echo".to_string(),
