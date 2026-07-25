@@ -2,42 +2,40 @@
 
 Phases are ordered; later work assumes earlier product polish unless noted.
 
-## Phase 0 — Product clarity (this branch)
+## Phase 0 — Product clarity
 
 - [x] `docs/DIRECTION.md` — north star and boundaries
-- [x] Consumer-first onboarding order (you → companion → voice → AI)
-- [x] Remove Composio from first-run path
+- [x] Consumer-first onboarding (you → companion → voice → CLI agent)
 - [x] README vision aligned with companion product
-- [x] ACP module scaffold in Rust (runtime wired behind `agent.backend`)
-- [x] Settings: group “Advanced” (integrations, agent tools, web search)
+- [x] ACP client wired for chat
 
 ## Phase 1 — Feel like a shipped app
 
 - [ ] One default character + avatar demo path polished (pick primary: VRM or Live2D)
-- [ ] Empty states and copy audit (no “vault”, “Composio”, “harness” in first-run UI)
+- [ ] Empty states and copy audit (no “vault” or harness jargon in first-run UI)
 - [ ] Chat empty state: invitation to talk, not feature list
 - [ ] Mini widget as hero demo asset (recording script + README GIF)
-- [ ] Ordered TTS merge + expression polish on single chat path
+- [x] Ordered TTS merge + expression tags on ACP chat path
 
-## Phase 2 — ACP companion session (spike → replace)
+## Phase 2 — ACP companion session
 
-- [x] `meuxe-desktop`: spawn configured ACP agent subprocess
-- [x] Map ACP stream events → existing chat UI + avatar states
-- [x] Companion context bundle: persona files + memory brief + relationship snapshot per session
-- [x] Companion home directory layout documented and created on first run
-- [x] Feature flag: `agent.backend = legacy | acp` for dogfooding
+- [x] Spawn configured ACP agent subprocess
+- [x] Map ACP stream → chat UI + avatar expressions
+- [x] Companion context bundle (persona + memory + relationship in prompt / `companion-home`)
+- [x] Companion home directory layout + `AGENTS.md` for agents
+- [x] Onboarding agent install (OpenCode, Claude, Codex presets)
 
 ## Phase 3 — Consolidate backend
 
-- [x] Route default chat through ACP when configured
-- [ ] Deprecate in-app tool registry for default users (Settings advanced only)
-- [ ] Composio optional plugin, not onboarding
-- [x] Delete dead code paths in `chat.rs` / built-in LLM agent loop
+- [x] Chat runs only through ACP (no in-app LLM agent loop)
+- [x] Removed Meuxe tool registry, web search settings, and Composio integrations
+- [x] Removed dead LLM streaming client and config test/list API commands
+- [ ] Trim `config.json` on save (drop legacy `search` / `composio` keys from old installs)
 
 ## Phase 4 — Ecosystem
 
-- [x] Agent picker (command + args) with validated presets (Claude, Codex, Gemini ACP)
-- [ ] Optional Meuxe MCP server for memory/relationship tools
+- [x] Agent picker with validated presets (OpenCode, Claude Code, Codex, custom)
+- [ ] Optional Meuxe MCP server for memory/relationship tools (for agents that support MCP)
 - [ ] Character packs (file-only distribution)
 
 ## Tracking

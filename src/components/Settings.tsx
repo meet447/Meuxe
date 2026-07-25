@@ -518,7 +518,7 @@ export function Settings({ onClose, characterId, characterName, modelId, onPrevi
         <SubHeader title="Local-First Privacy" />
         <div className="space-y-4">
           <PrivacyCard title="Always local" items={["Memory database and exports", "Character persona files", "Chat session history", "Relationship state", "Imported notes and transcripts"]} tone="emerald" />
-          <PrivacyCard title="Leaves only when enabled" items={["LLM prompts and retrieved memory snippets", "TTS text sent for speech generation", "Outbound calls made by your CLI agent", "CLI agent tool calls (handled by your agent, not Meuxe)"]} tone="blue" />
+          <PrivacyCard title="Leaves only when enabled" items={["TTS text sent to your voice provider", "Cloud speech-to-text when using an OpenAI-compatible transcription API", "Outbound calls made by your CLI agent (search, GitHub, etc.)"]} tone="blue" />
           <PrivacyCard title="Never store in plaintext intentionally" items={["API keys are masked in settings reads", "Blank key fields preserve existing values", "Generated exports are local files you control"]} tone="amber" />
 
           <section className="rounded-[1.75rem] border border-violet-200 bg-violet-50 px-5 py-5 text-violet-900">

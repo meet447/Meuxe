@@ -5,8 +5,6 @@ export async function invoke<T>(cmd: string, args?: Record<string, unknown>): Pr
       return { onboarding_complete: false } as T;
     case "config_save":
       return undefined as T;
-    case "config_test_llm":
-      return "ok" as T;
     case "models_list":
       return [
         { id: "haru", type: "live2d", model_file: "haru.model3.json", path: "live2d/haru" },

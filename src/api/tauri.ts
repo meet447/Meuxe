@@ -69,23 +69,6 @@ export async function installAgentSetup(preset: string) {
   return invoke<AgentSetupStatusResponse>("agent_setup_install", { preset });
 }
 
-export async function testLlm(provider: {
-  base_url: string;
-  api_key: string;
-  model: string;
-  provider?: string;
-}) {
-  return invoke<string>("config_test_llm", { provider });
-}
-
-export async function listLlmModels(provider: {
-  base_url: string;
-  api_key?: string;
-  provider?: string;
-}) {
-  return invoke<string[]>("config_list_llm_models", { provider });
-}
-
 // Characters
 export async function listCharacters() {
   return invoke<unknown[]>("characters_list");

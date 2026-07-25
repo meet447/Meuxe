@@ -70,16 +70,6 @@ describe('tauri api utilities', () => {
       await tauriApi.saveConfig(mockConfig);
       expect(invoke).toHaveBeenCalledWith('config_save', { config: mockConfig });
     });
-
-    it('testLlm calls config_test_llm with correct provider data', async () => {
-      const providerData = {
-        base_url: 'http://localhost:8080',
-        api_key: 'test-key',
-        model: 'test-model'
-      };
-      await tauriApi.testLlm(providerData);
-      expect(invoke).toHaveBeenCalledWith('config_test_llm', { provider: providerData });
-    });
   });
 
   describe('Character functions', () => {

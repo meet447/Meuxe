@@ -41,7 +41,7 @@ Optional **Meuxe MCP** later: `remember`, `recall`, `relationship_snapshot` so a
 └─────────────────────────────────────────┘
 ```
 
-Until ACP lands, the existing OpenAI-compatible chat path remains; migration is **replace the backend session**, not add a second mode.
+Until ACP landed, chat used an OpenAI-compatible loop in Meuxe; **default chat is now ACP-only**. Migration was **replace the backend session**, not add a second mode.
 
 ## Product principles (anti–AI slop)
 

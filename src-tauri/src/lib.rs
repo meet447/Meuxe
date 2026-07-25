@@ -6,7 +6,6 @@ mod window;
 use meuxe_core::character::CharacterLoader;
 use meuxe_core::config::ConfigManager;
 use meuxe_core::expressions::ExpressionManager;
-use meuxe_core::llm::OpenAiCompatClient;
 use meuxe_core::memory::store::MemoryStore;
 use meuxe_core::memory_vault::MemoryVault;
 use meuxe_core::session::SessionStore;
@@ -23,7 +22,6 @@ pub struct AppState {
     pub memories: MemoryStore,
     pub memory_vault: MemoryVault,
     pub expressions: ExpressionManager,
-    pub llm: OpenAiCompatClient,
     pub whisper_ctx: Option<Arc<WhisperContext>>,
     pub chat_cancel: std::sync::Mutex<Option<tokio_util::sync::CancellationToken>>,
 }
@@ -111,7 +109,6 @@ pub fn run() {
                 memories: MemoryStore::new(data_dir.clone()),
                 memory_vault: MemoryVault::new(data_dir.clone()),
                 expressions: ExpressionManager::new(&data_dir),
-                llm: OpenAiCompatClient::new(),
                 whisper_ctx,
                 chat_cancel: std::sync::Mutex::new(None),
             };
@@ -128,8 +125,6 @@ pub fn run() {
             commands::config::config_save,
             commands::config::config_reset_all,
             commands::config::config_reset_onboarding,
-            commands::config::config_list_llm_models,
-            commands::config::config_test_llm,
             commands::characters::characters_list,
             commands::characters::characters_get,
             commands::characters::characters_create,
