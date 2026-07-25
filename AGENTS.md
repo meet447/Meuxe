@@ -14,7 +14,7 @@ Meuxe is a local-first AI companion desktop app built with **Tauri 2** (Rust bac
 |---|---|---|
 | `src/` | TypeScript/React | Vite frontend (React 19, Tailwind, Three.js, PixiJS/Live2D) |
 | `src-tauri/` | Rust | Tauri 2 shell — desktop window, system tray, Whisper voice, commands |
-| `crates/meuxe-core/` | Rust | Core logic — LLM client, memory, sessions, characters, TTS, tools |
+| `crates/meuxe-core/` | Rust | Core logic — persona, memory, sessions, characters, TTS |
 
 ### Running in headless Cloud VM
 

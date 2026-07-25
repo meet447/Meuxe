@@ -13,7 +13,7 @@ Include enough detail to reproduce or understand the issue (steps, affected vers
 
 ## Scope
 
-This project is a **desktop application** (Tauri). Reports about third-party services you configure (LLM or TTS providers, API keys stored locally on your machine) are generally out of scope unless they expose a defect in **this** codebase.
+This project is a **desktop application** (Tauri). Reports about third-party services you configure (ACP CLI agents, TTS providers, API keys stored locally on your machine) are generally out of scope unless they expose a defect in **this** codebase.
 
 ## Supported versions
 
