@@ -5,12 +5,15 @@ use meuxe_core::llm::types::{
 };
 use meuxe_core::tools::{PermissionLevel, ToolCallRequest};
 use regex::Regex;
+use std::future::Future;
 use std::sync::{Arc, OnceLock};
+use std::time::Duration;
 use tauri::{AppHandle, Emitter, State};
 use tokio_util::sync::CancellationToken;
 
 const MAX_AGENT_ITERATIONS: usize = 10;
 const MAX_TOOL_RESULT_CHARS: usize = 4096;
+const TTS_SENTENCE_TIMEOUT: Duration = Duration::from_secs(30);
 
 // ---------------------------------------------------------------------------
 // Cached regexes (compiled once)
@@ -52,6 +55,7 @@ struct TextChunkEvent {
 
 #[derive(Clone, serde::Serialize)]
 struct SentenceEvent {
+    request_id: String,
     index: u32,
     text: String,
     expression: String,
@@ -59,17 +63,28 @@ struct SentenceEvent {
 
 #[derive(Clone, serde::Serialize)]
 struct AudioEvent {
+    request_id: String,
     index: u32,
     data: String, // base64-encoded audio
 }
 
 #[derive(Clone, serde::Serialize)]
+struct AudioFailedEvent {
+    request_id: String,
+    index: u32,
+    reason: String,
+    message: String,
+}
+
+#[derive(Clone, serde::Serialize)]
 struct ChatDoneEvent {
+    request_id: String,
     state_update: serde_json::Value,
 }
 
 #[derive(Clone, serde::Serialize)]
 struct ChatErrorEvent {
+    request_id: String,
     message: String,
 }
 
@@ -299,26 +314,96 @@ fn find_sentence_boundary(text: &str, allow_end_boundary: bool) -> Option<usize>
     None
 }
 
+#[derive(Debug, PartialEq)]
+enum TtsTaskOutcome {
+    Audio(Vec<u8>),
+    ProviderError(String),
+    Timeout,
+    Cancelled,
+}
+
+async fn await_tts_outcome<F>(
+    cancel: CancellationToken,
+    timeout: Duration,
+    future: F,
+) -> TtsTaskOutcome
+where
+    F: Future<Output = Result<Vec<u8>, String>>,
+{
+    tokio::select! {
+        biased;
+        _ = cancel.cancelled() => TtsTaskOutcome::Cancelled,
+        result = tokio::time::timeout(timeout, future) => match result {
+            Ok(Ok(audio)) => TtsTaskOutcome::Audio(audio),
+            Ok(Err(error)) => TtsTaskOutcome::ProviderError(error),
+            Err(_) => TtsTaskOutcome::Timeout,
+        },
+    }
+}
+
 fn spawn_tts_for_sentence(
     app: &AppHandle,
     tts_config: &meuxe_core::config::types::TtsConfig,
+    request_id: &str,
+    cancel: CancellationToken,
     index: u32,
     text: String,
 ) {
     let tts_cfg = tts_config.clone();
     let app_tts = app.clone();
+    let request_id = request_id.to_string();
 
     tokio::spawn(async move {
         let tts_text = clean_for_tts(&text);
-        match meuxe_core::tts::generate_tts_auto(&tts_text, &tts_cfg).await {
-            Ok(audio_data) => {
+        let outcome = await_tts_outcome(cancel, TTS_SENTENCE_TIMEOUT, async {
+            meuxe_core::tts::generate_tts_auto(&tts_text, &tts_cfg)
+                .await
+                .map_err(|error| error.to_string())
+        })
+        .await;
+
+        match outcome {
+            TtsTaskOutcome::Audio(audio_data) => {
                 use base64::Engine;
                 let b64 = base64::engine::general_purpose::STANDARD.encode(&audio_data);
-                let _ = app_tts.emit("chat:audio", AudioEvent { index, data: b64 });
+                let _ = app_tts.emit(
+                    "chat:audio",
+                    AudioEvent {
+                        request_id,
+                        index,
+                        data: b64,
+                    },
+                );
             }
-            Err(e) => {
-                eprintln!("TTS error for sentence {index}: {e}");
+            TtsTaskOutcome::ProviderError(message) => {
+                eprintln!("TTS error for sentence {index}: {message}");
+                let _ = app_tts.emit(
+                    "chat:audio-failed",
+                    AudioFailedEvent {
+                        request_id,
+                        index,
+                        reason: "provider_error".to_string(),
+                        message,
+                    },
+                );
             }
+            TtsTaskOutcome::Timeout => {
+                let message = format!(
+                    "TTS timed out after {} seconds",
+                    TTS_SENTENCE_TIMEOUT.as_secs()
+                );
+                eprintln!("TTS timeout for sentence {index}");
+                let _ = app_tts.emit(
+                    "chat:audio-failed",
+                    AudioFailedEvent {
+                        request_id,
+                        index,
+                        reason: "timeout".to_string(),
+                        message,
+                    },
+                );
+            }
+            TtsTaskOutcome::Cancelled => {}
         }
     });
 }
@@ -329,6 +414,8 @@ fn emit_sentence_chunk(
     model_id: &str,
     current_expression: &str,
     tts_config: &meuxe_core::config::types::TtsConfig,
+    request_id: &str,
+    cancel: &CancellationToken,
     sentence_index: &mut u32,
     raw_text: &str,
 ) {
@@ -343,13 +430,14 @@ fn emit_sentence_chunk(
     let _ = app.emit(
         "chat:sentence",
         SentenceEvent {
+            request_id: request_id.to_string(),
             index: idx,
             text: clean.clone(),
             expression: resolved,
         },
     );
 
-    spawn_tts_for_sentence(app, tts_config, idx, clean);
+    spawn_tts_for_sentence(app, tts_config, request_id, cancel.clone(), idx, clean);
     *sentence_index += 1;
 }
 
@@ -360,6 +448,8 @@ fn emit_ready_sentences(
     model_id: &str,
     current_expression: &str,
     tts_config: &meuxe_core::config::types::TtsConfig,
+    request_id: &str,
+    cancel: &CancellationToken,
     sentence_index: &mut u32,
     text: &str,
     allow_end_boundary: bool,
@@ -375,6 +465,8 @@ fn emit_ready_sentences(
             model_id,
             current_expression,
             tts_config,
+            request_id,
+            cancel,
             sentence_index,
             &sentence,
         );
@@ -388,6 +480,8 @@ fn emit_ready_sentences(
             model_id,
             current_expression,
             tts_config,
+            request_id,
+            cancel,
             sentence_index,
             &remaining,
         );
@@ -401,6 +495,8 @@ fn drain_buffer_sentences(
     model_id: &str,
     current_expression: &str,
     tts_config: &meuxe_core::config::types::TtsConfig,
+    request_id: &str,
+    cancel: &CancellationToken,
     sentence_index: &mut u32,
     buffer: &mut String,
     allow_end_boundary: bool,
@@ -415,6 +511,8 @@ fn drain_buffer_sentences(
             model_id,
             current_expression,
             tts_config,
+            request_id,
+            cancel,
             sentence_index,
             &sentence,
         );
@@ -434,6 +532,7 @@ pub async fn chat_send(
     state: State<'_, Arc<AppState>>,
     character_id: String,
     message: String,
+    request_id: String,
 ) -> Result<(), String> {
     let state = Arc::clone(&state);
     let app_handle = app.clone();
@@ -449,11 +548,13 @@ pub async fn chat_send(
     }
 
     tokio::spawn(async move {
+        let error_request_id = request_id.clone();
         if let Err(e) = run_chat_stream(
             app_handle.clone(),
             state,
             character_id,
             message,
+            request_id,
             cancel_token,
         )
         .await
@@ -461,6 +562,7 @@ pub async fn chat_send(
             let _ = app_handle.emit(
                 "chat:error",
                 ChatErrorEvent {
+                    request_id: error_request_id,
                     message: e.to_string(),
                 },
             );
@@ -490,6 +592,7 @@ async fn run_chat_stream(
     state: Arc<AppState>,
     character_id: String,
     message: String,
+    request_id: String,
     cancel: CancellationToken,
 ) -> Result<(), String> {
     // 1. Load config, derive user_id
@@ -662,6 +765,8 @@ async fn run_chat_stream(
                             &model_id,
                             &current_expression,
                             &tts_config,
+                            &request_id,
+                            &cancel,
                             &mut sentence_index,
                             &mut buffer,
                             false,
@@ -678,6 +783,8 @@ async fn run_chat_stream(
                                     &model_id,
                                     &current_expression,
                                     &tts_config,
+                                    &request_id,
+                                    &cancel,
                                     &mut sentence_index,
                                     &before_tag,
                                     true,
@@ -741,6 +848,8 @@ async fn run_chat_stream(
             &model_id,
             &current_expression,
             &tts_config,
+            &request_id,
+            &cancel,
             &mut sentence_index,
             &buffer,
             true,
@@ -1030,14 +1139,22 @@ async fn run_chat_stream(
         .and_then(Result::ok)
         .unwrap_or(serde_json::Value::Null);
 
-    let _ = app.emit("chat:done", ChatDoneEvent { state_update });
+    let _ = app.emit(
+        "chat:done",
+        ChatDoneEvent {
+            request_id,
+            state_update,
+        },
+    );
 
     Ok(())
 }
 
 #[cfg(test)]
 mod tests {
-    use super::find_sentence_boundary;
+    use super::{await_tts_outcome, find_sentence_boundary, TtsTaskOutcome};
+    use std::time::Duration;
+    use tokio_util::sync::CancellationToken;
 
     #[test]
     fn finds_sentence_before_next_text() {
@@ -1060,6 +1177,51 @@ mod tests {
             find_sentence_boundary("She said hi.\" Next", false),
             Some(13)
         );
+    }
+
+    #[tokio::test]
+    async fn tts_outcome_reports_success() {
+        let outcome = await_tts_outcome(CancellationToken::new(), Duration::from_secs(1), async {
+            Ok::<_, String>(vec![1, 2, 3])
+        })
+        .await;
+        assert_eq!(outcome, TtsTaskOutcome::Audio(vec![1, 2, 3]));
+    }
+
+    #[tokio::test]
+    async fn tts_outcome_reports_provider_error() {
+        let outcome = await_tts_outcome(CancellationToken::new(), Duration::from_secs(1), async {
+            Err::<Vec<u8>, _>("provider failed".to_string())
+        })
+        .await;
+        assert_eq!(
+            outcome,
+            TtsTaskOutcome::ProviderError("provider failed".to_string())
+        );
+    }
+
+    #[tokio::test]
+    async fn tts_outcome_reports_timeout() {
+        let outcome =
+            await_tts_outcome(CancellationToken::new(), Duration::from_millis(1), async {
+                tokio::time::sleep(Duration::from_secs(1)).await;
+                Ok::<_, String>(Vec::new())
+            })
+            .await;
+        assert_eq!(outcome, TtsTaskOutcome::Timeout);
+    }
+
+    #[tokio::test]
+    async fn tts_outcome_reports_cancellation() {
+        let cancel = CancellationToken::new();
+        cancel.cancel();
+        let outcome = await_tts_outcome(
+            cancel,
+            Duration::from_secs(1),
+            std::future::pending::<Result<Vec<u8>, String>>(),
+        )
+        .await;
+        assert_eq!(outcome, TtsTaskOutcome::Cancelled);
     }
 }
 

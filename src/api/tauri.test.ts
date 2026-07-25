@@ -128,9 +128,13 @@ describe('tauri api utilities', () => {
   });
 
   describe('Chat functions', () => {
-    it('sendChat calls chat_send', async () => {
-      await tauriApi.sendChat('char-1', 'Hello');
-      expect(invoke).toHaveBeenCalledWith('chat_send', { characterId: 'char-1', message: 'Hello' });
+    it('sendChat calls chat_send with a turn request ID', async () => {
+      await tauriApi.sendChat('char-1', 'Hello', 'turn-1');
+      expect(invoke).toHaveBeenCalledWith('chat_send', {
+        characterId: 'char-1',
+        message: 'Hello',
+        requestId: 'turn-1',
+      });
     });
 
     it('getChatHistory calls chat_history', async () => {

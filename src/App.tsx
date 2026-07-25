@@ -132,11 +132,34 @@ function App() {
   const [onboardingComplete, setOnboardingComplete] = useState<boolean | null>(null);
   const [userTyping, setUserTyping] = useState(false);
 
-  const { setMessages, timeline, isStreaming, streamingText, send, setOnSentence, setOnAudio, toolCalls, handleConfirm } =
-    useChat();
+  const {
+    setMessages,
+    timeline,
+    isStreaming,
+    streamingText,
+    send,
+    setOnSentence,
+    setOnAudio,
+    setOnAudioFailed,
+    setOnDone,
+    setOnError,
+    toolCalls,
+    handleConfirm,
+  } = useChat();
   const { listening, startListening, stopListening } = useVoice();
-  const { speaking, addSentence, addAudio, clearQueue, getAudioLevels, setOnExpressionChange, setNeutralExpression } =
-    useAudioQueue();
+  const {
+    speaking,
+    beginRequest,
+    addSentence,
+    addAudio,
+    failAudio,
+    markTextDone,
+    failRequest,
+    clearQueue,
+    getAudioLevels,
+    setOnExpressionChange,
+    setNeutralExpression,
+  } = useAudioQueue();
 
   const selectedCharRef = useRef<Character | undefined>(undefined);
 
@@ -206,13 +229,33 @@ function App() {
 
   // Wire chat sentence events to audio queue
   useEffect(() => {
-    setOnSentence((task) => {
-      addSentence(task);
+    setOnSentence((payload) => {
+      addSentence(payload.request_id, payload);
     });
-    setOnAudio((index, audio) => {
-      addAudio(index, audio);
+    setOnAudio((payload) => {
+      addAudio(payload.request_id, payload.index, payload.data);
     });
-  }, [setOnSentence, setOnAudio, addSentence, addAudio]);
+    setOnAudioFailed((payload) => {
+      failAudio(payload.request_id, payload.index);
+    });
+    setOnDone((payload) => {
+      markTextDone(payload.request_id);
+    });
+    setOnError((requestId) => {
+      failRequest(requestId);
+    });
+  }, [
+    setOnSentence,
+    setOnAudio,
+    setOnAudioFailed,
+    setOnDone,
+    setOnError,
+    addSentence,
+    addAudio,
+    failAudio,
+    markTextDone,
+    failRequest,
+  ]);
 
   useEffect(() => {
     refreshCharacters();
@@ -337,11 +380,11 @@ function App() {
   const handleSend = useCallback(
     async (text: string) => {
       if (!selectedCharId || !expressionsConfigured) return;
-      clearQueue();
-
-      await send(selectedCharId, text);
+      const requestId = crypto.randomUUID();
+      beginRequest(requestId);
+      await send(selectedCharId, text, requestId);
     },
-    [selectedCharId, expressionsConfigured, send, clearQueue]
+    [selectedCharId, expressionsConfigured, send, beginRequest]
   );
 
   useEffect(() => {
