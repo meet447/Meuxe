@@ -50,12 +50,7 @@ export function MiniWidget({
   const [input, setInput] = useState("");
   const [sizePresetIndex, setSizePresetIndex] = useState(1);
   const [dockVisible, setDockVisible] = useState(false);
-  const [composerOpen, setComposerOpen] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    if (composerOpen) inputRef.current?.focus();
-  }, [composerOpen]);
 
   // Sync preset with actual window size on mount
   useEffect(() => {
@@ -71,16 +66,6 @@ export function MiniWidget({
     void syncPresetWithWindow();
   }, []);
 
-  // Auto-close composer when streaming finishes
-  useEffect(() => {
-    if (!isStreaming && composerOpen && !input.trim()) {
-      setComposerOpen(false);
-    }
-  }, [isStreaming]);
-
-  const composerOpenRef = useRef(false);
-  composerOpenRef.current = composerOpen;
-
   // Open composer when triggered externally (via global shortcut in App.tsx)
   useEffect(() => {
     if (openComposerTrigger > 0) {
@@ -88,7 +73,7 @@ export function MiniWidget({
         void getCurrentWindow().setSize(new LogicalSize(MINI_WINDOW_PRESETS[1].width, MINI_WINDOW_PRESETS[1].height));
         setSizePresetIndex(1);
       }
-      setComposerOpen(true);
+      inputRef.current?.focus();
     }
   }, [openComposerTrigger]);
 
@@ -132,22 +117,21 @@ export function MiniWidget({
     if (!text || isStreaming) return;
     onSend(text);
     setInput("");
-    setComposerOpen(false);
   };
 
   const handleExpand = async () => { await expand(); };
 
-  const openComposer = () => {
-    if (!composerOpen && sizePresetIndex === 0) {
+  const focusInput = () => {
+    if (sizePresetIndex === 0) {
       void applyWindowPreset(1);
     }
-    setComposerOpen(true);
+    inputRef.current?.focus();
   };
 
   const handleRootKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
     if (event.key === "Escape") {
-      setComposerOpen(false);
       setInput("");
+      inputRef.current?.blur();
     }
   };
 
@@ -155,7 +139,7 @@ export function MiniWidget({
     ? toolCalls.find((tc) => tc.status === "awaiting_confirmation")
     : null;
 
-  const showDock = dockVisible || composerOpen || listening || isStreaming || pendingConfirmation || caption;
+  const showUtilities = dockVisible || listening || isStreaming || pendingConfirmation || caption;
 
   const showThinkingStatus =
     !caption && (isStreaming || (speechSessionActive && !speaking));
@@ -194,14 +178,14 @@ export function MiniWidget({
         </div>
       )}
 
-      {/* Spoken sentence subtitle — above dock */}
-      {caption && !composerOpen && !pendingTool && (
-        <div className="absolute bottom-16 left-2 right-2 z-10 pointer-events-none">
-          <div className="rounded-2xl border border-slate-200 bg-white/95 px-3 py-2.5 shadow-sm backdrop-blur-sm">
+      {/* Spoken sentence subtitle */}
+      {caption && !pendingTool && (
+        <div className="absolute bottom-[4.75rem] left-3 right-3 z-10 pointer-events-none">
+          <div className="rounded-2xl border border-slate-200 bg-white px-3 py-2.5 shadow-sm">
             {captionSpeaker && (
               <p className="mb-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-400">{captionSpeaker}</p>
             )}
-            <p className="text-[12px] leading-snug text-slate-800">{caption}</p>
+            <p className="text-[13px] leading-snug text-slate-800">{caption}</p>
           </div>
         </div>
       )}
@@ -209,7 +193,7 @@ export function MiniWidget({
       {/* Tool confirmation overlay — compact card */}
       {pendingTool && (
         <div
-          className="absolute bottom-16 left-2 right-2 z-20"
+          className="absolute bottom-[4.75rem] left-3 right-3 z-20"
           data-mini-interactive="true"
         >
           <div className="rounded-2xl border border-amber-200 bg-amber-50/90 backdrop-blur-xl shadow-md px-3 py-2.5">
@@ -237,89 +221,66 @@ export function MiniWidget({
         </div>
       )}
 
-      {/* Composer — popup input, appears on keyboard shortcut or button click */}
-      {composerOpen && (
-        <form
-          data-mini-interactive="true"
-          onSubmit={handleSubmit}
-          className="absolute bottom-16 left-1/2 z-30 flex w-[min(90vw,320px)] -translate-x-1/2 items-center gap-2 rounded-2xl border border-white/80 bg-white/90 p-2 shadow-[0_12px_40px_rgba(15,23,42,0.12)] backdrop-blur-xl"
+      {/* Bottom input + utilities */}
+      <div
+        className="absolute bottom-3 left-1/2 z-30 flex w-[min(92vw,340px)] -translate-x-1/2 flex-col gap-2"
+        data-mini-interactive="true"
+      >
+        <div
+          className={`flex items-center justify-between px-1 transition-opacity duration-200 ${
+            showUtilities ? "opacity-100" : "pointer-events-none opacity-0"
+          }`}
         >
+          <button
+            type="button"
+            onClick={cycleWindowSize}
+            className="rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-500 hover:bg-slate-50 hover:text-slate-800"
+            title="Window size"
+          >
+            {MINI_WINDOW_PRESETS[sizePresetIndex].label}
+          </button>
+          <button
+            type="button"
+            onClick={handleExpand}
+            className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:text-slate-900"
+            title="Open full app"
+          >
+            <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 3H5a2 2 0 00-2 2v3m16 0V5a2 2 0 00-2-2h-3m0 18h3a2 2 0 002-2v-3M5 16v3a2 2 0 002 2h3" />
+            </svg>
+          </button>
+        </div>
+
+        <form
+          onSubmit={handleSubmit}
+          className="flex items-center gap-1 rounded-full border border-slate-200 bg-white py-1 pl-1 pr-1.5 shadow-sm ring-1 ring-slate-100 focus-within:ring-slate-200"
+        >
+          <MicButton listening={listening} onToggle={onMicToggle} variant="stage" />
           <input
             ref={inputRef}
             type="text"
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            placeholder="Ask anything..."
-            className="min-w-0 flex-1 rounded-xl bg-slate-50 px-3 py-2.5 text-[13px] text-slate-700 outline-none placeholder:text-slate-400 focus:bg-white"
+            onFocus={focusInput}
+            placeholder="Type a message..."
+            className="companion-chat-input min-w-0 flex-1 bg-transparent px-2 py-2.5 text-[15px] text-slate-800 outline-none ring-0 placeholder:text-slate-400 focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0 disabled:opacity-50"
             disabled={isStreaming}
           />
           <button
             type="submit"
             disabled={!input.trim() || isStreaming}
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-blue-500 text-white shadow-sm hover:bg-blue-600 disabled:bg-slate-200 disabled:text-slate-400 transition-all"
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-blue-600 text-white transition-colors hover:bg-blue-700 disabled:opacity-30"
+            title="Send"
           >
-            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5" />
-            </svg>
+            {isStreaming ? (
+              <span className="h-4 w-4 rounded-full border-2 border-white/40 border-t-white animate-spin" />
+            ) : (
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5" />
+              </svg>
+            )}
           </button>
         </form>
-      )}
-
-      {/* Dock — hover to reveal, contains chat/mic/size/expand */}
-      <div
-        className={`absolute bottom-3 left-1/2 z-20 flex -translate-x-1/2 items-center gap-1.5 rounded-full border border-white/70 bg-white/70 px-2 py-1.5 shadow-sm backdrop-blur-xl transition-all duration-300 ${
-          showDock ? "opacity-100" : "pointer-events-none opacity-0"
-        }`}
-        data-mini-interactive="true"
-      >
-        {/* Size cycle */}
-        <button
-          type="button"
-          onClick={cycleWindowSize}
-          className="rounded-full bg-white/80 px-2.5 py-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-500 transition-all hover:bg-white hover:text-slate-700"
-          title="Cycle window size"
-        >
-          {MINI_WINDOW_PRESETS[sizePresetIndex].label}
-        </button>
-
-        {/* Text chat toggle */}
-        <button
-          type="button"
-          onClick={() => composerOpen ? setComposerOpen(false) : openComposer()}
-          className={`flex h-9 w-9 items-center justify-center rounded-full transition-all ${
-            isStreaming
-              ? "bg-blue-500 text-white shadow-md shadow-blue-500/25"
-              : composerOpen
-              ? "bg-blue-500 text-white shadow-md shadow-blue-500/25"
-              : "bg-white/80 text-slate-600 hover:bg-white hover:text-slate-800"
-          }`}
-          title="Text chat (/ or Cmd+K)"
-        >
-          {isStreaming ? (
-            <span className="h-3.5 w-3.5 rounded-full border-2 border-white/30 border-t-white animate-spin" />
-          ) : (
-            <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h8M8 14h5m-9 6l2.4-3.2A8.96 8.96 0 013 11a9 9 0 1118 0 9 9 0 01-9 9 8.96 8.96 0 01-4.6-1.2L3 20z" />
-            </svg>
-          )}
-        </button>
-
-        {/* Mic */}
-        <div className="rounded-full bg-white/80">
-          <MicButton listening={listening} onToggle={onMicToggle} />
-        </div>
-
-        {/* Expand */}
-        <button
-          type="button"
-          onClick={handleExpand}
-          className="flex h-9 w-9 items-center justify-center rounded-full bg-white/80 text-slate-600 transition-all hover:bg-white hover:text-slate-800"
-          title="Open full app"
-        >
-          <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 3H5a2 2 0 00-2 2v3m16 0V5a2 2 0 00-2-2h-3m0 18h3a2 2 0 002-2v-3M5 16v3a2 2 0 002 2h3" />
-          </svg>
-        </button>
       </div>
     </div>
   );
