@@ -142,7 +142,7 @@ const MessageBubble = memo(function MessageBubble({
           isUser
             ? dark
               ? "rounded-tr-lg bg-indigo-600 text-white shadow-md shadow-indigo-900/30"
-              : "rounded-tr-lg bg-gradient-to-br from-blue-500 to-blue-600 text-white shadow-md shadow-blue-500/20"
+              : "rounded-tr-lg bg-blue-600 text-white shadow-sm"
             : dark
               ? "rounded-tl-lg border border-white/10 bg-white/10 text-white/90 shadow-sm"
               : "rounded-tl-lg border border-slate-100 bg-white text-slate-700 shadow-sm"
@@ -365,7 +365,7 @@ export function ChatPanel({
           <div className={`mt-16 flex flex-col items-center text-center ${dark ? "text-white/40" : "text-slate-400"}`}>
             <div
               className={`mb-4 flex h-14 w-14 items-center justify-center rounded-2xl shadow-sm ${
-                dark ? "bg-white/10 text-white/30" : "bg-gradient-to-br from-blue-50 to-indigo-50 text-blue-300"
+                dark ? "bg-white/10 text-white/30" : "bg-blue-50 text-blue-400"
               }`}
             >
               <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">

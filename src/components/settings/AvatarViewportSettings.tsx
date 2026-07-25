@@ -2,7 +2,7 @@ import { BG_PRESETS } from "../../constants/bgPresets";
 
 const STAGE_BACKGROUNDS = [
   { name: "Transparent (match app)", value: "transparent" },
-  { name: "Light", value: "linear-gradient(180deg, #f8fafc 0%, #f1f5f9 55%, #eef2ff 100%)" },
+  { name: "Light", value: "#f8fafc" },
   ...BG_PRESETS,
 ];
 

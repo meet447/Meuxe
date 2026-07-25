@@ -16,7 +16,7 @@ export function OnboardingShell({
 
   return (
     <div
-      className="fixed inset-0 z-[200] overflow-x-hidden overflow-y-auto bg-gradient-to-b from-indigo-50/80 via-white to-slate-50 scrollbar-thin scrollbar-thumb-slate-200 scrollbar-track-transparent overscroll-y-contain"
+      className="fixed inset-0 z-[200] overflow-x-hidden overflow-y-auto bg-slate-50 scrollbar-thin scrollbar-thumb-slate-200 scrollbar-track-transparent overscroll-y-contain"
     >
       <div className="pointer-events-none fixed inset-0 overflow-hidden">
         <div className="absolute -left-[15%] top-[-10%] h-[45%] w-[45%] rounded-full bg-indigo-200/30 blur-[100px]" />

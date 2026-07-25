@@ -9,10 +9,6 @@
 /* ─── Companion stage (light) ─── */
 .companion-stage-light {
   background-color: #f8fafc;
-  background-image:
-    radial-gradient(rgba(15, 23, 42, 0.06) 1px, transparent 1px),
-    linear-gradient(180deg, #f8fafc 0%, #f1f5f9 55%, #eef2ff 100%);
-  background-size: 22px 22px, 100% 100%;
 }
 
 /* ─── Base & Typography ─── */

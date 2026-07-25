@@ -523,7 +523,7 @@ function App() {
 
   if (onboardingComplete === null) {
     return (
-      <div className="h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-white to-indigo-50">
+      <div className="h-screen flex items-center justify-center bg-slate-50">
         <div className="flex flex-col items-center gap-5">
           <div className="flex gap-2">
             <span className="w-3 h-3 rounded-full bg-blue-400 animate-bounce [animation-delay:-0.3s]" />

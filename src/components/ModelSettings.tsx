@@ -94,7 +94,7 @@ export const ModelSettings = memo(function ModelSettings({
   return (
     <div className="flex-1 flex flex-col bg-transparent relative h-full">
       {/* Header */}
-      <div className="px-6 py-5 border-b border-slate-100/80 bg-gradient-to-r from-white/80 to-blue-50/30 backdrop-blur-sm z-10">
+      <div className="px-6 py-5 border-b border-slate-100 bg-white z-10">
         <h2 className="text-[16px] font-bold text-slate-800 tracking-tight">Expression Mapping</h2>
         <p className="text-xs text-slate-400 mt-1 font-medium">Model: <span className="text-blue-500">{modelId || "none"}</span></p>
       </div>

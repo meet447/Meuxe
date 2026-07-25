@@ -260,7 +260,7 @@ export function Settings({ onClose, characterId, characterName, modelId, onPrevi
             className="rounded-2xl border border-slate-100 bg-white p-3.5 shadow-sm text-left transition-all hover:border-indigo-100 hover:shadow-md group"
           >
             <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 text-white shadow-md shadow-blue-500/20">
+      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-blue-600 text-white shadow-sm">
                 <SpeakerIcon />
               </div>
               <div className="min-w-0 flex-1">

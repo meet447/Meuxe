@@ -301,7 +301,7 @@ export function MemoryStatePanel({ characterId, characterName, onConversationCle
 
   return (
     <div className="flex-1 overflow-y-auto p-6 scrollbar-thin scrollbar-thumb-slate-200 scrollbar-track-transparent">
-      <div className="mb-6 rounded-[2rem] border border-slate-200/70 bg-[radial-gradient(circle_at_top_left,_rgba(219,234,254,0.6),_rgba(255,255,255,1)_50%)] px-5 py-5 shadow-[0_14px_40px_rgba(15,23,42,0.05)]">
+      <div className="mb-6 rounded-[2rem] border border-slate-200 bg-white px-5 py-5 shadow-sm">
         <div className="flex items-start justify-between gap-4">
           <div>
             <div className="text-[11px] font-semibold uppercase tracking-[0.26em] text-slate-500">Memory Vault</div>
@@ -575,7 +575,7 @@ export function MemoryStatePanel({ characterId, characterName, onConversationCle
               </div>
             </section>
 
-        <section className={`${sectionCardClass} bg-[linear-gradient(135deg,rgba(248,250,252,1),rgba(255,247,237,0.82))]`}>
+        <section className={`${sectionCardClass} bg-slate-50`}>
           <div className="mb-4">
             <div className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500">Conversation Archive</div>
             <h4 className="mt-2 text-lg font-bold text-slate-800">Session control</h4>
