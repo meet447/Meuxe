@@ -502,6 +502,15 @@ function App() {
     </Suspense>
   ), [modelType, selectedCharId, canvasProps, selectedModel?.animations, modelMapping]);
 
+  const charName = selectedChar?.name || "Companion";
+
+  const spokenCaption = useMemo(() => {
+    if (speaking && speakingSentence?.trim()) {
+      return cleanCompanionDisplayText(speakingSentence);
+    }
+    return null;
+  }, [speaking, speakingSentence]);
+
   // Mini mode: render just the avatar in MiniWidget
   if (isMiniMode) {
     return (
@@ -510,7 +519,9 @@ function App() {
         listening={listening}
         speaking={speaking}
         isStreaming={isStreaming}
-        streamingText={streamingText}
+        speechSessionActive={speechSessionActive}
+        caption={spokenCaption}
+        captionSpeaker={spokenCaption ? charName : undefined}
         toolCalls={toolCalls}
         onSend={handleSend}
         onMicToggle={handleMicToggle}
@@ -520,15 +531,6 @@ function App() {
       />
     );
   }
-
-  const charName = selectedChar?.name || "Companion";
-
-  const stageCaption = useMemo(() => {
-    if (speaking && speakingSentence?.trim()) {
-      return cleanCompanionDisplayText(speakingSentence);
-    }
-    return null;
-  }, [speaking, speakingSentence]);
 
   if (onboardingComplete === null) {
     return (
@@ -635,10 +637,10 @@ function App() {
                   listening={listening}
                   onMicToggle={handleMicToggle}
                   inputRef={fullChatInputRef}
-                  caption={stageCaption}
-                  captionSpeaker={stageCaption ? charName : undefined}
+                  caption={spokenCaption}
+                  captionSpeaker={spokenCaption ? charName : undefined}
                   statusLabel={
-                    stageCaption
+                    spokenCaption
                       ? null
                       : isStreaming || (speechSessionActive && !speaking)
                         ? "Thinking…"

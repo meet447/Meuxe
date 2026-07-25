@@ -10,7 +10,9 @@ interface MiniWidgetProps {
   listening: boolean;
   speaking: boolean;
   isStreaming: boolean;
-  streamingText: string;
+  speechSessionActive: boolean;
+  caption?: string | null;
+  captionSpeaker?: string;
   toolCalls: ToolCallStatus[];
   onSend: (text: string) => void;
   onMicToggle: () => void;
@@ -31,7 +33,9 @@ export function MiniWidget({
   listening,
   speaking,
   isStreaming,
-  streamingText,
+  speechSessionActive,
+  caption,
+  captionSpeaker,
   toolCalls,
   onSend,
   onMicToggle,
@@ -151,12 +155,10 @@ export function MiniWidget({
     ? toolCalls.find((tc) => tc.status === "awaiting_confirmation")
     : null;
 
-  const showDock = dockVisible || composerOpen || listening || isStreaming || pendingConfirmation;
+  const showDock = dockVisible || composerOpen || listening || isStreaming || pendingConfirmation || caption;
 
-  // Minimal streaming preview — just show a short text
-  const streamPreview = streamingText
-    ? streamingText.length > 60 ? "..." + streamingText.slice(-60) : streamingText
-    : null;
+  const showThinkingStatus =
+    !caption && (isStreaming || (speechSessionActive && !speaking));
 
   return (
     <div
@@ -181,26 +183,25 @@ export function MiniWidget({
       {avatarComponent}
 
       {/* Status pill — top right, subtle */}
-      {(speaking || listening || isStreaming) && (
-        <div className="absolute right-3 top-3 z-20 flex items-center gap-1.5 rounded-full border border-white/70 bg-white/80 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-slate-600 shadow-sm backdrop-blur-xl pointer-events-none">
+      {(listening || showThinkingStatus || (speaking && !caption)) && (
+        <div className="absolute right-3 top-3 z-20 flex items-center gap-1.5 rounded-full border border-slate-200 bg-white/90 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-slate-600 shadow-sm backdrop-blur-xl pointer-events-none">
           <span className={`h-1.5 w-1.5 rounded-full ${
             listening ? "bg-red-500 animate-ping"
-              : isStreaming ? "bg-blue-400 animate-pulse"
+              : showThinkingStatus ? "bg-blue-400 animate-pulse"
               : "bg-blue-400 animate-ping"
           }`} />
-          <span>{listening ? "Listening" : isStreaming ? "Thinking" : "Speaking"}</span>
+          <span>{listening ? "Listening" : showThinkingStatus ? "Thinking" : "Speaking"}</span>
         </div>
       )}
 
-      {/* Streaming text preview — bottom area, above dock */}
-      {isStreaming && streamPreview && !composerOpen && (
+      {/* Spoken sentence subtitle — above dock */}
+      {caption && !composerOpen && !pendingTool && (
         <div className="absolute bottom-16 left-2 right-2 z-10 pointer-events-none">
-          <div className="rounded-2xl px-3 py-2 text-[11px] leading-relaxed text-slate-700 bg-white/75 border border-white/50 backdrop-blur-xl shadow-sm">
-            {streamPreview}
-            <span className="inline-flex gap-0.5 ml-1 align-middle">
-              <span className="w-1 h-1 rounded-full bg-blue-400 animate-pulse" />
-              <span className="w-1 h-1 rounded-full bg-blue-400 animate-pulse [animation-delay:0.15s]" />
-            </span>
+          <div className="rounded-2xl border border-slate-200 bg-white/95 px-3 py-2.5 shadow-sm backdrop-blur-sm">
+            {captionSpeaker && (
+              <p className="mb-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-400">{captionSpeaker}</p>
+            )}
+            <p className="text-[12px] leading-snug text-slate-800">{caption}</p>
           </div>
         </div>
       )}
