@@ -12,6 +12,7 @@ import {
 } from "../api/tauri";
 import { ComposioIntegrationsPanel } from "./ComposioIntegrationsPanel";
 import { LLM_PRESETS, llmPresetEntries } from "../lib/llmPresets";
+import { ACP_AGENT_PRESETS } from "../lib/agentPresets";
 import { LlmModelField } from "./LlmModelField";
 interface Voice {
   id: string;
@@ -618,7 +619,7 @@ export function Settings({ onClose, characterId, characterName, modelId, onPrevi
                         : "border-slate-200 text-slate-600"
                     }`}
                   >
-                    {id === "claude" ? "Claude Code" : id === "codex" ? "Codex" : "Custom command"}
+                    {ACP_AGENT_PRESETS[id].title}
                   </button>
                 ))}
               </div>
