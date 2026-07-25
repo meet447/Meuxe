@@ -40,6 +40,21 @@ pub fn managed_npm_bin_dir(data_dir: &Path) -> PathBuf {
     managed_npm_prefix(data_dir).join("bin")
 }
 
+pub fn managed_npm_modules_bin_dir(data_dir: &Path) -> PathBuf {
+    managed_npm_prefix(data_dir)
+        .join("node_modules")
+        .join(".bin")
+}
+
+/// Resolves a CLI shim from our managed npm prefix (`bin/` for global installs, or legacy `node_modules/.bin/`).
+pub fn resolve_managed_bin(data_dir: &Path, name: &str) -> Option<PathBuf> {
+    let candidates = [
+        managed_npm_bin_dir(data_dir).join(name),
+        managed_npm_modules_bin_dir(data_dir).join(name),
+    ];
+    candidates.into_iter().find(|p| p.is_file())
+}
+
 fn trim_version(stdout: &[u8]) -> Option<String> {
     let s = String::from_utf8_lossy(stdout);
     let trimmed = s.trim();
@@ -94,8 +109,8 @@ pub async fn check_prerequisites() -> AcpPrerequisitesStatus {
     }
 }
 
-fn managed_bin(data_dir: &Path, name: &str) -> PathBuf {
-    managed_npm_bin_dir(data_dir).join(name)
+fn managed_install_present(data_dir: &Path, name: &str) -> bool {
+    resolve_managed_bin(data_dir, name).is_some()
 }
 
 pub async fn check_preset(data_dir: &Path, preset: &str) -> AgentPresetSetupStatus {
@@ -103,8 +118,7 @@ pub async fn check_preset(data_dir: &Path, preset: &str) -> AgentPresetSetupStat
 
     match preset {
         "opencode" => {
-            let managed = managed_bin(data_dir, "opencode");
-            let managed_install = managed.is_file();
+            let managed_install = managed_install_present(data_dir, "opencode");
             let system_path = command_ok("opencode", &["--version"]).await;
             let ready = managed_install || system_path;
             let needs_node = !managed_install && !prerequisites.node_available;
@@ -129,8 +143,7 @@ pub async fn check_preset(data_dir: &Path, preset: &str) -> AgentPresetSetupStat
             }
         }
         "claude" => {
-            let managed = managed_bin(data_dir, "claude-agent-acp");
-            let managed_install = managed.is_file();
+            let managed_install = managed_install_present(data_dir, "claude-agent-acp");
             let system_path = prerequisites.npx_available;
             let ready = managed_install || system_path;
             let needs_node = !prerequisites.node_available;
@@ -155,8 +168,7 @@ pub async fn check_preset(data_dir: &Path, preset: &str) -> AgentPresetSetupStat
             }
         }
         "codex" => {
-            let managed = managed_bin(data_dir, "codex-acp");
-            let managed_install = managed.is_file();
+            let managed_install = managed_install_present(data_dir, "codex-acp");
             let system_path = prerequisites.npx_available;
             let ready = managed_install || system_path;
             let needs_node = !prerequisites.node_available;
@@ -204,6 +216,7 @@ async fn run_npm_install(prefix: &Path, package: &str) -> Result<(), String> {
     let mut child = AsyncCommand::new("npm")
         .args([
             "install",
+            "--global",
             "--no-audit",
             "--no-fund",
             "--prefix",

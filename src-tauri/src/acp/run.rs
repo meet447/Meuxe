@@ -30,12 +30,9 @@ pub fn ensure_companion_home(data_dir: &Path) -> std::io::Result<()> {
 }
 
 pub fn resolve_acp_agent(config: &AgentConfig, data_dir: &Path) -> Result<AcpAgent, String> {
-    let bin_dir = crate::commands::agent_setup::managed_npm_bin_dir(data_dir);
-
     match config.preset.as_str() {
         "opencode" => {
-            let managed = bin_dir.join("opencode");
-            if managed.is_file() {
+            if let Some(managed) = crate::commands::agent_setup::resolve_managed_bin(data_dir, "opencode") {
                 let path = managed.to_string_lossy().into_owned();
                 AcpAgent::from_args([path, "acp".to_string()]).map_err(|e| e.to_string())
             } else {
@@ -43,8 +40,9 @@ pub fn resolve_acp_agent(config: &AgentConfig, data_dir: &Path) -> Result<AcpAge
             }
         }
         "claude" => {
-            let managed = bin_dir.join("claude-agent-acp");
-            if managed.is_file() {
+            if let Some(managed) =
+                crate::commands::agent_setup::resolve_managed_bin(data_dir, "claude-agent-acp")
+            {
                 let path = managed.to_string_lossy().into_owned();
                 AcpAgent::from_args([path]).map_err(|e| e.to_string())
             } else {
@@ -52,8 +50,7 @@ pub fn resolve_acp_agent(config: &AgentConfig, data_dir: &Path) -> Result<AcpAge
             }
         }
         "codex" => {
-            let managed = bin_dir.join("codex-acp");
-            if managed.is_file() {
+            if let Some(managed) = crate::commands::agent_setup::resolve_managed_bin(data_dir, "codex-acp") {
                 let path = managed.to_string_lossy().into_owned();
                 AcpAgent::from_args([path]).map_err(|e| e.to_string())
             } else {
