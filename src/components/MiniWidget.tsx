@@ -49,7 +49,8 @@ export function MiniWidget({
   });
   const [input, setInput] = useState("");
   const [sizePresetIndex, setSizePresetIndex] = useState(1);
-  const [dockVisible, setDockVisible] = useState(false);
+  const [bottomDockHover, setBottomDockHover] = useState(false);
+  const [inputFocused, setInputFocused] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   // Sync preset with actual window size on mount
@@ -73,6 +74,7 @@ export function MiniWidget({
         void getCurrentWindow().setSize(new LogicalSize(MINI_WINDOW_PRESETS[1].width, MINI_WINDOW_PRESETS[1].height));
         setSizePresetIndex(1);
       }
+      setBottomDockHover(true);
       inputRef.current?.focus();
     }
   }, [openComposerTrigger]);
@@ -125,6 +127,7 @@ export function MiniWidget({
     if (sizePresetIndex === 0) {
       void applyWindowPreset(1);
     }
+    setBottomDockHover(true);
     inputRef.current?.focus();
   };
 
@@ -139,7 +142,8 @@ export function MiniWidget({
     ? toolCalls.find((tc) => tc.status === "awaiting_confirmation")
     : null;
 
-  const showUtilities = dockVisible || listening || isStreaming || pendingConfirmation || caption;
+  const showBottomChrome =
+    bottomDockHover || inputFocused || input.trim().length > 0;
 
   const showThinkingStatus =
     !caption && (isStreaming || (speechSessionActive && !speaking));
@@ -150,8 +154,6 @@ export function MiniWidget({
       onPointerMoveCapture={handlePointerMoveCapture}
       onPointerUpCapture={handlePointerUpCapture}
       onPointerCancelCapture={handlePointerUpCapture}
-      onMouseEnter={() => setDockVisible(true)}
-      onMouseLeave={() => setDockVisible(false)}
       onKeyDown={handleRootKeyDown}
       tabIndex={-1}
       className="relative"
@@ -221,16 +223,21 @@ export function MiniWidget({
         </div>
       )}
 
-      {/* Bottom input + utilities */}
+      {/* Bottom hover zone — input + utilities appear on hover (or while typing / focused) */}
       <div
-        className="absolute bottom-3 left-1/2 z-30 flex w-[min(92vw,340px)] -translate-x-1/2 flex-col gap-2"
+        className="absolute bottom-0 left-0 right-0 z-30 flex justify-center pb-3 pt-12"
         data-mini-interactive="true"
+        onMouseEnter={() => setBottomDockHover(true)}
+        onMouseLeave={() => {
+          if (!inputFocused && !input.trim()) setBottomDockHover(false);
+        }}
       >
         <div
-          className={`flex items-center justify-between px-1 transition-opacity duration-200 ${
-            showUtilities ? "opacity-100" : "pointer-events-none opacity-0"
+          className={`flex w-[min(92vw,340px)] flex-col gap-2 transition-opacity duration-200 ${
+            showBottomChrome ? "opacity-100" : "pointer-events-none opacity-0"
           }`}
         >
+        <div className="flex items-center justify-between px-1">
           <button
             type="button"
             onClick={cycleWindowSize}
@@ -253,7 +260,7 @@ export function MiniWidget({
 
         <form
           onSubmit={handleSubmit}
-          className="flex items-center gap-1 rounded-full border border-slate-200 bg-white py-1 pl-1 pr-1.5 shadow-sm ring-1 ring-slate-100 focus-within:ring-slate-200"
+          className="pointer-events-auto flex items-center gap-1 rounded-full border border-slate-200 bg-white py-1 pl-1 pr-1.5 shadow-sm ring-1 ring-slate-100 focus-within:ring-slate-200"
         >
           <MicButton listening={listening} onToggle={onMicToggle} variant="stage" />
           <input
@@ -261,7 +268,11 @@ export function MiniWidget({
             type="text"
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            onFocus={focusInput}
+            onFocus={() => {
+              focusInput();
+              setInputFocused(true);
+            }}
+            onBlur={() => setInputFocused(false)}
             placeholder="Type a message..."
             className="companion-chat-input min-w-0 flex-1 bg-transparent px-2 py-2.5 text-[15px] text-slate-800 outline-none ring-0 placeholder:text-slate-400 focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0 disabled:opacity-50"
             disabled={isStreaming}
@@ -281,6 +292,7 @@ export function MiniWidget({
             )}
           </button>
         </form>
+        </div>
       </div>
     </div>
   );
