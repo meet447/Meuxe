@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef, useMemo, lazy, Suspense } from "react";
+import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { register, unregister } from "@tauri-apps/plugin-global-shortcut";
 import { ChatPanel } from "./components/ChatPanel";
@@ -58,7 +59,6 @@ function App() {
     const registered: string[] = [];
 
     const setup = async () => {
-      const { invoke } = await import("@tauri-apps/api/core");
       const broadcast = (event: string) => invoke("broadcast_event", { event }).catch(() => {});
 
       try {

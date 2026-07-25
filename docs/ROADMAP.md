@@ -16,6 +16,7 @@ Phases are ordered; later work assumes earlier product polish unless noted.
 - [ ] Chat empty state: invitation to talk, not feature list
 - [ ] Mini widget as hero demo asset (recording script + README GIF)
 - [x] Ordered TTS merge + expression tags on ACP chat path
+- [x] Light flat stage UI, speech subtitles, mini hover chat bar, settings avatar framing
 
 ## Phase 2 — ACP companion session
 

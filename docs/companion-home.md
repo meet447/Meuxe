@@ -4,7 +4,7 @@ Meuxe keeps **canonical app data** under the Tauri `app_data_dir()` (referred to
 
 **Path:** `data_dir/companion-home/`
 
-Phase 2 will create this tree on first run when `agent.backend = acp`. Until then, the layout is documented here so persona injection and exports can align with a single convention.
+Meuxe creates and refreshes this tree for ACP-backed sessions (`ensure_companion_home` in `src-tauri/src/acp/run.rs`). The layout below is the convention for persona injection and agent scratch space.
 
 ## Relationship to canonical storage
 
@@ -63,9 +63,9 @@ Optional daily markdown the companion maintains (reflections, “dream” summar
 
 Default **working directory** when spawning an ACP agent session (`companion_home_dir` / `ensure_companion_home` in `src-tauri/src/acp/run.rs`). Agents may create files here; Meuxe does not treat this tree as canonical memory unless ingested through normal memory pipelines.
 
-## Session context bundle (target)
+## Session context bundle
 
-When ACP Phase 2 lands, each session should receive:
+Each ACP session receives:
 
 1. `persona/{character_id}/*.md` (or a single merged brief)
 2. `relationship/{character_id}.md`
@@ -76,4 +76,4 @@ The React chat UI and avatar layer remain Meuxe-owned; only the **reasoning back
 
 ## Privacy
 
-Everything under `companion-home/` stays on disk with the rest of `data_dir`. Clearing app data (`reset_app_data`) removes `data/` and `characters/` today; Phase 2 should also remove `companion-home/` on full reset.
+Everything under `companion-home/` stays on disk with the rest of `data_dir`. Full app data reset removes companion home along with other app data.
