@@ -6,7 +6,7 @@ use std::path::PathBuf;
 use std::sync::RwLock;
 use uuid::Uuid;
 
-use crate::{MeuxError, Result};
+use crate::{MeuxeError, Result};
 
 /// A single memory entry persisted in JSONL format.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -69,7 +69,7 @@ impl MemoryStore {
         if MEMORY_FILES.iter().any(|(k, _)| *k == memory_type) {
             Ok(())
         } else {
-            Err(MeuxError::Memory(format!(
+            Err(MeuxeError::Memory(format!(
                 "Invalid memory type: {memory_type}"
             )))
         }
@@ -110,7 +110,7 @@ impl MemoryStore {
         let _guard = self
             ._lock
             .write()
-            .map_err(|e| MeuxError::Memory(format!("Lock poisoned: {e}")))?;
+            .map_err(|e| MeuxeError::Memory(format!("Lock poisoned: {e}")))?;
 
         let dir = self.store_path(character_id, user_id);
         let path = dir.join(Self::filename_for(memory_type));
@@ -142,7 +142,7 @@ impl MemoryStore {
         let _guard = self
             ._lock
             .read()
-            .map_err(|e| MeuxError::Memory(format!("Lock poisoned: {e}")))?;
+            .map_err(|e| MeuxeError::Memory(format!("Lock poisoned: {e}")))?;
 
         let types_to_read: Vec<&str> = match memory_type {
             Some(mt) => vec![mt],
@@ -193,7 +193,7 @@ impl MemoryStore {
         let _guard = self
             ._lock
             .write()
-            .map_err(|e| MeuxError::Memory(format!("Lock poisoned: {e}")))?;
+            .map_err(|e| MeuxeError::Memory(format!("Lock poisoned: {e}")))?;
 
         let types_to_clear: Vec<&str> = match memory_type {
             Some(mt) => vec![mt],

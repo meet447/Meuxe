@@ -1,15 +1,15 @@
 use crate::AppState;
-use meux_core::config::resolve_llm_api_key;
-use meux_core::config::types::AppConfig;
-use meux_core::llm::types::{ChatMessage, LlmStreamConfig};
-use meux_core::reset;
+use meuxe_core::config::resolve_llm_api_key;
+use meuxe_core::config::types::AppConfig;
+use meuxe_core::llm::types::{ChatMessage, LlmStreamConfig};
+use meuxe_core::reset;
 use std::sync::Arc;
 use tauri::State;
 
 #[tauri::command]
 pub fn config_get(state: State<Arc<AppState>>) -> Result<AppConfig, String> {
     let config = state.config.load().map_err(|e| e.to_string())?;
-    Ok(meux_core::config::ConfigManager::mask_config(&config))
+    Ok(meuxe_core::config::ConfigManager::mask_config(&config))
 }
 
 #[tauri::command]

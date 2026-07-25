@@ -5,7 +5,7 @@ use tauri::State;
 
 #[tauri::command]
 pub fn expressions_supported() -> Vec<String> {
-    meux_core::expressions::GLOBAL_EXPRESSIONS
+    meuxe_core::expressions::GLOBAL_EXPRESSIONS
         .iter()
         .map(|expr| expr.to_string())
         .collect()
@@ -16,7 +16,7 @@ pub fn expressions_model_list(
     state: State<Arc<AppState>>,
     model_id: String,
 ) -> Result<Vec<String>, String> {
-    meux_core::character::get_model_expressions(&state.data_dir, &model_id)
+    meuxe_core::character::get_model_expressions(&state.data_dir, &model_id)
         .map_err(|e| e.to_string())
 }
 

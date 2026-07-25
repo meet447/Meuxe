@@ -414,7 +414,7 @@ export function Onboarding({ onComplete }: { onComplete: () => void }) {
               <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
                 <h2 className={headingClass}>Local-first by default</h2>
                 <p className={descriptionClass}>
-                  MeuxCompanion keeps the companion brain on your machine first: memories, relationship state, character files, sessions, and vault exports are local data you control.
+                  Meuxe keeps the companion brain on your machine first: memories, relationship state, character files, sessions, and vault exports are local data you control.
                 </p>
 
                 <div className="grid gap-4 mb-8">

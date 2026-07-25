@@ -16,4 +16,4 @@ pub mod state;
 pub mod tools;
 pub mod tts;
 
-pub use error::{MeuxError, Result};
+pub use error::{MeuxeError, Result};

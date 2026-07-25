@@ -1,6 +1,6 @@
 use crate::AppState;
-use meux_core::character::slugify;
-use meux_core::character::types::{Character, CharacterSummary, ModelInfo};
+use meuxe_core::character::slugify;
+use meuxe_core::character::types::{Character, CharacterSummary, ModelInfo};
 use rfd::FileDialog;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -55,7 +55,7 @@ pub fn characters_create(
 
 #[tauri::command]
 pub fn models_list(state: State<Arc<AppState>>) -> Result<Vec<ModelInfo>, String> {
-    meux_core::character::list_models(&state.data_dir).map_err(|e| e.to_string())
+    meuxe_core::character::list_models(&state.data_dir).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -94,7 +94,7 @@ pub async fn models_import_live2d_dialog(
             .and_then(|name| name.to_str())
             .ok_or_else(|| "Failed to determine imported model id.".to_string())?;
 
-        let imported = meux_core::character::list_models(&data_dir)
+        let imported = meuxe_core::character::list_models(&data_dir)
             .map_err(|e| e.to_string())?
             .into_iter()
             .find(|model| model.id == imported_id)
@@ -151,7 +151,7 @@ pub async fn models_import_vrm_dialog(
             .and_then(|name| name.to_str())
             .ok_or_else(|| "Failed to determine imported model id.".to_string())?;
 
-        let imported = meux_core::character::list_models(&data_dir)
+        let imported = meuxe_core::character::list_models(&data_dir)
             .map_err(|e| e.to_string())?
             .into_iter()
             .find(|model| model.id == imported_id)

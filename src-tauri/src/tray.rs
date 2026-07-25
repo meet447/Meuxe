@@ -17,7 +17,7 @@ pub fn setup_tray(app: &AppHandle) -> Result<(), String> {
 
     TrayIconBuilder::new()
         .menu(&menu)
-        .tooltip("MeuxCompanion")
+        .tooltip("Meuxe")
         .on_menu_event(|app, event| match event.id.as_ref() {
             "open" => window::show_main_window(app),
             "toggle_mini" => {

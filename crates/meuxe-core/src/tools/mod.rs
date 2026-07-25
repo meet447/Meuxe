@@ -16,7 +16,7 @@ use crate::composio::tools::{
 };
 use crate::composio::{execute_catalog_entry, ComposioCatalogEntry};
 use crate::config::types::SearchConfig;
-use crate::error::{MeuxError, Result};
+use crate::error::{MeuxeError, Result};
 
 // Re-export core types
 pub use types::{PermissionLevel, ToolCallRequest, ToolDefinition, ToolResult};
@@ -80,13 +80,13 @@ impl ToolRegistry {
         let snapshot = self
             .composio_state
             .read()
-            .map_err(|e| MeuxError::Tool(e.to_string()))?
+            .map_err(|e| MeuxeError::Tool(e.to_string()))?
             .clone();
         let catalog = refresh_catalog_for(&snapshot).await?;
         let mut slot = self
             .composio_state
             .write()
-            .map_err(|e| MeuxError::Tool(e.to_string()))?;
+            .map_err(|e| MeuxeError::Tool(e.to_string()))?;
         slot.catalog = catalog;
         Ok(())
     }
@@ -187,7 +187,7 @@ impl ToolRegistry {
         let tool = self
             .tools
             .get(&call.name)
-            .ok_or_else(|| MeuxError::Tool(format!("Unknown tool: {}", call.name)))?;
+            .ok_or_else(|| MeuxeError::Tool(format!("Unknown tool: {}", call.name)))?;
 
         tool.execute(call.arguments.clone()).await
     }

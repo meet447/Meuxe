@@ -3,7 +3,7 @@ use serde_json::json;
 use std::sync::{Arc, RwLock};
 
 use crate::config::types::SearchConfig;
-use crate::error::{MeuxError, Result};
+use crate::error::{MeuxeError, Result};
 
 use super::types::*;
 use super::Tool;
@@ -55,12 +55,12 @@ impl Tool for WebSearchTool {
     async fn execute(&self, arguments: serde_json::Value) -> Result<ToolResult> {
         let query = arguments["query"]
             .as_str()
-            .ok_or_else(|| MeuxError::Tool("Missing 'query' argument".to_string()))?;
+            .ok_or_else(|| MeuxeError::Tool("Missing 'query' argument".to_string()))?;
 
         let config = self
             .config
             .read()
-            .map_err(|e| MeuxError::Tool(format!("Config lock error: {e}")))?
+            .map_err(|e| MeuxeError::Tool(format!("Config lock error: {e}")))?
             .clone();
 
         match config.provider.as_str() {
@@ -70,7 +70,7 @@ impl Tool for WebSearchTool {
                     .as_deref()
                     .filter(|k| !k.is_empty())
                     .ok_or_else(|| {
-                        MeuxError::Tool(
+                        MeuxeError::Tool(
                             "SerpAPI key not configured. Go to Settings → Web Search to add it."
                                 .to_string(),
                         )
@@ -83,7 +83,7 @@ impl Tool for WebSearchTool {
                     .as_deref()
                     .filter(|k| !k.is_empty())
                     .ok_or_else(|| {
-                        MeuxError::Tool(
+                        MeuxeError::Tool(
                             "Exa API key not configured. Go to Settings → Web Search to add it."
                                 .to_string(),
                         )
@@ -104,15 +104,15 @@ async fn search_duckduckgo(query: &str) -> Result<ToolResult> {
     let response = client
         .get("https://html.duckduckgo.com/html/")
         .query(&[("q", query)])
-        .header("User-Agent", "MeuxCompanion/1.0")
+        .header("User-Agent", "Meuxe/1.0")
         .send()
         .await
-        .map_err(|e| MeuxError::Tool(format!("Search request failed: {e}")))?;
+        .map_err(|e| MeuxeError::Tool(format!("Search request failed: {e}")))?;
 
     let html = response
         .text()
         .await
-        .map_err(|e| MeuxError::Tool(format!("Failed to read response: {e}")))?;
+        .map_err(|e| MeuxeError::Tool(format!("Failed to read response: {e}")))?;
 
     let results = parse_ddg_results(&html);
 
@@ -158,7 +158,7 @@ async fn search_serpapi(query: &str, api_key: &str) -> Result<ToolResult> {
         ])
         .send()
         .await
-        .map_err(|e| MeuxError::Tool(format!("SerpAPI request failed: {e}")))?;
+        .map_err(|e| MeuxeError::Tool(format!("SerpAPI request failed: {e}")))?;
 
     if !response.status().is_success() {
         let status = response.status();
@@ -173,7 +173,7 @@ async fn search_serpapi(query: &str, api_key: &str) -> Result<ToolResult> {
     let json: serde_json::Value = response
         .json()
         .await
-        .map_err(|e| MeuxError::Tool(format!("Failed to parse SerpAPI response: {e}")))?;
+        .map_err(|e| MeuxeError::Tool(format!("Failed to parse SerpAPI response: {e}")))?;
 
     let mut output = format!("Search results for: {query} (via SerpAPI/Google)\n\n");
 
@@ -237,7 +237,7 @@ async fn search_exa(query: &str, api_key: &str) -> Result<ToolResult> {
         .json(&body)
         .send()
         .await
-        .map_err(|e| MeuxError::Tool(format!("Exa request failed: {e}")))?;
+        .map_err(|e| MeuxeError::Tool(format!("Exa request failed: {e}")))?;
 
     if !response.status().is_success() {
         let status = response.status();
@@ -252,7 +252,7 @@ async fn search_exa(query: &str, api_key: &str) -> Result<ToolResult> {
     let json: serde_json::Value = response
         .json()
         .await
-        .map_err(|e| MeuxError::Tool(format!("Failed to parse Exa response: {e}")))?;
+        .map_err(|e| MeuxeError::Tool(format!("Failed to parse Exa response: {e}")))?;
 
     let mut output = format!("Search results for: {query} (via Exa)\n\n");
 

@@ -6,8 +6,8 @@ use tauri::State;
 pub fn tts_voices(
     _state: State<Arc<AppState>>,
     provider: String,
-) -> Result<Vec<meux_core::tts::VoiceInfo>, String> {
-    Ok(meux_core::tts::list_voices(&provider))
+) -> Result<Vec<meuxe_core::tts::VoiceInfo>, String> {
+    Ok(meuxe_core::tts::list_voices(&provider))
 }
 
 #[tauri::command]
@@ -20,13 +20,13 @@ pub async fn tts_preview(
 ) -> Result<Vec<u8>, String> {
     let sample_text = text.unwrap_or_else(|| "Hello! This is a voice preview.".to_string());
 
-    let tts_config = meux_core::config::types::TtsConfig {
+    let tts_config = meuxe_core::config::types::TtsConfig {
         provider: provider.clone(),
         api_key,
         voice,
     };
 
-    meux_core::tts::generate_tts_auto(&sample_text, &tts_config)
+    meuxe_core::tts::generate_tts_auto(&sample_text, &tts_config)
         .await
         .map_err(|e| e.to_string())
 }

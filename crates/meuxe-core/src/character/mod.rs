@@ -3,7 +3,7 @@ pub mod types;
 
 pub use types::*;
 
-use crate::{MeuxError, Result};
+use crate::{MeuxeError, Result};
 use regex::Regex;
 use std::collections::HashMap;
 use std::fs;
@@ -105,7 +105,7 @@ impl CharacterLoader {
                 CharacterSource::Directory { id, .. } => id == character_id,
                 CharacterSource::Markdown { id, .. } => id == character_id,
             })
-            .ok_or_else(|| MeuxError::CharacterNotFound(character_id.to_string()))?;
+            .ok_or_else(|| MeuxeError::CharacterNotFound(character_id.to_string()))?;
 
         let (mtime_path, source_type_tag) = match &source {
             CharacterSource::Directory { path, .. } => (path.join("character.yaml"), "directory"),
@@ -441,7 +441,7 @@ fn load_from_markdown(id: &str, path: &Path) -> Result<Character> {
 pub fn parse_md_frontmatter(input: &str) -> Result<(String, String)> {
     let re = Regex::new(r"(?s)^---\s*\n(.*?)\n---\s*\n(.*)").unwrap();
     let caps = re.captures(input).ok_or_else(|| {
-        MeuxError::InvalidConfig("Missing YAML frontmatter in markdown file".to_string())
+        MeuxeError::InvalidConfig("Missing YAML frontmatter in markdown file".to_string())
     })?;
     let frontmatter = caps.get(1).unwrap().as_str().to_string();
     let body = caps.get(2).unwrap().as_str().to_string();

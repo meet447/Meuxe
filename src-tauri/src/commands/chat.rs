@@ -1,9 +1,9 @@
 use crate::AppState;
 use futures::StreamExt;
-use meux_core::llm::types::{
+use meuxe_core::llm::types::{
     ChatMessage, FunctionCall, LlmStreamConfig, StreamEvent, ToolCallMessage,
 };
-use meux_core::tools::{PermissionLevel, ToolCallRequest};
+use meuxe_core::tools::{PermissionLevel, ToolCallRequest};
 use regex::Regex;
 use std::sync::{Arc, OnceLock};
 use tauri::{AppHandle, Emitter, State};
@@ -106,13 +106,13 @@ struct AgentLoopEvent {
 // Helpers
 // ---------------------------------------------------------------------------
 
-fn derive_user_id(config: &meux_core::config::types::AppConfig) -> String {
+fn derive_user_id(config: &meuxe_core::config::types::AppConfig) -> String {
     if !config.user.id.is_empty() {
         config.user.id.clone()
     } else if config.user.name.is_empty() {
         "default-user".to_string()
     } else {
-        meux_core::character::slugify(&config.user.name)
+        meuxe_core::character::slugify(&config.user.name)
     }
 }
 
@@ -301,7 +301,7 @@ fn find_sentence_boundary(text: &str, allow_end_boundary: bool) -> Option<usize>
 
 fn spawn_tts_for_sentence(
     app: &AppHandle,
-    tts_config: &meux_core::config::types::TtsConfig,
+    tts_config: &meuxe_core::config::types::TtsConfig,
     index: u32,
     text: String,
 ) {
@@ -310,7 +310,7 @@ fn spawn_tts_for_sentence(
 
     tokio::spawn(async move {
         let tts_text = clean_for_tts(&text);
-        match meux_core::tts::generate_tts_auto(&tts_text, &tts_cfg).await {
+        match meuxe_core::tts::generate_tts_auto(&tts_text, &tts_cfg).await {
             Ok(audio_data) => {
                 use base64::Engine;
                 let b64 = base64::engine::general_purpose::STANDARD.encode(&audio_data);
@@ -328,7 +328,7 @@ fn emit_sentence_chunk(
     state: &Arc<AppState>,
     model_id: &str,
     current_expression: &str,
-    tts_config: &meux_core::config::types::TtsConfig,
+    tts_config: &meuxe_core::config::types::TtsConfig,
     sentence_index: &mut u32,
     raw_text: &str,
 ) {
@@ -359,7 +359,7 @@ fn emit_ready_sentences(
     state: &Arc<AppState>,
     model_id: &str,
     current_expression: &str,
-    tts_config: &meux_core::config::types::TtsConfig,
+    tts_config: &meuxe_core::config::types::TtsConfig,
     sentence_index: &mut u32,
     text: &str,
     allow_end_boundary: bool,
@@ -400,7 +400,7 @@ fn drain_buffer_sentences(
     state: &Arc<AppState>,
     model_id: &str,
     current_expression: &str,
-    tts_config: &meux_core::config::types::TtsConfig,
+    tts_config: &meuxe_core::config::types::TtsConfig,
     sentence_index: &mut u32,
     buffer: &mut String,
     allow_end_boundary: bool,
@@ -504,19 +504,20 @@ async fn run_chat_stream(
     let model_id = character.live2d_model.clone();
 
     // 2. Build prompt
-    let prompt_result = meux_core::prompt::build_chat_prompt(meux_core::prompt::ChatPromptParams {
-        character_loader: &state.characters,
-        session_store: &state.sessions,
-        memory_store: &state.memories,
-        memory_vault: Some(&state.memory_vault),
-        _expression_manager: &state.expressions,
-        character_id: &character_id,
-        user_id: &user_id,
-        user_message: &message,
-        history_limit: None,
-        memory_limit: None,
-    })
-    .map_err(|e| e.to_string())?;
+    let prompt_result =
+        meuxe_core::prompt::build_chat_prompt(meuxe_core::prompt::ChatPromptParams {
+            character_loader: &state.characters,
+            session_store: &state.sessions,
+            memory_store: &state.memories,
+            memory_vault: Some(&state.memory_vault),
+            _expression_manager: &state.expressions,
+            character_id: &character_id,
+            user_id: &user_id,
+            user_message: &message,
+            history_limit: None,
+            memory_limit: None,
+        })
+        .map_err(|e| e.to_string())?;
 
     // 3. Create LlmStreamConfig
     let llm_config = LlmStreamConfig {
@@ -532,13 +533,13 @@ async fn run_chat_stream(
         .tool_registry
         .update_search_config(config.search.clone());
     let enabled_toolkits = if config.composio.enabled_toolkits.is_empty() {
-        meux_core::composio_toolkits::default_enabled_toolkits()
+        meuxe_core::composio_toolkits::default_enabled_toolkits()
     } else {
         config.composio.enabled_toolkits.clone()
     };
     state
         .tool_registry
-        .update_composio_state(meux_core::composio::ComposioToolState {
+        .update_composio_state(meuxe_core::composio::ComposioToolState {
             api_key: config.composio.api_key.clone(),
             user_id: user_id.clone(),
             connections: config.composio.connections.clone(),
@@ -583,7 +584,7 @@ async fn run_chat_stream(
 
         // Context management: compress stale tool results + enforce token budget
         // ~6000 tokens budget leaves room for the LLM response (~1024 max_tokens)
-        meux_core::context::manage_context(&mut conversation, 6000);
+        meuxe_core::context::manage_context(&mut conversation, 6000);
 
         let mut text_content = String::new();
         let mut buffer = String::new();
@@ -632,7 +633,7 @@ async fn run_chat_stream(
                     Ok(e) => e,
                     Err(e) => {
                         let err_str = e.to_string();
-                        if meux_core::retry::is_retryable_llm_error(&e) && stream_attempt < 5 {
+                        if meuxe_core::retry::is_retryable_llm_error(&e) && stream_attempt < 5 {
                             eprintln!("[agent] stream error (retryable): {err_str}");
                             stream_error = true;
                             break;
@@ -840,7 +841,7 @@ async fn run_chat_stream(
                         .await
                         {
                             Ok(result) => result,
-                            Err(_) => Err(meux_core::MeuxError::Tool(format!(
+                            Err(_) => Err(meuxe_core::MeuxeError::Tool(format!(
                                 "{tool_name} timed out after 60s"
                             ))),
                         }
@@ -1013,7 +1014,7 @@ async fn run_chat_stream(
     }
 
     // Keep the legacy JSONL store populated until all old callers are removed.
-    let _ = meux_core::memory::remember_exchange(
+    let _ = meuxe_core::memory::remember_exchange(
         &state.memories,
         &character_id,
         &user_id,

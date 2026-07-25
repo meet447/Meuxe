@@ -5,7 +5,7 @@ use reqwest::Client;
 use serde_json::Value;
 
 use crate::config::types::ComposioConnectionConfig;
-use crate::error::{MeuxError, Result};
+use crate::error::{MeuxeError, Result};
 
 pub const COMPOSIO_BASE_URL: &str = "https://backend.composio.dev";
 pub const GITHUB_README_TOOL: &str = "GITHUB_GET_A_REPOSITORY_README";
@@ -38,16 +38,16 @@ impl ComposioClient {
     }
 
     pub async fn request_json(&self, request: reqwest::RequestBuilder) -> Result<Value> {
-        let response = request.send().await.map_err(MeuxError::Http)?;
+        let response = request.send().await.map_err(MeuxeError::Http)?;
         let status = response.status();
-        let text = response.text().await.map_err(MeuxError::Http)?;
+        let text = response.text().await.map_err(MeuxeError::Http)?;
         if !status.is_success() {
-            return Err(MeuxError::Llm(format!(
+            return Err(MeuxeError::Llm(format!(
                 "Composio request failed ({status}): {text}"
             )));
         }
         serde_json::from_str(&text)
-            .map_err(|e| MeuxError::Llm(format!("Invalid Composio response: {e}")))
+            .map_err(|e| MeuxeError::Llm(format!("Invalid Composio response: {e}")))
     }
 
     pub async fn find_or_create_auth_config(&self, toolkit: &str) -> Result<String> {
@@ -71,7 +71,7 @@ impl ComposioClient {
                 "toolkit": { "slug": toolkit },
                 "auth_config": {
                     "type": "use_composio_managed_auth",
-                    "name": format!("MeuxCompanion {toolkit} Auth")
+                    "name": format!("Meuxe {toolkit} Auth")
                 }
             })))
             .await?;
@@ -81,7 +81,7 @@ impl ComposioClient {
                     .get("auth_config")
                     .and_then(|v| value_string(v, &["id", "nanoid"]))
             })
-            .ok_or_else(|| MeuxError::Llm("Composio did not return an auth config id".to_string()))
+            .ok_or_else(|| MeuxeError::Llm("Composio did not return an auth config id".to_string()))
     }
 
     pub async fn connected_account(&self, connected_account_id: &str) -> Result<Value> {
@@ -129,10 +129,10 @@ impl ComposioClient {
             .await?;
         let connected_account_id = value_string(&response, &["connected_account_id", "id"])
             .ok_or_else(|| {
-                MeuxError::Llm("Composio did not return a connected account id".to_string())
+                MeuxeError::Llm("Composio did not return a connected account id".to_string())
             })?;
         let redirect_url = value_string(&response, &["redirect_url", "redirectUrl"])
-            .ok_or_else(|| MeuxError::Llm("Composio did not return a redirect URL".to_string()))?;
+            .ok_or_else(|| MeuxeError::Llm("Composio did not return a redirect URL".to_string()))?;
         let status =
             value_string(&response, &["status"]).unwrap_or_else(|| "initiated".to_string());
         Ok((connected_account_id, redirect_url, status))
@@ -179,7 +179,7 @@ impl ComposioClient {
             )
             .await?;
         if let Some(error) = tool_error(&response) {
-            return Err(MeuxError::Llm(format!(
+            return Err(MeuxeError::Llm(format!(
                 "Composio tool {tool_slug} failed: {error}"
             )));
         }
@@ -206,7 +206,7 @@ impl ComposioClient {
             )
             .await?;
         if let Some(error) = tool_error(&response) {
-            return Err(MeuxError::Llm(format!(
+            return Err(MeuxeError::Llm(format!(
                 "Composio proxy request failed: {error}"
             )));
         }
@@ -222,7 +222,7 @@ impl ComposioClient {
             .and_then(|connection| connection.connected_account_id.clone())
             .filter(|id| !id.trim().is_empty())
             .ok_or_else(|| {
-                MeuxError::Tool(format!(
+                MeuxeError::Tool(format!(
                     "{toolkit} is not connected. Connect it in Settings → Integrations first."
                 ))
             })
@@ -323,14 +323,14 @@ pub fn extract_proxy_text(value: &Value) -> Result<String> {
             .is_some_and(|encoding| encoding.eq_ignore_ascii_case("base64"))
         {
             let decoded = BASE64.decode(content).map_err(|e| {
-                MeuxError::Tool(format!("Failed to decode base64 proxy content: {e}"))
+                MeuxeError::Tool(format!("Failed to decode base64 proxy content: {e}"))
             })?;
             return String::from_utf8(decoded)
-                .map_err(|e| MeuxError::Tool(format!("Proxy content was not valid UTF-8: {e}")));
+                .map_err(|e| MeuxeError::Tool(format!("Proxy content was not valid UTF-8: {e}")));
         }
         return Ok(content.to_string());
     }
-    Err(MeuxError::Tool(
+    Err(MeuxeError::Tool(
         "Composio proxy response did not include readable text".to_string(),
     ))
 }
@@ -355,7 +355,7 @@ pub fn extract_github_readme_markdown(
             }
         }
     }
-    Err(MeuxError::Tool(
+    Err(MeuxeError::Tool(
         "Composio GitHub README response did not include markdown content".to_string(),
     ))
 }

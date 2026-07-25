@@ -3,6 +3,6 @@
 <plist version="1.0">
 <dict>
   <key>NSMicrophoneUsageDescription</key>
-  <string>MeuxCompanion uses your microphone so you can send voice messages to your companion.</string>
+  <string>Meuxe uses your microphone so you can send voice messages to your companion.</string>
 </dict>
 </plist>

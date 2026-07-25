@@ -75,7 +75,7 @@ fn render_index(
         .map(|dream| dream.summary.as_str())
         .unwrap_or("No dream/reflection run has completed yet.");
     format!(
-        "# Meux Memory Vault\n\n\
+        "# Meuxe Memory Vault\n\n\
          Character: `{character_id}`\n\n\
          ## Stats\n\n\
          - Total memories: {}\n\

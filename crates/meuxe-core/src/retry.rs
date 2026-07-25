@@ -45,7 +45,7 @@ where
 }
 
 /// Check if an HTTP/LLM error is retryable (transient server errors, rate limits).
-pub fn is_retryable_llm_error(err: &crate::error::MeuxError) -> bool {
+pub fn is_retryable_llm_error(err: &crate::error::MeuxeError) -> bool {
     let msg = err.to_string();
     // Rate limit
     if msg.contains("429") || msg.contains("rate limit") || msg.contains("Rate limit") {
@@ -60,14 +60,14 @@ pub fn is_retryable_llm_error(err: &crate::error::MeuxError) -> bool {
         return true;
     }
     // reqwest transport errors
-    if matches!(err, crate::error::MeuxError::Http(_)) {
+    if matches!(err, crate::error::MeuxeError::Http(_)) {
         return true;
     }
     false
 }
 
 /// Check if a TTS error is retryable.
-pub fn is_retryable_tts_error(err: &crate::error::MeuxError) -> bool {
+pub fn is_retryable_tts_error(err: &crate::error::MeuxeError) -> bool {
     // TTS errors from network are retryable, config errors are not
     let msg = err.to_string();
     if msg.contains("API key") || msg.contains("Unknown TTS provider") {

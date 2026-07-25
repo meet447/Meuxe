@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use serde_json::{json, Value};
 
-use crate::error::{MeuxError, Result};
+use crate::error::{MeuxeError, Result};
 use crate::tools::{PermissionLevel, ToolDefinition, ToolResult};
 
 use super::client::{
@@ -145,7 +145,7 @@ pub async fn build_catalog(
         .api_key
         .as_ref()
         .filter(|k| !k.trim().is_empty())
-        .ok_or_else(|| MeuxError::Tool("Composio API key is not configured.".to_string()))?;
+        .ok_or_else(|| MeuxeError::Tool("Composio API key is not configured.".to_string()))?;
     let client = ComposioClient::new(api_key.clone());
 
     let mut catalog = HashMap::new();

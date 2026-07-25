@@ -1,3 +1,3 @@
 [workspace]
-members = ["crates/meux-core", "src-tauri"]
+members = ["crates/meuxe-core", "src-tauri"]
 resolver = "2"
