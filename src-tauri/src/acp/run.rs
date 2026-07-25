@@ -15,7 +15,7 @@ use tauri::{AppHandle, Emitter};
 use tokio_util::sync::CancellationToken;
 
 use crate::AppState;
-use crate::commands::chat::{drain_buffer_sentences, ChatDoneEvent};
+use crate::commands::chat::ChatDoneEvent;
 
 pub fn companion_home_dir(data_dir: &Path) -> std::path::PathBuf {
     data_dir.join("companion-home")
@@ -27,6 +27,24 @@ pub fn ensure_companion_home(data_dir: &Path) -> std::io::Result<()> {
         std::fs::create_dir_all(root.join(sub))?;
     }
     Ok(())
+}
+
+fn write_companion_home_context(companion_home: &Path, persona_context: &str) -> std::io::Result<()> {
+    let agents_md = format!(
+        "# Meuxe companion session\n\n\
+You are the user's AI companion in **Meuxe** — not OpenCode, not Codex, and not a generic coding assistant.\n\
+When asked who you are, answer as the companion in the persona below.\n\
+Follow all expression-tag rules in the persona for avatar reactions.\n\n\
+{persona}\n",
+        persona = persona_context.trim()
+    );
+    std::fs::write(companion_home.join("AGENTS.md"), agents_md)?;
+    std::fs::write(companion_home.join("persona").join("context.md"), persona_context)?;
+    Ok(())
+}
+
+fn build_acp_prompt_for_send(agent_prompt: &str) -> String {
+    agent_prompt.to_string()
 }
 
 pub fn resolve_acp_agent(config: &AgentConfig, data_dir: &Path) -> Result<AcpAgent, String> {
@@ -74,6 +92,7 @@ pub async fn run_acp_chat_stream(
     state: Arc<AppState>,
     character_id: String,
     user_message: String,
+    agent_prompt: String,
     request_id: String,
     cancel: CancellationToken,
     persona_context: String,
@@ -83,9 +102,7 @@ pub async fn run_acp_chat_stream(
 ) -> Result<(), String> {
     let companion_home = companion_home_dir(&state.data_dir);
     ensure_companion_home(&state.data_dir).map_err(|e| e.to_string())?;
-
-    let persona_path = companion_home.join("persona").join("context.md");
-    std::fs::write(&persona_path, &persona_context).map_err(|e| e.to_string())?;
+    write_companion_home_context(&companion_home, &persona_context).map_err(|e| e.to_string())?;
 
     let agent = resolve_acp_agent(&agent_config, &state.data_dir)?;
     let user_id = derive_user_id_from_state(&state)?;
@@ -99,7 +116,7 @@ pub async fn run_acp_chat_stream(
     let request_id_session = request_id.clone();
     let model_id_session = model_id.clone();
     let tts_config_session = tts_config.clone();
-    let user_message_prompt = user_message.clone();
+    let agent_prompt_send = build_acp_prompt_for_send(&agent_prompt);
 
     Client
         .builder()
@@ -132,7 +149,7 @@ pub async fn run_acp_chat_stream(
             let request_id_done = request_id_session.clone();
             let user_id = user_id.clone();
             let companion_home = companion_home.clone();
-            let user_message_prompt = user_message_prompt.clone();
+            let agent_prompt_send = agent_prompt_send.clone();
 
             async move {
                 connection
@@ -145,10 +162,11 @@ pub async fn run_acp_chat_stream(
                     .block_task()
                     .run_until(async move |mut session| {
                         let mut accumulated = String::new();
+                        let mut tts_buffer = String::new();
                         let mut sentence_index = 0u32;
-                        let current_expression = "neutral".to_string();
+                        let mut current_expression = "neutral".to_string();
 
-                        session.send_prompt(&user_message_prompt)?;
+                        session.send_prompt(&agent_prompt_send)?;
 
                         loop {
                             if cancel.is_cancelled() {
@@ -174,6 +192,19 @@ pub async fn run_acp_chat_stream(
                                                 let chunk = text.text;
                                                 if !chunk.is_empty() {
                                                     accumulated.push_str(&chunk);
+                                                    tts_buffer.push_str(&chunk);
+                                                    crate::commands::chat::drain_buffer_sentences(
+                                                        &app,
+                                                        &state,
+                                                        &model_id,
+                                                        &mut current_expression,
+                                                        &tts_config,
+                                                        &request_id,
+                                                        &cancel,
+                                                        &mut sentence_index,
+                                                        &mut tts_buffer,
+                                                        false,
+                                                    );
                                                     let _ = app.emit(
                                                         "chat:text-chunk",
                                                         serde_json::json!({ "text": chunk }),
@@ -196,17 +227,16 @@ pub async fn run_acp_chat_stream(
                         }
 
                         if !accumulated.trim().is_empty() {
-                            let mut buffer = accumulated.clone();
-                            drain_buffer_sentences(
+                            crate::commands::chat::drain_buffer_sentences(
                                 &app,
                                 &state,
                                 &model_id,
-                                &current_expression,
+                                &mut current_expression,
                                 &tts_config,
                                 &request_id,
                                 &cancel,
                                 &mut sentence_index,
-                                &mut buffer,
+                                &mut tts_buffer,
                                 true,
                             );
                         }

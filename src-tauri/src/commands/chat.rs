@@ -20,6 +20,96 @@ fn expression_clean_re() -> &'static Regex {
     })
 }
 
+fn expression_peel_re() -> &'static Regex {
+    static RE: OnceLock<Regex> = OnceLock::new();
+    RE.get_or_init(|| {
+        Regex::new(r"^(?:\[expression:\s*([^\]]+)\]|<<([^>]+)>>|\[([a-zA-Z0-9_\-]+)\])\s*")
+            .expect("invalid regex")
+    })
+}
+
+fn global_expression_names() -> Vec<String> {
+    meuxe_core::expressions::GLOBAL_EXPRESSIONS
+        .iter()
+        .map(|s| s.to_string())
+        .collect()
+}
+
+/// If `text` starts with an expression tag, update `current` and return the remainder.
+pub(crate) fn peel_expression_prefix(text: &str, current: &mut String) -> String {
+    let trimmed = text.trim_start();
+    let caps = expression_peel_re().captures(trimmed);
+    if let Some(caps) = caps {
+        let name = caps
+            .get(1)
+            .or_else(|| caps.get(2))
+            .or_else(|| caps.get(3))
+            .map(|m| m.as_str().trim())
+            .unwrap_or("");
+        if !name.is_empty() {
+            let available = global_expression_names();
+            if let Some(valid) =
+                meuxe_core::expressions::ExpressionManager::validate_expression(name, &available)
+            {
+                *current = valid;
+            }
+        }
+        return trimmed[caps.get(0).unwrap().end()..].to_string();
+    }
+    trimmed.to_string()
+}
+
+/// Build the full text prompt sent to the ACP agent (persona + optional history + user turn).
+pub(crate) fn build_acp_agent_prompt(
+    persona_context: &str,
+    messages: &[meuxe_core::llm::types::ChatMessage],
+    user_message: &str,
+) -> String {
+    let mut parts = vec![
+        "## Meuxe companion (required)".to_string(),
+        "You are the user's companion in the Meuxe desktop app — not OpenCode, not a generic coding CLI, and not a nameless assistant."
+            .to_string(),
+        "When asked who you are, answer as the companion described in the persona below. Stay in character for every reply."
+            .to_string(),
+        "Use expression tags as specified in the persona (for avatar reactions and voice timing)."
+            .to_string(),
+        String::new(),
+        persona_context.trim().to_string(),
+    ];
+
+    let mut history_lines: Vec<String> = Vec::new();
+    for msg in messages {
+        if msg.role == "system" || msg.role == "tool" {
+            continue;
+        }
+        let content = msg.content_str().trim();
+        if content.is_empty() {
+            continue;
+        }
+        if msg.role == "user" && content == user_message.trim() {
+            continue;
+        }
+        let label = if msg.role == "user" {
+            "User"
+        } else {
+            "Companion"
+        };
+        history_lines.push(format!("{label}: {content}"));
+    }
+
+    if !history_lines.is_empty() {
+        parts.push(String::new());
+        parts.push("## Recent conversation".to_string());
+        parts.extend(history_lines);
+    }
+
+    parts.push(String::new());
+    parts.push("## Current user message".to_string());
+    parts.push(user_message.trim().to_string());
+
+    parts.join("\n")
+}
+
 // ---------------------------------------------------------------------------
 // Event payload structs
 // ---------------------------------------------------------------------------
@@ -280,14 +370,15 @@ fn emit_sentence_chunk(
     app: &AppHandle,
     state: &Arc<AppState>,
     model_id: &str,
-    current_expression: &str,
+    current_expression: &mut String,
     tts_config: &meuxe_core::config::types::TtsConfig,
     request_id: &str,
     cancel: &CancellationToken,
     sentence_index: &mut u32,
     raw_text: &str,
 ) {
-    let clean = clean_text(raw_text).trim().to_string();
+    let without_tag = peel_expression_prefix(raw_text, current_expression);
+    let clean = clean_text(&without_tag).trim().to_string();
     if clean.is_empty() {
         return;
     }
@@ -314,7 +405,7 @@ pub(crate) fn drain_buffer_sentences(
     app: &AppHandle,
     state: &Arc<AppState>,
     model_id: &str,
-    current_expression: &str,
+    current_expression: &mut String,
     tts_config: &meuxe_core::config::types::TtsConfig,
     request_id: &str,
     cancel: &CancellationToken,
@@ -438,11 +529,15 @@ async fn run_chat_stream(
         persona_context.push_str(&prompt_result.memory_prompt);
     }
 
+    let acp_prompt =
+        build_acp_agent_prompt(&persona_context, &prompt_result.messages, &message);
+
     crate::acp::run_acp_chat_stream(
         app,
         state,
         character_id,
         message,
+        acp_prompt,
         request_id,
         cancel,
         persona_context,
@@ -480,6 +575,32 @@ mod tests {
             find_sentence_boundary("She said hi.\" Next", false),
             Some(13)
         );
+    }
+
+    #[test]
+    fn peel_expression_updates_current_and_strips_tag() {
+        use super::peel_expression_prefix;
+        let mut current = "neutral".to_string();
+        let rest = peel_expression_prefix("[expression:happy] Hello there.", &mut current);
+        assert_eq!(current, "happy");
+        assert_eq!(rest, "Hello there.");
+    }
+
+    #[test]
+    fn build_acp_agent_prompt_includes_persona_and_user_message() {
+        use super::build_acp_agent_prompt;
+        let messages = vec![
+            meuxe_core::llm::types::ChatMessage::text("system", "ignored"),
+            meuxe_core::llm::types::ChatMessage::text("user", "Hi"),
+            meuxe_core::llm::types::ChatMessage::text("assistant", "Hey!"),
+            meuxe_core::llm::types::ChatMessage::text("user", "Who are you?"),
+        ];
+        let prompt = build_acp_agent_prompt("You are Luna.", &messages, "Who are you?");
+        assert!(prompt.contains("You are Luna."));
+        assert!(prompt.contains("User: Hi"));
+        assert!(prompt.contains("Companion: Hey!"));
+        assert!(prompt.contains("Who are you?"));
+        assert!(prompt.contains("not OpenCode"));
     }
 
     #[tokio::test]
