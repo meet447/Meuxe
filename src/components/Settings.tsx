@@ -269,10 +269,14 @@ export function Settings({ onClose, characterId, characterName, modelId, onPrevi
             <button
               key={item.id}
               onClick={() => setPage(item.id)}
-              className="w-full flex items-center gap-5 px-5 py-4 rounded-3xl border border-slate-100/80 bg-white shadow-sm shadow-blue-900/5 hover:border-blue-100 hover:shadow-md hover:-translate-y-0.5 transition-all text-left group"
+              className="w-full flex items-center gap-4 px-4 py-3.5 rounded-2xl border border-slate-100/80 bg-white shadow-sm shadow-slate-900/5 hover:border-indigo-100 hover:shadow-md transition-all text-left group"
             >
-              <div className="w-12 h-12 rounded-2xl bg-slate-50 group-hover:bg-blue-50 flex items-center justify-center text-slate-500 group-hover:text-blue-500 transition-colors shadow-sm">
-                <item.icon />
+              <div className="w-11 h-11 rounded-2xl bg-slate-50 group-hover:bg-indigo-50 flex items-center justify-center text-slate-500 group-hover:text-indigo-600 transition-colors shadow-sm shrink-0">
+                {item.id === "llm" ? (
+                  <AgentPresetIcon id={(config.agent?.preset as AcpAgentPresetId) || "opencode"} size="sm" />
+                ) : (
+                  <item.icon />
+                )}
               </div>
               <div className="flex-1 min-w-0">
                 <div className="text-[15px] font-semibold text-slate-700 group-hover:text-blue-600 transition-colors">{item.label}</div>
@@ -528,9 +532,21 @@ export function Settings({ onClose, characterId, characterName, modelId, onPrevi
       <div className="flex-1 overflow-y-auto p-6 scrollbar-thin scrollbar-thumb-slate-200 scrollbar-track-transparent">
         <SubHeader title="Local-First Privacy" />
         <div className="space-y-4">
-          <PrivacyCard title="Always local" items={["Memory database and exports", "Character persona files", "Chat session history", "Relationship state", "Imported notes and transcripts"]} tone="emerald" />
-          <PrivacyCard title="Leaves only when enabled" items={["TTS text sent to your voice provider", "Cloud speech-to-text when using an OpenAI-compatible transcription API", "Outbound calls made by your CLI agent (search, GitHub, etc.)"]} tone="blue" />
-          <PrivacyCard title="Never store in plaintext intentionally" items={["API keys are masked in settings reads", "Blank key fields preserve existing values", "Generated exports are local files you control"]} tone="amber" />
+          <PrivacyCard
+            title="Stays on your device"
+            items={["Memories and chat history", "Character personality", "Your profile"]}
+            tone="emerald"
+          />
+          <PrivacyCard
+            title="Uses the network when you choose"
+            items={["Speaking (voice provider)", "Your chat assistant", "Anything that assistant does online"]}
+            tone="blue"
+          />
+          <PrivacyCard
+            title="Keys & exports"
+            items={["API keys stay in local config", "Exports are files you control"]}
+            tone="amber"
+          />
 
           <section className="rounded-[1.75rem] border border-violet-200 bg-violet-50 px-5 py-5 text-violet-900">
             <h3 className="text-lg font-bold">Run onboarding again</h3>

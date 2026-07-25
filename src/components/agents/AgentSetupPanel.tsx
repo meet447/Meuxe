@@ -9,9 +9,12 @@ import { ACP_AGENT_PRESETS, type AcpAgentPresetId } from "../../lib/agentPresets
 export function AgentSetupPanel({
   preset,
   onStatusChange,
+  friendly,
 }: {
   preset: AcpAgentPresetId;
   onStatusChange?: (status: AgentSetupStatusResponse | null, loading: boolean) => void;
+  /** Shorter, non-technical copy for onboarding */
+  friendly?: boolean;
 }) {
   const [status, setStatus] = useState<AgentSetupStatusResponse | null>(null);
   const [loading, setLoading] = useState(false);
@@ -68,7 +71,9 @@ export function AgentSetupPanel({
   return (
     <div className="rounded-2xl border border-slate-200/90 bg-slate-50/80 p-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">Setup</span>
+        <span className="text-xs font-semibold text-slate-600">
+          {friendly ? "Quick setup" : "Setup"}
+        </span>
         {loading && <span className="text-xs text-slate-400">Checking…</span>}
       </div>
 
@@ -83,8 +88,13 @@ export function AgentSetupPanel({
             <StatusPill ok={status.prerequisites.npx_available} label="npx" muted={!status.prerequisites.npx_available} />
           </div>
 
-          {!status.agent.ready && (
+          {!status.agent.ready && !friendly && (
             <p className="text-sm text-slate-600 leading-snug">{status.agent.detail}</p>
+          )}
+          {!status.agent.ready && friendly && (
+            <p className="text-sm text-slate-600 leading-snug">
+              Tap install once — we&apos;ll set this up in your Meuxe folder.
+            </p>
           )}
 
           <div className="flex flex-wrap gap-2">
