@@ -544,7 +544,7 @@ export function Settings({ onClose, characterId, characterName, modelId, onPrevi
           <section className="rounded-[1.75rem] border border-red-200 bg-red-50 px-5 py-5 text-red-800">
             <h3 className="text-lg font-bold">Reset everything</h3>
             <p className="mt-2 text-sm leading-relaxed text-red-700/90">
-              Deletes your profile, companions, chat history, saved memories, API keys, integrations, and settings, then returns you to onboarding. Imported Live2D and VRM models stay on disk.
+              Deletes your profile, companions, chat history, saved memories, API keys, and settings, then returns you to onboarding. Imported Live2D and VRM models stay on disk.
             </p>
             {resetError && (
               <p className="mt-3 rounded-2xl border border-red-300 bg-white/70 px-4 py-3 text-sm font-medium text-red-700">
