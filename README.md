@@ -66,11 +66,6 @@ npm ci
 npm run tauri dev
 ```
 
-On first launch, complete onboarding (companion, voice, then **install/link your CLI agent**). Without a configured ACP agent, the UI runs but chat will not respond.
-
-For Cursor Cloud agents and repeatable setup details, see
-[`docs/cloud-agent-environment.md`](docs/cloud-agent-environment.md).
-
 ### Production build
 
 ```bash
