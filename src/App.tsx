@@ -472,7 +472,6 @@ function App() {
       onBackgroundChange: setBackground,
       onFramingChange: setFraming,
       getAudioLevels,
-      hideAvatarControls: !isMiniMode,
     }),
     [modelPath, currentExpression, speaking, userTyping, isMiniMode, background, zoom, framing, getAudioLevels]
   );
@@ -691,6 +690,12 @@ function App() {
                 setOnboardingComplete(false);
               }}
               onClose={handleSettingsClose}
+              avatarZoom={zoom}
+              avatarFraming={framing}
+              avatarBackground={background}
+              onAvatarZoomChange={setZoom}
+              onAvatarFramingChange={setFraming}
+              onAvatarBackgroundChange={setBackground}
             />
           </aside>
         )}

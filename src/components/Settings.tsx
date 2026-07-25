@@ -15,13 +15,14 @@ import { AgentPresetCard } from "./agents/AgentPresetCard";
 import { AgentPresetIcon } from "./agents/AgentPresetIcon";
 import { AgentSetupPanel } from "./agents/AgentSetupPanel";
 import { MeuxeMark } from "./ui/MeuxeMark";
+import { AvatarViewportSettings } from "./settings/AvatarViewportSettings";
 import type { AcpAgentPresetId } from "../lib/agentPresets";
 interface Voice {
   id: string;
   name: string;
 }
 
-type SettingsPage = null | "profile" | "llm" | "tts" | "privacy" | "expressions" | "memory";
+type SettingsPage = null | "profile" | "llm" | "tts" | "privacy" | "expressions" | "memory" | "avatar";
 
 const SETTINGS_TTS_PRESETS: Record<string, { name: string; needs_key: boolean }> = {
   tiktok: TTS_PRESETS_UI.tiktok,
@@ -46,10 +47,14 @@ const ShieldIcon = () => (
 const ArchiveIcon = () => (
   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M5 8h14M5 12h10M5 16h8M4 4h16v16H4z" /></svg>
 );
+const FrameIcon = () => (
+  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M4 5a1 1 0 011-1h14a1 1 0 011 1v14a1 1 0 01-1 1H5a1 1 0 01-1-1V5z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M9 3v18M15 3v18" /></svg>
+);
 const MENU_ITEMS: { id: SettingsPage & string; label: string; description: string; icon: () => JSX.Element }[] = [
   { id: "profile", label: "Your Profile", description: "Name and about yourself", icon: ProfileIcon },
   { id: "privacy", label: "Privacy", description: "What stays on your device", icon: ShieldIcon },
   { id: "memory", label: "Memory", description: "What your companion remembers", icon: ArchiveIcon },
+  { id: "avatar", label: "Avatar on screen", description: "Zoom, framing, background", icon: FrameIcon },
   { id: "tts", label: "Voice", description: "How they sound when they speak", icon: SpeakerIcon },
   { id: "llm", label: "CLI Agent", description: "OpenCode, Claude, Codex, custom", icon: BrainIcon },
   { id: "expressions", label: "Expressions", description: "Emotions on their avatar", icon: MaskIcon },
@@ -93,7 +98,7 @@ function PrivacyCard({ title, items, tone }: { title: string; items: string[]; t
   );
 }
 
-export function Settings({ onClose, characterId, characterName, modelId, onPreviewExpression, onExpressionsSaved, onConversationCleared, onResetAll, onResetOnboarding }: {
+export function Settings({ onClose, characterId, characterName, modelId, onPreviewExpression, onExpressionsSaved, onConversationCleared, onResetAll, onResetOnboarding, avatarZoom, avatarFraming, avatarBackground, onAvatarZoomChange, onAvatarFramingChange, onAvatarBackgroundChange }: {
   onClose: () => void;
   characterId?: string;
   characterName: string;
@@ -103,6 +108,12 @@ export function Settings({ onClose, characterId, characterName, modelId, onPrevi
   onConversationCleared?: () => void;
   onResetAll?: () => void;
   onResetOnboarding?: () => void;
+  avatarZoom?: number;
+  avatarFraming?: "full" | "half";
+  avatarBackground?: string;
+  onAvatarZoomChange?: (zoom: number) => void;
+  onAvatarFramingChange?: (framing: "full" | "half") => void;
+  onAvatarBackgroundChange?: (bg: string) => void;
 }) {
   const [page, setPage] = useState<SettingsPage>(null);
   const [config, setConfig] = useState<any>(null);
@@ -634,6 +645,31 @@ export function Settings({ onClose, characterId, characterName, modelId, onPrevi
           characterName={characterName}
           onConversationCleared={onConversationCleared}
         />
+      </div>
+    );
+  }
+
+  if (page === "avatar") {
+    return (
+      <div className="flex-1 overflow-y-auto p-6 scrollbar-thin scrollbar-thumb-slate-200 scrollbar-track-transparent">
+        <SubHeader title="Avatar on screen" />
+        {avatarZoom != null &&
+        avatarFraming &&
+        avatarBackground &&
+        onAvatarZoomChange &&
+        onAvatarFramingChange &&
+        onAvatarBackgroundChange ? (
+          <AvatarViewportSettings
+            zoom={avatarZoom}
+            framing={avatarFraming}
+            background={avatarBackground}
+            onZoomChange={onAvatarZoomChange}
+            onFramingChange={onAvatarFramingChange}
+            onBackgroundChange={onAvatarBackgroundChange}
+          />
+        ) : (
+          <p className="text-sm text-slate-400">Avatar controls are not available in this view.</p>
+        )}
       </div>
     );
   }
