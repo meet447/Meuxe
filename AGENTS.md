@@ -1,5 +1,7 @@
 # Meuxe — Agent Development Guide
 
+See [`docs/DIRECTION.md`](docs/DIRECTION.md) for product north star and [`docs/ROADMAP.md`](docs/ROADMAP.md) for phased work.
+
 ## Cursor Cloud specific instructions
 
 ### Overview

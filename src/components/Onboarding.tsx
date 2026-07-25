@@ -7,7 +7,6 @@ import {
   previewVoice,
   listModels,
 } from "../api/tauri";
-import { ComposioIntegrationsPanel } from "./ComposioIntegrationsPanel";
 import { LlmModelField } from "./LlmModelField";
 import { LLM_PRESETS, llmPresetEntries } from "../lib/llmPresets";
 
@@ -75,7 +74,7 @@ const SPEECH_STYLES = [
   { id: "Intimate", title: "Intimate", blurb: "Close, emotionally tuned-in, and personal." },
 ];
 
-const STEPS = ["Local-First", "About You", "LLM Provider", "Voice & TTS", "Integrations", "Build Companion"];
+const STEPS = ["Welcome", "About You", "Companion", "Voice", "Connect AI"];
 
 const VIBE_DESCRIPTIONS: Record<string, string> = {
   Cheerful: "They bring bright energy, celebrate small wins, and want the user to feel more alive after talking to them.",
@@ -313,12 +312,6 @@ export function Onboarding({ onComplete }: { onComplete: () => void }) {
       case 1:
         return form.user.name.trim() !== "" && form.user.about.trim() !== "";
       case 2:
-        return form.llm.provider !== "" && form.llm.model !== "" && testResult?.success === true;
-      case 3:
-        return form.tts.voice !== "";
-      case 4:
-        return true;
-      case 5:
         return (
           form.companion.name.trim() !== "" &&
           form.companion.personality.trim() !== "" &&
@@ -326,6 +319,10 @@ export function Onboarding({ onComplete }: { onComplete: () => void }) {
           form.companion.relationship_style !== "" &&
           form.companion.speech_style !== ""
         );
+      case 3:
+        return form.tts.voice !== "";
+      case 4:
+        return form.llm.provider !== "" && form.llm.model !== "";
       default:
         return false;
     }
@@ -369,7 +366,7 @@ export function Onboarding({ onComplete }: { onComplete: () => void }) {
         onboarding_complete: true,
       });
 
-      setStep(6);
+      setStep(5);
       setTimeout(onComplete, 2200);
     } catch {
       setError("Something went wrong while creating your companion. Please try again.");
@@ -386,7 +383,7 @@ export function Onboarding({ onComplete }: { onComplete: () => void }) {
 
       <div className="min-h-full flex flex-col items-center justify-center p-6 py-12">
         <div className="w-full max-w-2xl z-10 relative">
-          {step < 6 && (
+          {step < 5 && (
             <div className="flex items-center justify-center gap-2 mb-10">
               {STEPS.map((label, i) => (
                 <div key={label} className="flex items-center gap-2">
@@ -412,23 +409,19 @@ export function Onboarding({ onComplete }: { onComplete: () => void }) {
           <div className="backdrop-blur-3xl bg-white/90 rounded-[2.5rem] shadow-[0_8px_30px_rgb(0,0,0,0.06)] shadow-blue-900/5 border border-white p-10 ring-1 ring-slate-100/50">
             {step === 0 && (
               <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-                <h2 className={headingClass}>Local-first by default</h2>
+                <h2 className={headingClass}>Meet your companion</h2>
                 <p className={descriptionClass}>
-                  Meuxe keeps the companion brain on your machine first: memories, relationship state, character files, sessions, and vault exports are local data you control.
+                  Meuxe is a character on your desktop who remembers you, grows with you, and can help with everyday life—not a settings panel or a coding demo.
                 </p>
 
                 <div className="grid gap-4 mb-8">
-                  <div className="rounded-[1.8rem] border border-emerald-100 bg-emerald-50 px-5 py-4">
-                    <div className="text-[11px] font-semibold uppercase tracking-[0.22em] text-emerald-700 mb-2">Stays on this device</div>
-                    <p className="text-sm leading-relaxed text-emerald-700">SQLite memory vault, Markdown vault files, relationship state, character profile, imported notes, and chat history.</p>
-                  </div>
                   <div className="rounded-[1.8rem] border border-blue-100 bg-blue-50 px-5 py-4">
-                    <div className="text-[11px] font-semibold uppercase tracking-[0.22em] text-blue-700 mb-2">Leaves only when you enable it</div>
-                    <p className="text-sm leading-relaxed text-blue-700">LLM prompts, TTS text, web search queries, and connected-source requests for integrations like Composio.</p>
+                    <div className="text-[11px] font-semibold uppercase tracking-[0.22em] text-blue-700 mb-2">Someone to talk to</div>
+                    <p className="text-sm leading-relaxed text-blue-800">Pick a personality, see them react, and build a relationship that continues between sessions.</p>
                   </div>
-                  <div className="rounded-[1.8rem] border border-amber-100 bg-amber-50 px-5 py-4">
-                    <div className="text-[11px] font-semibold uppercase tracking-[0.22em] text-amber-700 mb-2">You choose services</div>
-                    <p className="text-sm leading-relaxed text-amber-700">Use local Ollama/LM Studio where possible, or add API keys for remote LLM/TTS/search providers. Blank key fields preserve existing keys later.</p>
+                  <div className="rounded-[1.8rem] border border-emerald-100 bg-emerald-50 px-5 py-4">
+                    <div className="text-[11px] font-semibold uppercase tracking-[0.22em] text-emerald-700 mb-2">Your data stays local</div>
+                    <p className="text-sm leading-relaxed text-emerald-800">Memories, chat history, and relationship state live on this device. You choose if and when to connect cloud AI or voice services.</p>
                   </div>
                 </div>
               </div>
@@ -436,14 +429,13 @@ export function Onboarding({ onComplete }: { onComplete: () => void }) {
 
             {step === 1 && (
               <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-                <h2 className={headingClass}>Set up your private companion</h2>
+                <h2 className={headingClass}>A little about you</h2>
                 <p className={descriptionClass}>
-                  Your companion now has local memory, evolving relationship state, and a layered character profile. Start by giving it enough context to care about you like a person, not a prompt.
+                  Your companion will remember what you share here. Be honest—they&apos;re built to respond to a real person, not a generic user profile.
                 </p>
 
                 <div className="mb-8 rounded-[1.8rem] border border-blue-100 bg-gradient-to-r from-blue-50 to-indigo-50 px-5 py-4 text-sm leading-relaxed text-slate-600">
-                  <div className="text-[11px] font-semibold uppercase tracking-[0.22em] text-blue-600 mb-2">Local-First</div>
-                  Memories, relationship state, and session history stay on this machine in local files. The backend is the source of truth for any client you connect later.
+                  Everything in this step stays on your computer unless you later connect cloud AI or voice services in Settings.
                 </div>
 
                 <label className={labelClass}>Your Name</label>
@@ -466,10 +458,12 @@ export function Onboarding({ onComplete }: { onComplete: () => void }) {
               </div>
             )}
 
-            {step === 2 && (
+            {step === 4 && (
               <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-                <h2 className={headingClass}>Connect the brain</h2>
-                <p className={descriptionClass}>Choose the model that will drive your companion. Local endpoints keep inference on-device; remote providers receive the prompt context needed to reply.</p>
+                <h2 className={headingClass}>Connect their mind</h2>
+                <p className={descriptionClass}>
+                  Choose who powers your companion&apos;s replies. Local models keep everything on your machine; cloud providers need an API key. You can change this anytime in Settings.
+                </p>
 
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mb-6 max-h-[280px] overflow-y-auto pr-1 scrollbar-thin scrollbar-thumb-slate-200">
                   {llmPresetList.map(([id, preset]) => (
@@ -627,27 +621,16 @@ export function Onboarding({ onComplete }: { onComplete: () => void }) {
               </div>
             )}
 
-            {step === 4 && (
+            {step === 2 && (
               <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-                <h2 className={headingClass}>Connect optional sources</h2>
+                <h2 className={headingClass}>Create your companion</h2>
                 <p className={descriptionClass}>
-                  Link services through Composio if you want GitHub READMEs, Gmail context, or other toolkits available in chat later. You can skip this and configure integrations anytime in Settings.
-                </p>
-
-                <ComposioIntegrationsPanel />
-              </div>
-            )}
-
-            {step === 5 && (
-              <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-                <h2 className={headingClass}>Build your companion</h2>
-                <p className={descriptionClass}>
-                  This step now creates a layered character profile: soul, style, rules, and user context. Pick the emotional shape first, then fine-tune the written draft.
+                  Shape how they feel and speak. These choices feed their long-term memory and relationship with you—not just the first message.
                 </p>
 
                 <div className="mb-7 rounded-[1.8rem] border border-emerald-100 bg-gradient-to-r from-emerald-50 to-teal-50 px-5 py-4 text-sm leading-relaxed text-slate-600">
-                  <div className="text-[11px] font-semibold uppercase tracking-[0.22em] text-emerald-700 mb-2">Memory + State Aware</div>
-                  Your companion will keep local memory and relationship state after onboarding. These choices shape how that future memory feels, not just the first prompt.
+                  <div className="text-[11px] font-semibold uppercase tracking-[0.22em] text-emerald-700 mb-2">They remember you</div>
+                  Meuxe keeps local memory and relationship state so conversations feel continuous, not reset every time you open the app.
                 </div>
 
                 <label className={labelClass}>Companion Name</label>
@@ -766,14 +749,14 @@ export function Onboarding({ onComplete }: { onComplete: () => void }) {
               </div>
             )}
 
-            {step === 6 && (
+            {step === 5 && (
               <div className="text-center py-12 animate-in fade-in zoom-in-95 duration-500">
                 <div className="w-20 h-20 bg-gradient-to-tr from-green-400 to-emerald-400 text-white shadow-lg shadow-green-500/30 rounded-full flex items-center justify-center text-4xl mx-auto mb-6">
                   {"\u2713"}
                 </div>
                 <h2 className="text-3xl font-extrabold text-slate-800 mb-3 tracking-tight">Your companion is ready</h2>
                 <p className="text-slate-500 text-[16px] max-w-md mx-auto leading-relaxed">
-                  <span className="font-semibold text-blue-600">{form.companion.name}</span> has been created with a layered profile, local memory, and evolving relationship state. Loading them now...
+                  <span className="font-semibold text-blue-600">{form.companion.name}</span> is ready. Take a breath—they&apos;re waiting for you.
                 </p>
               </div>
             )}
@@ -784,7 +767,7 @@ export function Onboarding({ onComplete }: { onComplete: () => void }) {
               </div>
             )}
 
-            {step < 6 && (
+            {step < 5 && (
               <div className="flex justify-between mt-10 space-x-4">
                 <button
                   onClick={() => setStep(step - 1)}
@@ -795,7 +778,7 @@ export function Onboarding({ onComplete }: { onComplete: () => void }) {
                 >
                   Back
                 </button>
-                {step < 5 ? (
+                {step < 4 ? (
                   <button
                     onClick={() => setStep(step + 1)}
                     disabled={!canProceed()}

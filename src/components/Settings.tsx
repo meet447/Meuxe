@@ -62,14 +62,14 @@ const PlugIcon = () => (
 
 const MENU_ITEMS: { id: SettingsPage & string; label: string; description: string; icon: () => JSX.Element }[] = [
   { id: "profile", label: "Your Profile", description: "Name and about yourself", icon: ProfileIcon },
-  { id: "llm", label: "LLM Provider", description: "Optional remote or local model endpoint", icon: BrainIcon },
-  { id: "tts", label: "Voice & TTS", description: "Optional voice provider and key", icon: SpeakerIcon },
-  { id: "search", label: "Web Search", description: "Optional search provider keys", icon: SearchIcon },
-  { id: "integrations", label: "Integrations", description: "Composio and external source keys", icon: PlugIcon },
-  { id: "privacy", label: "Local-First Privacy", description: "What stays local and what leaves", icon: ShieldIcon },
-  { id: "tools", label: "Agent Tools", description: "Enable or disable tools the agent can use", icon: ToolsIcon },
-  { id: "expressions", label: "Expression Mapping", description: "Map emotions to model expressions", icon: MaskIcon },
-  { id: "memory", label: "Memory", description: "Inspect local memories", icon: ArchiveIcon },
+  { id: "privacy", label: "Privacy", description: "What stays on your device", icon: ShieldIcon },
+  { id: "memory", label: "Memory", description: "What your companion remembers", icon: ArchiveIcon },
+  { id: "tts", label: "Voice", description: "How they sound when they speak", icon: SpeakerIcon },
+  { id: "llm", label: "AI Connection", description: "Model that powers replies", icon: BrainIcon },
+  { id: "expressions", label: "Expressions", description: "Emotions on their avatar", icon: MaskIcon },
+  { id: "search", label: "Web Search (advanced)", description: "Optional search API keys", icon: SearchIcon },
+  { id: "integrations", label: "Integrations (advanced)", description: "External apps via Composio", icon: PlugIcon },
+  { id: "tools", label: "Agent Tools (advanced)", description: "Built-in tools for the legacy agent", icon: ToolsIcon },
 ];
 
 const PERMISSION_STYLES: Record<string, { label: string; color: string }> = {

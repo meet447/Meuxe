@@ -3,9 +3,9 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
 
-A **local-first** AI companion **desktop app** with Live2D and VRM avatars, layered character writing, persistent memory, and evolving relationship state.
+A **desktop companion**—a character on your screen who remembers you, speaks, and grows with you over time. Built with [**Tauri 2**](https://v2.tauri.app/) (Rust + React). Memories and relationship state stay on your machine unless you connect optional cloud AI or voice services.
 
-> Built with [**Tauri 2**](https://v2.tauri.app/) (Rust + web frontend). Your chats and memory stay on your machine unless you configure external APIs.
+Product direction: [`docs/DIRECTION.md`](docs/DIRECTION.md) · Roadmap: [`docs/ROADMAP.md`](docs/ROADMAP.md)
 
 ![Meuxe demo](assets/demo.png)
 

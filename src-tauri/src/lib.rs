@@ -1,3 +1,4 @@
+mod acp;
 mod commands;
 mod tray;
 mod window;
