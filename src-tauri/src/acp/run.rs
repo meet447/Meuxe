@@ -31,6 +31,7 @@ pub fn ensure_companion_home(data_dir: &Path) -> std::io::Result<()> {
 
 pub fn resolve_acp_agent(config: &AgentConfig) -> Result<AcpAgent, String> {
     match config.preset.as_str() {
+        "opencode" => AcpAgent::from_args(["opencode", "acp"]).map_err(|e| e.to_string()),
         "claude" => Ok(AcpAgent::claude_agent()),
         "codex" => Ok(AcpAgent::codex()),
         "custom" => {

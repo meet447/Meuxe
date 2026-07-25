@@ -30,7 +30,7 @@ pub struct AppConfig {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AgentConfig {
-    /// Preset id: `claude`, `codex`, or `custom`.
+    /// Preset id: `opencode`, `claude`, `codex`, or `custom`.
     #[serde(default = "default_agent_preset")]
     pub preset: String,
     #[serde(default)]
@@ -40,7 +40,7 @@ pub struct AgentConfig {
 }
 
 fn default_agent_preset() -> String {
-    "claude".to_string()
+    "opencode".to_string()
 }
 
 impl Default for AgentConfig {

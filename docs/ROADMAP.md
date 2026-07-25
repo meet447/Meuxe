@@ -32,7 +32,7 @@ Phases are ordered; later work assumes earlier product polish unless noted.
 - [x] Route default chat through ACP when configured
 - [ ] Deprecate in-app tool registry for default users (Settings advanced only)
 - [ ] Composio optional plugin, not onboarding
-- [ ] Delete dead code paths in `chat.rs` / `meuxe-core` tools after parity
+- [x] Delete dead code paths in `chat.rs` / built-in LLM agent loop
 
 ## Phase 4 — Ecosystem
 

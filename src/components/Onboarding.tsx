@@ -190,7 +190,7 @@ export function Onboarding({ onComplete }: { onComplete: () => void }) {
 
   const [form, setForm] = useState<FormData>({
     user: { name: "", about: "" },
-    agent: { preset: "claude", program: "", args: "" },
+    agent: { preset: "opencode", program: "", args: "" },
     tts: { provider: "tiktok", api_key: "", voice: "jp_001" },
     companion: {
       name: "",

@@ -130,7 +130,7 @@ export function Settings({ onClose, characterId, characterName, modelId, onPrevi
   const [searchProvider, setSearchProvider] = useState("duckduckgo");
   const [serpApiKey, setSerpApiKey] = useState("");
   const [exaApiKey, setExaApiKey] = useState("");
-  const [agentPreset, setAgentPreset] = useState("claude");
+  const [agentPreset, setAgentPreset] = useState("opencode");
   const [agentProgram, setAgentProgram] = useState("");
   const [agentArgs, setAgentArgs] = useState("");
   const [confirmReset, setConfirmReset] = useState(false);
@@ -169,7 +169,7 @@ export function Settings({ onClose, characterId, characterName, modelId, onPrevi
         setSearchProvider(cfg.search?.provider || "duckduckgo");
         setSerpApiKey("");
         setExaApiKey("");
-        setAgentPreset(cfg.agent?.preset || "claude");
+        setAgentPreset(cfg.agent?.preset || "opencode");
         setAgentProgram(cfg.agent?.program || "");
         setAgentArgs((cfg.agent?.args || []).join(" "));
       })
@@ -252,7 +252,7 @@ export function Settings({ onClose, characterId, characterName, modelId, onPrevi
             <div className="rounded-2xl bg-white/80 px-4 py-3">
               <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-400">Agent</div>
               <div className="mt-1 text-sm font-bold text-slate-700">
-                {ACP_AGENT_PRESETS[(config.agent?.preset as keyof typeof ACP_AGENT_PRESETS) || "claude"]?.title ||
+                {ACP_AGENT_PRESETS[(config.agent?.preset as keyof typeof ACP_AGENT_PRESETS) || "opencode"]?.title ||
                   config.agent?.preset ||
                   "not set"}
               </div>
