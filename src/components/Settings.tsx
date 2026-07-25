@@ -51,7 +51,7 @@ const MENU_ITEMS: { id: SettingsPage & string; label: string; description: strin
   { id: "profile", label: "Your Profile", description: "Name and about yourself", icon: ProfileIcon },
   { id: "privacy", label: "Privacy", description: "What stays on your device", icon: ShieldIcon },
   { id: "memory", label: "Memory", description: "What your companion remembers", icon: ArchiveIcon },
-  { id: "avatar", label: "Avatar on screen", description: "Zoom, framing, background", icon: FrameIcon },
+  { id: "avatar", label: "Avatar on screen", description: "Zoom and background", icon: FrameIcon },
   { id: "expressions", label: "Expressions", description: "Emotions on their avatar", icon: MaskIcon },
   ];
 
@@ -93,7 +93,7 @@ function PrivacyCard({ title, items, tone }: { title: string; items: string[]; t
   );
 }
 
-export function Settings({ onClose, characterId, characterName, modelId, onPreviewExpression, onExpressionsSaved, onConversationCleared, onResetAll, onResetOnboarding, avatarZoom, avatarFraming, avatarBackground, onAvatarZoomChange, onAvatarFramingChange, onAvatarBackgroundChange }: {
+export function Settings({ onClose, characterId, characterName, modelId, onPreviewExpression, onExpressionsSaved, onConversationCleared, onResetAll, onResetOnboarding, avatarZoom, avatarBackground, onAvatarZoomChange, onAvatarBackgroundChange }: {
   onClose: () => void;
   characterId?: string;
   characterName: string;
@@ -104,10 +104,8 @@ export function Settings({ onClose, characterId, characterName, modelId, onPrevi
   onResetAll?: () => void;
   onResetOnboarding?: () => void;
   avatarZoom?: number;
-  avatarFraming?: "full" | "half";
   avatarBackground?: string;
   onAvatarZoomChange?: (zoom: number) => void;
-  onAvatarFramingChange?: (framing: "full" | "half") => void;
   onAvatarBackgroundChange?: (bg: string) => void;
 }) {
   const [page, setPage] = useState<SettingsPage>(null);
@@ -654,18 +652,11 @@ export function Settings({ onClose, characterId, characterName, modelId, onPrevi
     return (
       <div className="flex-1 overflow-y-auto p-6 scrollbar-thin scrollbar-thumb-slate-200 scrollbar-track-transparent">
         <SubHeader title="Avatar on screen" />
-        {avatarZoom != null &&
-        avatarFraming &&
-        avatarBackground &&
-        onAvatarZoomChange &&
-        onAvatarFramingChange &&
-        onAvatarBackgroundChange ? (
+        {avatarZoom != null && avatarBackground && onAvatarZoomChange && onAvatarBackgroundChange ? (
           <AvatarViewportSettings
             zoom={avatarZoom}
-            framing={avatarFraming}
             background={avatarBackground}
             onZoomChange={onAvatarZoomChange}
-            onFramingChange={onAvatarFramingChange}
             onBackgroundChange={onAvatarBackgroundChange}
           />
         ) : (

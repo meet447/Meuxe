@@ -19,7 +19,6 @@ export function useVRM(canvasRef: React.RefObject<HTMLCanvasElement | null>) {
   const clockRef = useRef<THREE.Clock | null>(null);
   const animFrameRef = useRef<number>(0);
   const animatingRef = useRef(false);
-  const resizeHandlerRef = useRef<(() => void) | null>(null);
   const viewportRef = useRef({
     zoom: 1,
     framing: "full" as "full" | "half",
@@ -56,10 +55,6 @@ export function useVRM(canvasRef: React.RefObject<HTMLCanvasElement | null>) {
     return () => {
       animatingRef.current = false;
       if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
-      if (resizeHandlerRef.current) {
-        window.removeEventListener("resize", resizeHandlerRef.current);
-        resizeHandlerRef.current = null;
-      }
     };
   }, []);
 

@@ -688,10 +688,8 @@ function App() {
               }}
               onClose={handleSettingsClose}
               avatarZoom={zoom}
-              avatarFraming={framing}
               avatarBackground={background}
               onAvatarZoomChange={setZoom}
-              onAvatarFramingChange={setFraming}
               onAvatarBackgroundChange={setBackground}
             />
           </aside>

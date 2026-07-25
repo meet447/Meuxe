@@ -8,17 +8,13 @@ const STAGE_BACKGROUNDS = [
 
 export function AvatarViewportSettings({
   zoom,
-  framing,
   background,
   onZoomChange,
-  onFramingChange,
   onBackgroundChange,
 }: {
   zoom: number;
-  framing: "full" | "half";
   background: string;
   onZoomChange: (zoom: number) => void;
-  onFramingChange: (framing: "full" | "half") => void;
   onBackgroundChange: (bg: string) => void;
 }) {
   const pct = Math.round(zoom * 100);
@@ -26,7 +22,7 @@ export function AvatarViewportSettings({
   return (
     <div className="space-y-6">
       <p className="text-sm text-slate-500 leading-relaxed">
-        Adjust how your companion appears on the main screen. Changes apply immediately.
+        Adjust zoom and background on the main screen. Use the <span className="font-semibold text-slate-600">FULL / HALF</span> button below the settings icon for framing.
       </p>
 
       <section className="rounded-2xl border border-slate-100 bg-white p-5 shadow-sm">
@@ -48,34 +44,6 @@ export function AvatarViewportSettings({
             aria-label="Zoom in"
           >
             +
-          </button>
-        </div>
-      </section>
-
-      <section className="rounded-2xl border border-slate-100 bg-white p-5 shadow-sm">
-        <h3 className="text-sm font-semibold text-slate-800">Framing</h3>
-        <div className="mt-3 flex gap-2">
-          <button
-            type="button"
-            onClick={() => onFramingChange("full")}
-            className={`flex-1 rounded-xl px-4 py-3 text-sm font-semibold transition-all ${
-              framing === "full"
-                ? "bg-blue-500 text-white shadow-md shadow-blue-500/20"
-                : "border border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100"
-            }`}
-          >
-            Full body
-          </button>
-          <button
-            type="button"
-            onClick={() => onFramingChange("half")}
-            className={`flex-1 rounded-xl px-4 py-3 text-sm font-semibold transition-all ${
-              framing === "half"
-                ? "bg-blue-500 text-white shadow-md shadow-blue-500/20"
-                : "border border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100"
-            }`}
-          >
-            Half body
           </button>
         </div>
       </section>
