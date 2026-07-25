@@ -10,6 +10,11 @@ import {
   getVoices,
 } from "../api/tauri";
 import { ACP_AGENT_PRESET_IDS, ACP_AGENT_PRESETS } from "../lib/agentPresets";
+import { AgentPresetCard } from "./agents/AgentPresetCard";
+import { AgentPresetIcon } from "./agents/AgentPresetIcon";
+import { AgentSetupPanel } from "./agents/AgentSetupPanel";
+import { MeuxeMark } from "./ui/MeuxeMark";
+import type { AcpAgentPresetId } from "../lib/agentPresets";
 interface Voice {
   id: string;
   name: string;
@@ -50,7 +55,7 @@ const MENU_ITEMS: { id: SettingsPage & string; label: string; description: strin
   { id: "privacy", label: "Privacy", description: "What stays on your device", icon: ShieldIcon },
   { id: "memory", label: "Memory", description: "What your companion remembers", icon: ArchiveIcon },
   { id: "tts", label: "Voice", description: "How they sound when they speak", icon: SpeakerIcon },
-  { id: "llm", label: "CLI Agent", description: "Claude Code, Codex, or custom ACP", icon: BrainIcon },
+  { id: "llm", label: "CLI Agent", description: "OpenCode, Claude, Codex, custom", icon: BrainIcon },
   { id: "expressions", label: "Expressions", description: "Emotions on their avatar", icon: MaskIcon },
   ];
 
@@ -60,14 +65,13 @@ const buttonClass = "w-full py-3.5 rounded-2xl bg-blue-500 text-white text-[15px
 
 function LocalFirstNotice({ variant = "blue" }: { variant?: "blue" | "emerald" | "amber" }) {
   const colors = {
-    blue: "border-blue-100 bg-blue-50 text-blue-700",
-    emerald: "border-emerald-100 bg-emerald-50 text-emerald-700",
-    amber: "border-amber-100 bg-amber-50 text-amber-700",
+    blue: "border-blue-100 bg-blue-50 text-blue-800",
+    emerald: "border-emerald-100 bg-emerald-50 text-emerald-800",
+    amber: "border-amber-100 bg-amber-50 text-amber-800",
   };
   return (
-    <div className={`mb-6 rounded-[1.5rem] border px-5 py-4 text-sm leading-relaxed ${colors[variant]}`}>
-      <div className="mb-1 text-[11px] font-semibold uppercase tracking-[0.22em]">Local-first boundary</div>
-      Memories, chat history, character files, and relationship state stay on this device. Speech (TTS) and your CLI agent may use external services when configured.
+    <div className={`mb-5 rounded-2xl border px-4 py-3 text-sm leading-snug ${colors[variant]}`}>
+      Memory and chat stay on this device. Voice and your CLI agent only use the network when you configure them.
     </div>
   );
 }
@@ -217,33 +221,45 @@ export function Settings({ onClose, characterId, characterName, modelId, onPrevi
   if (page === null) {
     return (
       <div className="flex-1 overflow-y-auto p-6 scrollbar-thin scrollbar-thumb-slate-200 scrollbar-track-transparent">
-        <div className="flex items-center justify-between mb-8">
-          <div>
-            <h2 className="text-2xl font-bold text-slate-800 tracking-tight">Settings</h2>
-            <p className="mt-1 text-sm text-slate-400">Local by default. Add only the external services you want.</p>
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center gap-3">
+            <MeuxeMark className="h-11 w-11 shrink-0" />
+            <div>
+              <h2 className="text-xl font-bold text-slate-800 tracking-tight">Settings</h2>
+              <p className="text-sm text-slate-400">Local companion · optional cloud voice & agents</p>
+            </div>
           </div>
           <button onClick={onClose} className="w-10 h-10 rounded-full bg-white border border-slate-100 shadow-sm shadow-blue-900/5 hover:shadow-md hover:-translate-y-0.5 flex items-center justify-center text-slate-500 hover:text-red-500 transition-all">
             <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M3 3L13 13M13 3L3 13" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
           </button>
         </div>
 
-        <div className="mb-6 rounded-[2rem] border border-emerald-100 bg-gradient-to-r from-emerald-50 to-blue-50 px-5 py-5 shadow-sm">
-          <div className="text-[11px] font-semibold uppercase tracking-[0.24em] text-emerald-700">Local-first setup</div>
-          <p className="mt-2 text-sm leading-relaxed text-slate-600">
-            Your memories, character profiles, chat history, and relationship state stay on this device. Voice and your CLI agent use external services only when you configure them.
-          </p>
-          <div className="mt-4 grid grid-cols-2 gap-3">
-            <div className="rounded-2xl bg-white/80 px-4 py-3">
-              <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-400">Agent</div>
-              <div className="mt-1 text-sm font-bold text-slate-700">
-                {ACP_AGENT_PRESETS[(config.agent?.preset as keyof typeof ACP_AGENT_PRESETS) || "opencode"]?.title ||
-                  config.agent?.preset ||
-                  "not set"}
+        <div className="mb-5 grid grid-cols-2 gap-3">
+          <div className="rounded-2xl border border-slate-100 bg-white p-3.5 shadow-sm">
+            <div className="flex items-center gap-3">
+              <AgentPresetIcon
+                id={(config.agent?.preset as AcpAgentPresetId) || "opencode"}
+                size="sm"
+              />
+              <div className="min-w-0">
+                <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Agent</div>
+                <div className="text-sm font-bold text-slate-800 truncate">
+                  {ACP_AGENT_PRESETS[(config.agent?.preset as AcpAgentPresetId) || "opencode"]?.title || "—"}
+                </div>
               </div>
             </div>
-            <div className="rounded-2xl bg-white/80 px-4 py-3">
-              <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-400">TTS</div>
-              <div className="mt-1 text-sm font-bold text-slate-700">{config.tts?.provider || "not set"}</div>
+          </div>
+          <div className="rounded-2xl border border-slate-100 bg-white p-3.5 shadow-sm">
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 text-white shadow-md shadow-blue-500/20">
+                <SpeakerIcon />
+              </div>
+              <div className="min-w-0">
+                <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Voice</div>
+                <div className="text-sm font-bold text-slate-800 truncate">
+                  {TTS_PRESETS[config.tts?.provider]?.name || config.tts?.provider || "—"}
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -340,29 +356,22 @@ export function Settings({ onClose, characterId, characterName, modelId, onPrevi
 
   // ========== LLM PAGE ==========
   if (page === "llm") {
+    const presetId = (agentPreset as AcpAgentPresetId) || "opencode";
     return (
       <div className="flex-1 overflow-y-auto p-6 scrollbar-thin scrollbar-thumb-slate-200 scrollbar-track-transparent">
         <SubHeader title="CLI Agent" />
-        <p className="text-slate-500 text-[15px] mb-8 leading-relaxed max-w-xl">
-          Chat always runs through your local ACP agent. Meuxe supplies persona, memory, voice, and avatar; the agent supplies reasoning and tools.
+        <p className="text-slate-500 text-sm mb-6 leading-relaxed max-w-xl">
+          Chat runs through your local ACP agent. Meuxe supplies persona, memory, voice, and avatar.
         </p>
 
-        <label className={labelClass}>Agent preset</label>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
+        <div className="grid grid-cols-1 gap-3 mb-5">
           {ACP_AGENT_PRESET_IDS.map((id) => (
-            <button
+            <AgentPresetCard
               key={id}
-              type="button"
-              onClick={() => setAgentPreset(id)}
-              className={`rounded-[1.4rem] border px-4 py-4 text-left transition-all ${
-                agentPreset === id
-                  ? "border-violet-400 bg-violet-50 text-violet-800 shadow-sm"
-                  : "border-slate-200 bg-white text-slate-600 hover:border-slate-300"
-              }`}
-            >
-              <div className="text-sm font-semibold">{ACP_AGENT_PRESETS[id].title}</div>
-              <div className="mt-1 text-xs leading-relaxed text-slate-500">{ACP_AGENT_PRESETS[id].blurb}</div>
-            </button>
+              id={id}
+              selected={agentPreset === id}
+              onSelect={() => setAgentPreset(id)}
+            />
           ))}
         </div>
 
@@ -387,9 +396,11 @@ export function Settings({ onClose, characterId, characterName, modelId, onPrevi
           </>
         )}
 
-        <p className="text-xs text-slate-500 leading-relaxed mb-6">
-          Persona and memory context are written to companion-home before each turn. Install the CLI and sign in on your machine first.
-        </p>
+        {agentPreset !== "custom" && (
+          <div className="mb-6">
+            <AgentSetupPanel preset={presetId} />
+          </div>
+        )}
 
         <button onClick={handleSave} disabled={saving} className={buttonClass}>
           {saving ? "Saving..." : saved ? "Saved!" : "Save agent"}
