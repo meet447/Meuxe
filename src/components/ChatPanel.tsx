@@ -18,6 +18,8 @@ interface Props {
   speaking?: boolean;
   onToolConfirm?: (requestId: string, approved: boolean) => void;
   inputRef?: React.RefObject<HTMLInputElement | null>;
+  /** Timeline only — for sidebar layout with external input bar */
+  hideInput?: boolean;
 }
 
 // Markdown component config — shared between messages and streaming
@@ -216,7 +218,7 @@ const ChatInput = memo(function ChatInput({
   );
 
   return (
-    <div className="w-full bg-white/90 backdrop-blur-md pb-4 pt-2 border-t border-slate-100/50">
+    <div className="w-full bg-transparent pb-2 pt-1">
       <form onSubmit={handleSubmit} className="px-4 flex items-center gap-2">
         <div className="flex-1 relative group">
           <input
@@ -258,6 +260,8 @@ function timelineItemToMessage(item: ChatTimelineItem): ChatMessage | null {
   return { role: "assistant", text: item.text, expression: item.expression };
 }
 
+export const ChatInputBar = ChatInput;
+
 export function ChatPanel({
   timeline,
   loading,
@@ -271,6 +275,7 @@ export function ChatPanel({
   speaking = false,
   onToolConfirm,
   inputRef: externalInputRef,
+  hideInput = false,
 }: Props) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const internalInputRef = useRef<HTMLInputElement>(null);
@@ -400,7 +405,7 @@ export function ChatPanel({
       </div>
 
       {/* Status Bar */}
-      {(speaking || ttsLoading) && (
+      {(speaking || ttsLoading) && !hideInput && (
         <div className="px-4 py-1.5 bg-blue-50/60 backdrop-blur-sm border-t border-blue-100/40 flex items-center justify-between text-[10px] text-blue-600/70 font-medium uppercase tracking-widest z-10">
           <div className="flex items-center gap-2">
             {speaking && <span className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-ping" />}
@@ -410,15 +415,16 @@ export function ChatPanel({
         </div>
       )}
 
-      {/* Input Form */}
-      <ChatInput
-        isProcessing={isProcessing}
-        onSend={onSend}
-        onTypingChange={onTypingChange}
-        listening={listening}
-        onMicToggle={onMicToggle}
-        inputRef={inputRef as React.RefObject<HTMLInputElement | null>}
-      />
+      {!hideInput && (
+        <ChatInput
+          isProcessing={isProcessing}
+          onSend={onSend}
+          onTypingChange={onTypingChange}
+          listening={listening}
+          onMicToggle={onMicToggle}
+          inputRef={inputRef as React.RefObject<HTMLInputElement | null>}
+        />
+      )}
     </div>
   );
 }
