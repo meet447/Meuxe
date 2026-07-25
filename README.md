@@ -3,9 +3,9 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
 
-A **local-first** AI companion **desktop app** with Live2D and VRM avatars, layered character writing, persistent memory, and evolving relationship state.
+A **desktop companion**—a character on your screen who remembers you, speaks, and grows with you over time. Built with [**Tauri 2**](https://v2.tauri.app/) (Rust + React). Memories and relationship state stay on your machine unless you connect optional cloud AI or voice services.
 
-> Built with [**Tauri 2**](https://v2.tauri.app/) (Rust + web frontend). Your chats and memory stay on your machine unless you configure external APIs.
+Product direction: [`docs/DIRECTION.md`](docs/DIRECTION.md) · Roadmap: [`docs/ROADMAP.md`](docs/ROADMAP.md)
 
 ![Meuxe demo](assets/demo.png)
 
@@ -31,15 +31,19 @@ A **local-first** AI companion **desktop app** with Live2D and VRM avatars, laye
 
 ### Interaction
 
-- **Streaming chat** — real-time text streaming
+- **Streaming chat** — real-time text over ACP-backed agent sessions
+- **Speech subtitles** — per-sentence captions on the main stage and in mini mode while TTS plays
 - **Parallel TTS** — synthesizes speech segments in parallel for lower latency
 - **Voice input** — microphone capture, VAD, and optional Whisper-based transcription
+- **Light companion stage** — flat, readable UI with history drawer and floating chat input
+- **Global shortcuts** — toggle mini mode, focus chat, and mic from the keyboard
 
 ### Avatars
 
 - **Live2D** — Cubism models with lip sync and expression mapping
 - **VRM** — 3D avatars with custom animations
-- **Mini mode** — transparent “mini widget” that can float on your desktop
+- **Mini mode** — transparent desktop widget with hover-to-reveal chat, size presets, and expand to full app
+- **Avatar framing** — zoom and background in Settings (full / half-body on stage toolbar)
 
 ## Quick start
 
@@ -69,10 +73,10 @@ npm run tauri build
 
 ## Providers (optional)
 
-You choose which remote services to use, if any:
+You choose which services to use, if any:
 
-- **LLM** — OpenAI-compatible HTTP APIs (OpenAI, Groq, Ollama, OpenRouter, and similar). Configure endpoints and keys in the app; nothing is sent until you set this up.
-- **TTS** — includes options such as local-friendly TikTok TTS (no key), ElevenLabs, and OpenAI TTS, depending on your configuration.
+- **Chat (ACP)** — companion reasoning runs in your configured CLI agent (Claude Code, Codex, OpenCode, or custom ACP). Install and pick the agent in Settings → Agent; nothing runs until you complete onboarding.
+- **TTS** — built-in Meuxe TTS (no key), plus ElevenLabs and OpenAI TTS when configured.
 
 ## Project structure
 
@@ -95,6 +99,21 @@ The desktop app identifier is now `com.meuxe.app` (product name **Meuxe**). Loca
 ```bash
 npm run tauri dev    # desktop app + hot reload
 npm run dev          # Vite frontend only (without Tauri shell)
+npm test             # Vitest unit tests
+npm run build        # Typecheck + production frontend build
+```
+
+### Rust (Linux / CI parity)
+
+`whisper-rs-sys` needs CMake and g++. On Linux CI images, link against GCC’s `libstdc++`:
+
+```bash
+export CC=gcc CXX=g++
+gcc_dir=$(dirname "$(gcc -print-file-name=libstdc++.so)")
+export RUSTFLAGS="-C link-arg=-L${gcc_dir}"
+cargo fmt --all -- --check
+cargo clippy --workspace --all-targets -- -D warnings
+cargo test --workspace
 ```
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for how we handle issues, pull requests, and code review.

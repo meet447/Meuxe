@@ -6,6 +6,11 @@
   --shadow-glow-blue: 0 0 20px rgba(59, 130, 246, 0.15);
 }
 
+/* ─── Companion stage (light) ─── */
+.companion-stage-light {
+  background-color: #f8fafc;
+}
+
 /* ─── Base & Typography ─── */
 body {
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
@@ -37,6 +42,11 @@ body {
   outline: 2px solid rgba(59, 130, 246, 0.5);
   outline-offset: 2px;
   border-radius: 8px;
+}
+
+.companion-chat-input:focus-visible {
+  outline: none;
+  outline-offset: 0;
 }
 
 /* ─── Animations ─── */

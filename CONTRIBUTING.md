@@ -11,9 +11,9 @@ Thank you for helping improve Meuxe. This document explains how to get set up an
 
 Prerequisites:
 
-- **Node.js** 18 or newer
-- **Rust** stable (with Cargo), as required by [Tauri 2](https://v2.tauri.app/start/prerequisites/)
-- On **Linux**, install WebKitGTK and related packages (see the [release workflow](.github/workflows/release.yml) for the list used in CI).
+- **Node.js** 22 recommended (see [`.nvmrc`](.nvmrc))
+- **Rust** 1.88.0 with **Cargo** (pinned in [`rust-toolchain.toml`](rust-toolchain.toml); see [Tauri prerequisites](https://v2.tauri.app/start/prerequisites/) for OS-specific packages)
+- On **Linux**, install WebKitGTK and related packages (see the [CI workflow](.github/workflows/ci.yml) or [release workflow](.github/workflows/release.yml) for package lists)
 
 Clone and run in development mode:
 
@@ -29,6 +29,25 @@ Build a production bundle locally:
 ```bash
 npm run tauri build
 ```
+
+### Checks before you open a PR
+
+Match what [CI](.github/workflows/ci.yml) runs:
+
+```bash
+npm ci
+npm run build
+npm test
+
+export CC=gcc CXX=g++
+gcc_dir=$(dirname "$(gcc -print-file-name=libstdc++.so)")
+export RUSTFLAGS="-C link-arg=-L${gcc_dir}"
+cargo fmt --all -- --check
+cargo clippy --workspace --all-targets -- -D warnings
+cargo test --workspace
+```
+
+On Linux without a display, `npm run dev` exercises the frontend; full `npm run tauri dev` needs a desktop session.
 
 ## Pull requests
 

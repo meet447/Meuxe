@@ -42,6 +42,7 @@ export function useLive2D(canvasRef: React.RefObject<HTMLCanvasElement | null>) 
   const appRef = useRef<PIXI.Application | null>(null);
   const modelRef = useRef<any>(null);
   const baseScaleRef = useRef(1);
+  const modelSizeRef = useRef({ width: 0, height: 0 });
   const mappingRef = useRef<ModelMapping | null>(null);
   const debugRef = useRef<DebugInfo>({
     modelLoaded: false,
@@ -69,6 +70,13 @@ export function useLive2D(canvasRef: React.RefObject<HTMLCanvasElement | null>) 
   const audioLevelsGetterRef = useRef<(() => AudioLevels) | null>(null);
   const typingReactionRef = useRef<(() => void) | null>(null);
   const mouseCleanupRef = useRef<(() => void) | null>(null);
+  const viewportRef = useRef({
+    zoom: 1,
+    framing: "full" as "full" | "half",
+    offsetX: 0,
+    offsetY: 0,
+  });
+  const applyModelLayoutRef = useRef<() => void>(() => undefined);
 
   const getParams = useCallback(() => {
     return mappingRef.current?.params || DEFAULT_PARAMS;
@@ -80,6 +88,67 @@ export function useLive2D(canvasRef: React.RefObject<HTMLCanvasElement | null>) 
       mouseCleanupRef.current?.();
     };
   }, []);
+
+  const applyModelLayout = useCallback(() => {
+    const model = modelRef.current;
+    const app = appRef.current;
+    if (!model || !app) return;
+
+    const parent = canvasRef.current?.parentElement;
+    if (parent) {
+      const w = parent.clientWidth;
+      const h = parent.clientHeight;
+      if (w > 0 && h > 0) {
+        app.renderer.resize(w, h);
+      }
+    }
+
+    const intrinsicW = modelSizeRef.current.width;
+    const intrinsicH = modelSizeRef.current.height;
+    if (intrinsicW <= 0 || intrinsicH <= 0) return;
+
+    const scaleX = app.screen.width / intrinsicW;
+    const scaleY = app.screen.height / intrinsicH;
+    baseScaleRef.current = Math.min(scaleX, scaleY);
+
+    const { zoom, framing, offsetX, offsetY } = viewportRef.current;
+    const baseScale = baseScaleRef.current * zoom;
+    const screenW = app.screen.width;
+    const screenH = app.screen.height;
+
+    let targetScale = baseScale;
+    let targetY = screenH / 2 + offsetY;
+
+    if (framing === "half") {
+      const halfZoom = 1.65;
+      const widthCap = (screenW * 0.96) / intrinsicW;
+      targetScale = Math.min(baseScale * halfZoom, widthCap);
+      const scaledH = intrinsicH * targetScale;
+      const topMargin = screenH * 0.08;
+      // Center anchor: align sprite top near top margin so head stays in frame
+      targetY = topMargin + scaledH / 2 + offsetY;
+    }
+
+    model.scale.set(targetScale);
+    model.x = screenW / 2 + offsetX;
+    model.y = targetY;
+  }, [canvasRef]);
+
+  applyModelLayoutRef.current = applyModelLayout;
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    const parent = canvas?.parentElement;
+    if (!parent) return;
+
+    const observer = new ResizeObserver(() => {
+      requestAnimationFrame(() => {
+        applyModelLayoutRef.current();
+      });
+    });
+    observer.observe(parent);
+    return () => observer.disconnect();
+  }, [canvasRef]);
 
   // ========================================
   // IDLE ANIMATION SYSTEM
@@ -308,6 +377,7 @@ export function useLive2D(canvasRef: React.RefObject<HTMLCanvasElement | null>) 
         }
         oldModel.destroy();
         modelRef.current = null;
+        modelSizeRef.current = { width: 0, height: 0 };
       }
 
       let app = appRef.current;
@@ -335,19 +405,15 @@ export function useLive2D(canvasRef: React.RefObject<HTMLCanvasElement | null>) 
 
         modelRef.current = model;
 
-        const scaleX = app.screen.width / model.width;
-        const scaleY = app.screen.height / model.height;
-        baseScaleRef.current = Math.min(scaleX, scaleY);
+        model.scale.set(1);
+        modelSizeRef.current = { width: model.width, height: model.height };
 
-        model.scale.set(baseScaleRef.current);
         model.anchor.set(0.5, 0.5);
-        model.x = app.screen.width / 2;
-        model.y = app.screen.height / 2;
-
         model.interactive = true;
         model.buttonMode = true;
 
         app.stage.addChild(model);
+        applyModelLayoutRef.current();
 
         // Debug info
         debugRef.current.modelLoaded = true;
@@ -577,25 +643,9 @@ export function useLive2D(canvasRef: React.RefObject<HTMLCanvasElement | null>) 
   }, []);
 
   const setViewport = useCallback((zoom: number, framing: "full" | "half", offsetX: number = 0, offsetY: number = 0) => {
-    const model = modelRef.current;
-    if (!model || !appRef.current) return;
-
-    let targetScale = baseScaleRef.current * zoom;
-    let targetY = appRef.current.screen.height / 2;
-
-    if (framing === "half") {
-      const framingZoom = 2.2; // Increase scale safely for half-body
-      targetScale *= framingZoom;
-
-      // Mathematically pushes the center of the model down exactly relative to the zoom
-      // ensuring the top of the character stays locked at the top of the screen safely.
-      targetY = (appRef.current.screen.height / 2) * framingZoom;
-    }
-
-    model.scale.set(targetScale);
-    model.x = (appRef.current.screen.width / 2) + offsetX;
-    model.y = targetY + offsetY;
-  }, []);
+    viewportRef.current = { zoom, framing, offsetX, offsetY };
+    applyModelLayout();
+  }, [applyModelLayout]);
 
   // Typing awareness
   const setTypingReaction = useCallback((isTyping: boolean) => {

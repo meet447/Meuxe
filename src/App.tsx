@@ -1,13 +1,17 @@
 import { useState, useEffect, useCallback, useRef, useMemo, lazy, Suspense } from "react";
+import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { register, unregister } from "@tauri-apps/plugin-global-shortcut";
 import { ChatPanel } from "./components/ChatPanel";
+import { HistoryDrawer } from "./components/chat/HistoryDrawer";
+import { StageCornerToolbar } from "./components/chat/StageCornerToolbar";
+import { FloatingChatInput } from "./components/chat/FloatingChatInput";
 import { AddCharacterModal } from "./components/AddCharacterModal";
 import { CharacterSelect } from "./components/CharacterSelect";
 import { Onboarding } from "./components/Onboarding";
 import { Settings } from "./components/Settings";
 import { MiniWidget } from "./components/MiniWidget";
-import { useChat } from "./hooks/useChat";
+import { useChat, cleanCompanionDisplayText } from "./hooks/useChat";
 import { useAudioQueue } from "./hooks/useAudioQueue";
 import { useVoice } from "./hooks/useVoice";
 import { useWindow } from "./hooks/useWindow";
@@ -55,7 +59,6 @@ function App() {
     const registered: string[] = [];
 
     const setup = async () => {
-      const { invoke } = await import("@tauri-apps/api/core");
       const broadcast = (event: string) => invoke("broadcast_event", { event }).catch(() => {});
 
       try {
@@ -128,15 +131,41 @@ function App() {
   const [background, setBackground] = useState("transparent");
   const [zoom, setZoom] = useState(1.1);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
   const [expressionsConfigured, setExpressionsConfigured] = useState<boolean | null>(null);
   const [onboardingComplete, setOnboardingComplete] = useState<boolean | null>(null);
   const [userTyping, setUserTyping] = useState(false);
 
-  const { setMessages, timeline, isStreaming, streamingText, send, setOnSentence, setOnAudio, toolCalls, handleConfirm } =
-    useChat();
+  const {
+    setMessages,
+    timeline,
+    isStreaming,
+    streamingText,
+    send,
+    setOnSentence,
+    setOnAudio,
+    setOnAudioFailed,
+    setOnDone,
+    setOnError,
+    toolCalls,
+    handleConfirm,
+  } = useChat();
   const { listening, startListening, stopListening } = useVoice();
-  const { speaking, addSentence, addAudio, clearQueue, getAudioLevels, setOnExpressionChange, setNeutralExpression } =
-    useAudioQueue();
+  const {
+    speaking,
+    speakingSentence,
+    speechSessionActive,
+    beginRequest,
+    addSentence,
+    addAudio,
+    failAudio,
+    markTextDone,
+    failRequest,
+    clearQueue,
+    getAudioLevels,
+    setOnExpressionChange,
+    setNeutralExpression,
+  } = useAudioQueue();
 
   const selectedCharRef = useRef<Character | undefined>(undefined);
 
@@ -206,13 +235,33 @@ function App() {
 
   // Wire chat sentence events to audio queue
   useEffect(() => {
-    setOnSentence((task) => {
-      addSentence(task);
+    setOnSentence((payload) => {
+      addSentence(payload.request_id, payload);
     });
-    setOnAudio((index, audio) => {
-      addAudio(index, audio);
+    setOnAudio((payload) => {
+      addAudio(payload.request_id, payload.index, payload.data);
     });
-  }, [setOnSentence, setOnAudio, addSentence, addAudio]);
+    setOnAudioFailed((payload) => {
+      failAudio(payload.request_id, payload.index);
+    });
+    setOnDone((payload) => {
+      markTextDone(payload.request_id);
+    });
+    setOnError((requestId) => {
+      failRequest(requestId);
+    });
+  }, [
+    setOnSentence,
+    setOnAudio,
+    setOnAudioFailed,
+    setOnDone,
+    setOnError,
+    addSentence,
+    addAudio,
+    failAudio,
+    markTextDone,
+    failRequest,
+  ]);
 
   useEffect(() => {
     refreshCharacters();
@@ -337,11 +386,11 @@ function App() {
   const handleSend = useCallback(
     async (text: string) => {
       if (!selectedCharId || !expressionsConfigured) return;
-      clearQueue();
-
-      await send(selectedCharId, text);
+      const requestId = crypto.randomUUID();
+      beginRequest(requestId);
+      await send(selectedCharId, text, requestId);
     },
-    [selectedCharId, expressionsConfigured, send, clearQueue]
+    [selectedCharId, expressionsConfigured, send, beginRequest]
   );
 
   useEffect(() => {
@@ -453,6 +502,15 @@ function App() {
     </Suspense>
   ), [modelType, selectedCharId, canvasProps, selectedModel?.animations, modelMapping]);
 
+  const charName = selectedChar?.name || "Companion";
+
+  const spokenCaption = useMemo(() => {
+    if (speaking && speakingSentence?.trim()) {
+      return cleanCompanionDisplayText(speakingSentence);
+    }
+    return null;
+  }, [speaking, speakingSentence]);
+
   // Mini mode: render just the avatar in MiniWidget
   if (isMiniMode) {
     return (
@@ -461,7 +519,9 @@ function App() {
         listening={listening}
         speaking={speaking}
         isStreaming={isStreaming}
-        streamingText={streamingText}
+        speechSessionActive={speechSessionActive}
+        caption={spokenCaption}
+        captionSpeaker={spokenCaption ? charName : undefined}
         toolCalls={toolCalls}
         onSend={handleSend}
         onMicToggle={handleMicToggle}
@@ -472,11 +532,9 @@ function App() {
     );
   }
 
-  const charName = selectedChar?.name || "Companion";
-
   if (onboardingComplete === null) {
     return (
-      <div className="h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-white to-indigo-50">
+      <div className="h-screen flex items-center justify-center bg-slate-50">
         <div className="flex flex-col items-center gap-5">
           <div className="flex gap-2">
             <span className="w-3 h-3 rounded-full bg-blue-400 animate-bounce [animation-delay:-0.3s]" />
@@ -509,75 +567,117 @@ function App() {
   }
 
   return (
-    <div className="h-screen flex flex-col font-sans text-slate-800" style={{ backgroundColor: "transparent" }}>
-      {/* Wavy background for header */}
-      <svg
-        className="absolute top-0 left-0 w-full z-0 pointer-events-none"
-        preserveAspectRatio="none"
-        viewBox="0 0 1440 100"
-        fill="none"
-        xmlns="http://www.w3.org/2000/svg"
-        style={{ height: "6rem" }}
-      >
-        <path d="M0,0 L1440,0 L1440,60 C1240,100 960,20 720,60 C480,100 240,40 0,80 Z" fill="#eaf3fd" />
-      </svg>
+    <div className="companion-stage-light relative flex h-screen flex-col overflow-hidden font-sans text-slate-900">
+      <div className="relative flex min-h-0 flex-1">
+        <main className="relative min-h-0 min-w-0 flex-1">
+          {expressionsConfigured === null ? (
+            <div className="flex h-full items-center justify-center">
+              <div className="flex gap-2">
+                <span className="h-2.5 w-2.5 rounded-full bg-slate-400/60 animate-bounce [animation-delay:-0.3s]" />
+                <span className="h-2.5 w-2.5 rounded-full bg-slate-400/60 animate-bounce [animation-delay:-0.15s]" />
+                <span className="h-2.5 w-2.5 rounded-full bg-slate-400/60 animate-bounce" />
+              </div>
+            </div>
+          ) : !expressionsConfigured ? (
+            <div className="flex h-full flex-col items-center justify-center p-8 text-center">
+              <p className="mb-6 max-w-sm text-sm text-slate-500 leading-relaxed">
+                Map avatar expressions in Settings before you chat.
+              </p>
+              <button
+                onClick={() => setSettingsOpen(true)}
+                className="rounded-full border border-slate-200 bg-white px-6 py-3 text-sm font-semibold text-slate-800 shadow-sm hover:bg-slate-50"
+              >
+                Open Settings
+              </button>
+            </div>
+          ) : (
+            <>
+              <div className="absolute inset-0">{avatarCanvas}</div>
 
-      <header className="relative z-10 flex items-center justify-between px-6 py-4">
-        <div className="flex items-center gap-3">
-          <svg className="w-6 h-6 text-blue-400" fill="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-            <path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z" />
-          </svg>
-          <div className="flex items-center gap-3">
-            <h1 className="text-xl font-bold text-slate-700 tracking-wide uppercase">{charName}</h1>
-            {selectedChar?.source_type === "directory" && (
-              <span className="rounded-full border border-emerald-200/70 bg-emerald-50/90 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-emerald-700">
-                layered soul
-              </span>
-            )}
-          </div>
-        </div>
-        <div className="flex items-center gap-4 bg-white/70 backdrop-blur-md px-3 py-1.5 rounded-full shadow-sm shadow-blue-900/5 ring-1 ring-slate-100">
-          <button
-            onClick={() => toggleMini(selectedCharId)}
-            className="rounded-full px-4 py-1.5 text-sm font-medium transition-colors hover:bg-violet-100 text-violet-600"
-            title="Switch to mini mode"
+              <StageCornerToolbar
+                historyOpen={historyOpen}
+                onHistoryToggle={() => {
+                  setHistoryOpen((o) => !o);
+                  setCharSelectOpen(false);
+                }}
+                onMini={() => toggleMini(selectedCharId)}
+                onSettings={() => {
+                  setSettingsOpen((o) => !o);
+                  setCharSelectOpen(false);
+                }}
+                settingsOpen={settingsOpen}
+                onCharacters={() => {
+                  setCharSelectOpen((o) => !o);
+                  setHistoryOpen(false);
+                }}
+                charSelectOpen={charSelectOpen}
+                framing={framing}
+                onFramingChange={setFraming}
+              />
+
+              <CharacterSelect
+                menuOnly
+                characters={characters}
+                selected={selectedCharId}
+                onSelect={handleCharacterChange}
+                onAddCharacter={() => setAddCharacterOpen(true)}
+                open={charSelectOpen}
+                onToggle={() => setCharSelectOpen(false)}
+              />
+
+              <div className="pointer-events-none absolute bottom-6 left-5 z-20 hidden sm:block">
+                <p className="text-sm font-semibold text-slate-800">{charName}</p>
+              </div>
+
+              <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20 flex flex-col items-center px-4 pb-6 pt-16">
+                <FloatingChatInput
+                  isProcessing={isStreaming}
+                  onSend={handleSend}
+                  onTypingChange={handleTypingChange}
+                  listening={listening}
+                  onMicToggle={handleMicToggle}
+                  inputRef={fullChatInputRef}
+                  caption={spokenCaption}
+                  captionSpeaker={spokenCaption ? charName : undefined}
+                  statusLabel={
+                    spokenCaption
+                      ? null
+                      : isStreaming || (speechSessionActive && !speaking)
+                        ? "Thinking…"
+                        : null
+                  }
+                />
+              </div>
+            </>
+          )}
+        </main>
+
+        {expressionsConfigured && (
+          <HistoryDrawer
+            open={historyOpen}
+            onClose={() => setHistoryOpen(false)}
+            title={`Chat with ${charName}`}
           >
-            Mini
-          </button>
+            <ChatPanel
+              hideInput
+              appearance="light"
+              timeline={timeline}
+              loading={isStreaming}
+              streamingText={streamingText}
+              characterName={charName}
+              onSend={handleSend}
+              onTypingChange={handleTypingChange}
+              listening={listening}
+              onMicToggle={handleMicToggle}
+              onToolConfirm={handleConfirm}
+            />
+          </HistoryDrawer>
+        )}
 
-          <div className="text-slate-300">|</div>
-
-          <button
-            onClick={() => (settingsOpen ? handleSettingsClose() : setSettingsOpen(true))}
-            className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
-              settingsOpen
-                ? "bg-blue-100 text-blue-700"
-                : "hover:bg-slate-100 text-slate-600"
-            }`}
+        {settingsOpen && (
+          <aside
+            className="absolute inset-y-0 right-0 z-30 flex w-full max-w-[420px] flex-col border-l border-slate-200 bg-white/95 shadow-2xl backdrop-blur-xl"
           >
-            {settingsOpen ? "Chat" : "Settings"}
-          </button>
-
-          <div className="text-slate-300">|</div>
-
-          <CharacterSelect
-            characters={characters}
-            selected={selectedCharId}
-            onSelect={handleCharacterChange}
-            onAddCharacter={() => setAddCharacterOpen(true)}
-            open={charSelectOpen}
-            onToggle={() => setCharSelectOpen(!charSelectOpen)}
-          />
-        </div>
-      </header>
-
-      <div className="flex-1 flex overflow-hidden relative z-0 pl-10 pr-6 pb-6">
-        <div className="flex-1 relative rounded-3xl overflow-hidden mr-6">
-          {avatarCanvas}
-        </div>
-
-        <div className="w-[420px] rounded-[2rem] bg-white border border-slate-100/50 shadow-[0_8px_30px_rgb(0,0,0,0.04)] shadow-blue-900/5 my-2 mr-2 flex flex-col overflow-hidden relative backdrop-blur-3xl bg-white/95">
-          {settingsOpen ? (
             <Settings
               characterId={selectedCharId}
               characterName={charName}
@@ -599,49 +699,20 @@ function App() {
                 setExpressionsConfigured(null);
                 setCurrentExpression("neutral");
               }}
+              onResetOnboarding={() => {
+                setSettingsOpen(false);
+                setOnboardingComplete(false);
+              }}
               onClose={handleSettingsClose}
+              avatarZoom={zoom}
+              avatarBackground={background}
+              onAvatarZoomChange={setZoom}
+              onAvatarBackgroundChange={setBackground}
             />
-          ) : expressionsConfigured === null ? (
-            <div className="flex-1 flex items-center justify-center">
-              <div className="flex gap-2">
-                <span className="w-2.5 h-2.5 rounded-full bg-blue-400 animate-bounce [animation-delay:-0.3s]" />
-                <span className="w-2.5 h-2.5 rounded-full bg-blue-400 animate-bounce [animation-delay:-0.15s]" />
-                <span className="w-2.5 h-2.5 rounded-full bg-blue-400 animate-bounce" />
-              </div>
-            </div>
-          ) : !expressionsConfigured ? (
-            <div className="flex-1 flex flex-col items-center justify-center p-8 text-center bg-orange-50/50">
-              <div className="w-16 h-16 bg-orange-100 text-orange-500 rounded-full flex items-center justify-center text-3xl font-bold mb-6 shadow-sm">
-                !
-              </div>
-              <h3 className="text-slate-800 font-semibold text-lg mb-3">Expression Mapping Required</h3>
-              <p className="text-slate-500 text-sm mb-8 leading-relaxed">
-                This model's expressions need to be mapped before chatting. Open Settings to preview
-                each expression and assign them to emotions.
-              </p>
-              <button
-                onClick={() => setSettingsOpen(true)}
-                className="bg-blue-500 hover:bg-blue-600 text-white shadow-md shadow-blue-500/20 rounded-full px-8 py-3 text-sm font-semibold transition-all hover:-translate-y-0.5"
-              >
-                Configure Expressions
-              </button>
-            </div>
-          ) : (
-            <ChatPanel
-              timeline={timeline}
-              loading={isStreaming}
-              streamingText={streamingText}
-              characterName={charName}
-              onSend={handleSend}
-              onTypingChange={handleTypingChange}
-              listening={listening}
-              onMicToggle={handleMicToggle}
-              onToolConfirm={handleConfirm}
-              inputRef={fullChatInputRef}
-            />
-          )}
-        </div>
+          </aside>
+        )}
       </div>
+
       <AddCharacterModal
         open={addCharacterOpen}
         onClose={() => setAddCharacterOpen(false)}

@@ -132,4 +132,17 @@ mod tests {
         // Empty list returns empty string
         assert!(format_memory_prompt(&[]).is_empty());
     }
+
+    #[test]
+    fn chinese_query_ranks_semantically_overlapping_memory_first() {
+        let memories = vec![
+            make_memory("我喜欢安静的咖啡馆", "semantic", 0.8, vec!["preferences"]),
+            make_memory("我正在开发本地陪伴应用", "semantic", 0.8, vec!["project"]),
+            make_memory("我养了一只橘猫", "semantic", 0.8, vec!["identity"]),
+            make_memory("我住在成都高新区", "semantic", 0.8, vec!["identity"]),
+        ];
+
+        let results = retrieve_relevant("我开发的陪伴项目是什么？", &memories, 1);
+        assert_eq!(results[0].summary, "我正在开发本地陪伴应用");
+    }
 }

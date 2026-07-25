@@ -37,8 +37,13 @@ automatically use the pinned toolchain from the repository root.
 ## Useful validation commands
 
 ```bash
-cargo check -p meuxe-core
-cargo test -p meuxe-core memory_vault
+export CC=gcc CXX=g++
+gcc_dir=$(dirname "$(gcc -print-file-name=libstdc++.so)")
+export RUSTFLAGS="-C link-arg=-L${gcc_dir}"
+
+cargo fmt --all -- --check
+cargo clippy --workspace --all-targets -- -D warnings
+cargo test --workspace
 npm test
 npm run build
 ```

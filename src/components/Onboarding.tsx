@@ -1,20 +1,24 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   saveConfig,
   createCharacter,
   getVoices,
-  testLlm,
   previewVoice,
   listModels,
+  type AgentSetupStatusResponse,
 } from "../api/tauri";
-import { ComposioIntegrationsPanel } from "./ComposioIntegrationsPanel";
-import { LlmModelField } from "./LlmModelField";
-import { LLM_PRESETS, llmPresetEntries } from "../lib/llmPresets";
-
-interface TTSPreset {
-  name: string;
-  needs_key: boolean;
-}
+import {
+  ACP_AGENT_PRESET_IDS,
+  type AcpAgentPresetId,
+} from "../lib/agentPresets";
+import { COMPANION_VIBE_PACKS } from "../lib/companionVibes";
+import { DEFAULT_TTS_PROVIDER, TTS_PRESETS_UI } from "../lib/ttsPresets";
+import { AgentPresetCard } from "./agents/AgentPresetCard";
+import { AgentSetupPanel } from "./agents/AgentSetupPanel";
+import { CompanionAvatarPreview } from "./onboarding/CompanionAvatarPreview";
+import { ModelPicker } from "./onboarding/ModelPicker";
+import { OnboardingShell } from "./onboarding/OnboardingShell";
+import { MeuxeMark } from "./ui/MeuxeMark";
 
 interface Voice {
   id: string;
@@ -30,7 +34,11 @@ interface Model {
 
 interface FormData {
   user: { name: string; about: string };
-  llm: { provider: string; base_url: string; api_key: string; model: string };
+  agent: {
+    preset: AcpAgentPresetId;
+    program: string;
+    args: string;
+  };
   tts: { provider: string; api_key: string; voice: string };
   companion: {
     name: string;
@@ -41,41 +49,6 @@ interface FormData {
     model_id: string;
   };
 }
-
-const TTS_PRESETS: Record<string, TTSPreset> = {
-  tiktok: { name: "TikTok", needs_key: false },
-  elevenlabs: { name: "ElevenLabs", needs_key: true },
-  openai_tts: { name: "OpenAI TTS", needs_key: true },
-};
-
-const VIBES = [
-  { id: "Cheerful", title: "Cheerful", blurb: "Radiant, encouraging, and emotionally bright." },
-  { id: "Chill", title: "Chill", blurb: "Relaxed, grounded, and easy to stay around." },
-  { id: "Tsundere", title: "Tsundere", blurb: "Defensive on the surface, soft underneath." },
-  { id: "Gothic", title: "Gothic", blurb: "Elegant, moody, and aesthetically intense." },
-  { id: "Mysterious", title: "Mysterious", blurb: "Elusive, observant, and hard to read." },
-  { id: "Sassy", title: "Sassy", blurb: "Quick-witted, flirty, and a little dangerous." },
-  { id: "Wise", title: "Wise", blurb: "Steady, reflective, and emotionally mature." },
-  { id: "Energetic", title: "Energetic", blurb: "Fast, vivid, excitable, and full of momentum." },
-];
-
-const RELATIONSHIP_STYLES = [
-  { id: "Gentle", title: "Gentle", blurb: "Comforting, patient, and safe to return to." },
-  { id: "Teasing", title: "Teasing", blurb: "Chemistry through banter, wit, and playful pressure." },
-  { id: "Protective", title: "Protective", blurb: "Attentive to your stress and quietly loyal." },
-  { id: "Devoted", title: "Devoted", blurb: "Deeply attached, intimate, and hard to replace." },
-  { id: "Chaotic", title: "Chaotic", blurb: "Lively, surprising, and emotionally high-voltage." },
-];
-
-const SPEECH_STYLES = [
-  { id: "Poetic", title: "Poetic", blurb: "Evocative, textured, and a little dramatic." },
-  { id: "Playful", title: "Playful", blurb: "Lively, bright, and naturally expressive." },
-  { id: "Calm", title: "Calm", blurb: "Measured, soothing, and steady under pressure." },
-  { id: "Sharp", title: "Sharp", blurb: "Clever, clean, and memorable." },
-  { id: "Intimate", title: "Intimate", blurb: "Close, emotionally tuned-in, and personal." },
-];
-
-const STEPS = ["Local-First", "About You", "LLM Provider", "Voice & TTS", "Integrations", "Build Companion"];
 
 const VIBE_DESCRIPTIONS: Record<string, string> = {
   Cheerful: "They bring bright energy, celebrate small wins, and want the user to feel more alive after talking to them.",
@@ -105,10 +78,10 @@ const SPEECH_DESCRIPTIONS: Record<string, string> = {
 };
 
 const inputClass =
-  "w-full px-5 py-3.5 rounded-2xl bg-slate-50 hover:bg-slate-100/50 text-slate-700 text-[15px] outline-none transition-all placeholder-slate-400 border border-slate-100 focus:bg-white focus:ring-2 focus:ring-blue-100 focus:border-blue-300 mb-5";
-const labelClass = "block text-sm font-semibold text-slate-700 tracking-wide mb-2 pl-1";
-const headingClass = "text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-indigo-600 mb-3 tracking-tight";
-const descriptionClass = "text-slate-500 text-[15px] mb-8 leading-relaxed";
+  "w-full px-5 py-3.5 rounded-2xl bg-slate-50 hover:bg-slate-100/50 text-slate-700 text-[15px] outline-none transition-all placeholder-slate-400 border border-slate-100 focus:bg-white focus:ring-2 focus:ring-indigo-100 focus:border-indigo-300 mb-4";
+const labelClass = "block text-sm font-semibold text-slate-700 mb-2";
+const headingClass = "text-2xl sm:text-[1.65rem] font-bold text-slate-900 mb-1.5 tracking-tight";
+const descriptionClass = "text-slate-500 text-sm mb-5 leading-relaxed";
 
 function buildCompanionDraft(form: FormData): string {
   const companionName = form.companion.name.trim() || "This companion";
@@ -146,51 +119,22 @@ Private Character Notes
 Write them as someone memorable enough that a user could miss them, not just reuse them.`;
 }
 
-function SelectionCard({
-  title,
-  blurb,
-  selected,
-  onClick,
-}: {
-  title: string;
-  blurb: string;
-  selected: boolean;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      onClick={onClick}
-      className={`rounded-[1.4rem] border px-4 py-4 text-left transition-all ${
-        selected
-          ? "border-blue-400 bg-blue-50 text-blue-700 shadow-sm shadow-blue-500/10"
-          : "border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:shadow-sm"
-      }`}
-    >
-      <div className="text-[14px] font-semibold">{title}</div>
-      <div className={`mt-1 text-[12px] leading-relaxed ${selected ? "text-blue-600/80" : "text-slate-400"}`}>{blurb}</div>
-    </button>
-  );
-}
-
 export function Onboarding({ onComplete }: { onComplete: () => void }) {
   const [step, setStep] = useState(0);
   const [voices, setVoices] = useState<Voice[]>([]);
   const [models, setModels] = useState<Model[]>([]);
-  const [testResult, setTestResult] = useState<{ success: boolean; message?: string; error?: string } | null>(null);
-  const [testing, setTesting] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
-  const [personalityTouched, setPersonalityTouched] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const [agentSetup, setAgentSetup] = useState<AgentSetupStatusResponse | null>(null);
+  const [agentSetupLoading, setAgentSetupLoading] = useState(false);
 
-  const llmPresets = LLM_PRESETS;
-  const llmPresetList = llmPresetEntries();
-  const ttsPresets = TTS_PRESETS;
+  const ttsPresets = TTS_PRESETS_UI;
 
   const [form, setForm] = useState<FormData>({
     user: { name: "", about: "" },
-    llm: { provider: "", base_url: "", api_key: "", model: "" },
-    tts: { provider: "tiktok", api_key: "", voice: "jp_001" },
+    agent: { preset: "opencode", program: "", args: "" },
+    tts: { provider: DEFAULT_TTS_PROVIDER, api_key: "", voice: "jp_001" },
     companion: {
       name: "",
       personality: "",
@@ -203,7 +147,16 @@ export function Onboarding({ onComplete }: { onComplete: () => void }) {
 
   useEffect(() => {
     listModels()
-      .then((data) => setModels(data as Model[]))
+      .then((data) => {
+        const list = data as Model[];
+        setModels(list);
+        if (list.length > 0 && !list.some((m) => m.id === form.companion.model_id)) {
+          setForm((prev) => ({
+            ...prev,
+            companion: { ...prev.companion, model_id: list[0].id },
+          }));
+        }
+      })
       .catch(console.error);
   }, []);
 
@@ -212,29 +165,26 @@ export function Onboarding({ onComplete }: { onComplete: () => void }) {
       .then((data) => {
         setVoices(data);
         if (data.length > 0 && !data.find((v: Voice) => v.id === form.tts.voice)) {
-          updateForm("tts", "voice", data[0].id);
+          setForm((prev) => ({
+            ...prev,
+            tts: { ...prev.tts, voice: data[0].id },
+          }));
         }
       })
       .catch(console.error);
   }, [form.tts.provider]);
 
   useEffect(() => {
-    if (personalityTouched && form.companion.personality.trim()) return;
-    setForm((prev) => ({
-      ...prev,
-      companion: {
-        ...prev.companion,
-        personality: buildCompanionDraft(prev),
-      },
-    }));
-  }, [
-    form.user.about,
-    form.companion.name,
-    form.companion.vibe,
-    form.companion.relationship_style,
-    form.companion.speech_style,
-    personalityTouched,
-  ]);
+    if (step !== 4 || form.agent.preset === "custom") {
+      setAgentSetup(null);
+      setAgentSetupLoading(false);
+    }
+  }, [step, form.agent.preset]);
+
+  const handleAgentSetupStatus = (status: AgentSetupStatusResponse | null, loading: boolean) => {
+    setAgentSetup(status);
+    setAgentSetupLoading(loading);
+  };
 
   const updateForm = (section: keyof FormData, field: string, value: string) => {
     setForm((prev) => ({
@@ -243,37 +193,22 @@ export function Onboarding({ onComplete }: { onComplete: () => void }) {
     }));
   };
 
-  const selectLLMPreset = (presetId: string) => {
-    const preset = llmPresets[presetId];
-    if (!preset) return;
+  const selectVibePack = (packId: string) => {
+    const pack = COMPANION_VIBE_PACKS.find((p) => p.id === packId);
+    if (!pack) return;
     setForm((prev) => ({
       ...prev,
-      llm: {
-        provider: presetId,
-        base_url: preset.base_url,
-        api_key: prev.llm.api_key,
-        model: preset.default_model,
+      companion: {
+        ...prev.companion,
+        vibe: pack.id,
+        relationship_style: pack.relationship_style,
+        speech_style: pack.speech_style,
       },
     }));
-    setTestResult(null);
   };
 
-  const testConnection = async () => {
-    setTesting(true);
-    setTestResult(null);
-    try {
-      await testLlm({
-        base_url: form.llm.base_url,
-        api_key: form.llm.api_key || "",
-        model: form.llm.model,
-        provider: form.llm.provider,
-      });
-      setTestResult({ success: true, message: "Connected successfully!" });
-    } catch (err: any) {
-      setTestResult({ success: false, error: err?.message || String(err) || "Connection failed" });
-    }
-    setTesting(false);
-  };
+  const selectedPreviewModel = models.find((m) => m.id === form.companion.model_id) ?? null;
+  const selectedVibePack = COMPANION_VIBE_PACKS.find((p) => p.id === form.companion.vibe);
 
   const [previewError, setPreviewError] = useState("");
   const [previewing, setPreviewing] = useState(false);
@@ -288,7 +223,7 @@ export function Onboarding({ onComplete }: { onComplete: () => void }) {
     try {
       const data = await previewVoice(form.tts.provider, form.tts.voice, form.tts.api_key || undefined);
       if (!data || data.length === 0) {
-        setPreviewError("No audio returned from TTS provider");
+        setPreviewError("Could not load a sample");
         return;
       }
       const blob = new Blob([new Uint8Array(data)], { type: "audio/mp3" });
@@ -297,10 +232,9 @@ export function Onboarding({ onComplete }: { onComplete: () => void }) {
       audio.addEventListener("ended", () => URL.revokeObjectURL(url));
       audioRef.current = audio;
       await audio.play();
-    } catch (err: any) {
-      const msg = err?.message || String(err) || "Voice preview failed";
-      setPreviewError(msg);
-      console.error("Voice preview failed:", err);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setPreviewError(msg || "Preview failed");
     } finally {
       setPreviewing(false);
     }
@@ -311,30 +245,28 @@ export function Onboarding({ onComplete }: { onComplete: () => void }) {
       case 0:
         return true;
       case 1:
-        return form.user.name.trim() !== "" && form.user.about.trim() !== "";
+        return form.user.name.trim() !== "";
       case 2:
-        return form.llm.provider !== "" && form.llm.model !== "" && testResult?.success === true;
+        return form.companion.name.trim() !== "" && form.companion.vibe !== "";
       case 3:
         return form.tts.voice !== "";
       case 4:
-        return true;
-      case 5:
-        return (
-          form.companion.name.trim() !== "" &&
-          form.companion.personality.trim() !== "" &&
-          form.companion.vibe !== "" &&
-          form.companion.relationship_style !== "" &&
-          form.companion.speech_style !== ""
-        );
+        if (form.agent.preset === "custom") {
+          return form.agent.program.trim() !== "";
+        }
+        if (agentSetupLoading) return false;
+        return agentSetup?.agent.ready === true;
       default:
         return false;
     }
   };
 
-  const selectedModel = useMemo(
-    () => models.find((model) => model.id === form.companion.model_id) || null,
-    [models, form.companion.model_id],
-  );
+  const stepHint = (): string | null => {
+    if (step === 4 && form.agent.preset !== "custom" && !canProceed() && !agentSetupLoading) {
+      return "Install your pick above to finish setup.";
+    }
+    return null;
+  };
 
   const handleFinish = async () => {
     setSubmitting(true);
@@ -342,7 +274,7 @@ export function Onboarding({ onComplete }: { onComplete: () => void }) {
     try {
       const charId = await createCharacter({
         name: form.companion.name,
-        personality: form.companion.personality,
+        personality: buildCompanionDraft(form),
         modelId: form.companion.model_id,
         voice: form.tts.voice,
         vibe: form.companion.vibe,
@@ -354,11 +286,10 @@ export function Onboarding({ onComplete }: { onComplete: () => void }) {
 
       await saveConfig({
         user: form.user,
-        llm: {
-          provider: form.llm.provider,
-          base_url: form.llm.base_url,
-          api_key: form.llm.api_key || null,
-          model: form.llm.model,
+        agent: {
+          preset: form.agent.preset,
+          program: form.agent.program,
+          args: form.agent.args.trim() ? form.agent.args.trim().split(/\s+/) : [],
         },
         tts: {
           provider: form.tts.provider,
@@ -369,454 +300,316 @@ export function Onboarding({ onComplete }: { onComplete: () => void }) {
         onboarding_complete: true,
       });
 
-      setStep(6);
+      setStep(5);
       setTimeout(onComplete, 2200);
     } catch {
-      setError("Something went wrong while creating your companion. Please try again.");
+      setError("Something went wrong. Please try again.");
     }
     setSubmitting(false);
   };
 
+  const preview = (
+    <CompanionAvatarPreview
+      model={selectedPreviewModel}
+      companionName={form.companion.name}
+      vibeLabel={selectedVibePack?.title}
+    />
+  );
+
+  if (step === 5) {
+    return (
+      <OnboardingShell step={step}>
+        <div className="text-center py-8 animate-in fade-in zoom-in-95 duration-500">
+          <MeuxeMark className="h-16 w-16 mx-auto mb-5" />
+          <h2 className="text-2xl font-bold text-slate-900 mb-2">You&apos;re all set</h2>
+          <p className="text-slate-500 text-[15px] max-w-sm mx-auto">
+            <span className="font-semibold text-indigo-600">{form.companion.name}</span> is waiting on your desktop.
+          </p>
+        </div>
+      </OnboardingShell>
+    );
+  }
+
   return (
-    <div className="h-screen overflow-y-auto bg-gradient-to-br from-blue-50 via-white to-indigo-50 relative">
-      <div className="fixed top-0 left-0 w-full h-full overflow-hidden pointer-events-none z-0">
-        <div className="absolute -top-[20%] -left-[10%] w-[50%] h-[50%] rounded-full bg-blue-300/20 blur-[100px]" />
-        <div className="absolute top-[60%] -right-[10%] w-[60%] h-[60%] rounded-full bg-indigo-300/20 blur-[120px]" />
-      </div>
-
-      <div className="min-h-full flex flex-col items-center justify-center p-6 py-12">
-        <div className="w-full max-w-2xl z-10 relative">
-          {step < 6 && (
-            <div className="flex items-center justify-center gap-2 mb-10">
-              {STEPS.map((label, i) => (
-                <div key={label} className="flex items-center gap-2">
-                  <div
-                    className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold transition-all duration-300 ${
-                      i === step
-                        ? "bg-blue-500 text-white shadow-md shadow-blue-500/30 scale-110"
-                        : i < step
-                          ? "bg-blue-100 text-blue-600"
-                          : "bg-white/60 text-slate-400 border border-slate-200/50"
-                    }`}
-                  >
-                    {i < step ? "\u2713" : i + 1}
-                  </div>
-                  {i < STEPS.length - 1 && (
-                    <div className={`w-10 h-1 rounded-full transition-all duration-300 ${i < step ? "bg-blue-400/80" : "bg-white/60 border border-slate-100/50"}`} />
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
-
-          <div className="backdrop-blur-3xl bg-white/90 rounded-[2.5rem] shadow-[0_8px_30px_rgb(0,0,0,0.06)] shadow-blue-900/5 border border-white p-10 ring-1 ring-slate-100/50">
-            {step === 0 && (
-              <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-                <h2 className={headingClass}>Local-first by default</h2>
-                <p className={descriptionClass}>
-                  Meuxe keeps the companion brain on your machine first: memories, relationship state, character files, sessions, and vault exports are local data you control.
-                </p>
-
-                <div className="grid gap-4 mb-8">
-                  <div className="rounded-[1.8rem] border border-emerald-100 bg-emerald-50 px-5 py-4">
-                    <div className="text-[11px] font-semibold uppercase tracking-[0.22em] text-emerald-700 mb-2">Stays on this device</div>
-                    <p className="text-sm leading-relaxed text-emerald-700">SQLite memory vault, Markdown vault files, relationship state, character profile, imported notes, and chat history.</p>
-                  </div>
-                  <div className="rounded-[1.8rem] border border-blue-100 bg-blue-50 px-5 py-4">
-                    <div className="text-[11px] font-semibold uppercase tracking-[0.22em] text-blue-700 mb-2">Leaves only when you enable it</div>
-                    <p className="text-sm leading-relaxed text-blue-700">LLM prompts, TTS text, web search queries, and connected-source requests for integrations like Composio.</p>
-                  </div>
-                  <div className="rounded-[1.8rem] border border-amber-100 bg-amber-50 px-5 py-4">
-                    <div className="text-[11px] font-semibold uppercase tracking-[0.22em] text-amber-700 mb-2">You choose services</div>
-                    <p className="text-sm leading-relaxed text-amber-700">Use local Ollama/LM Studio where possible, or add API keys for remote LLM/TTS/search providers. Blank key fields preserve existing keys later.</p>
-                  </div>
+    <OnboardingShell step={step} preview={preview}>
+      {step === 0 && (
+        <div className="animate-in fade-in duration-500">
+          <h2 className={headingClass}>A companion on your desktop</h2>
+          <p className={descriptionClass}>
+            Talk to someone who remembers you. They live on your computer—not in a generic chat app.
+          </p>
+          <div className="grid gap-3 sm:grid-cols-3">
+            {[
+              { emoji: "💬", title: "Real conversations", sub: "They grow with you" },
+              { emoji: "🎭", title: "Face & voice", sub: "See them react" },
+              { emoji: "🔒", title: "Your device", sub: "Memories stay local" },
+            ].map((f) => (
+              <div
+                key={f.title}
+                className="flex items-center gap-3 rounded-2xl border border-slate-100 bg-slate-50/90 px-4 py-3.5"
+              >
+                <span className="text-2xl">{f.emoji}</span>
+                <div>
+                  <div className="text-sm font-semibold text-slate-800">{f.title}</div>
+                  <div className="text-xs text-slate-500">{f.sub}</div>
                 </div>
               </div>
-            )}
-
-            {step === 1 && (
-              <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-                <h2 className={headingClass}>Set up your private companion</h2>
-                <p className={descriptionClass}>
-                  Your companion now has local memory, evolving relationship state, and a layered character profile. Start by giving it enough context to care about you like a person, not a prompt.
-                </p>
-
-                <div className="mb-8 rounded-[1.8rem] border border-blue-100 bg-gradient-to-r from-blue-50 to-indigo-50 px-5 py-4 text-sm leading-relaxed text-slate-600">
-                  <div className="text-[11px] font-semibold uppercase tracking-[0.22em] text-blue-600 mb-2">Local-First</div>
-                  Memories, relationship state, and session history stay on this machine in local files. The backend is the source of truth for any client you connect later.
-                </div>
-
-                <label className={labelClass}>Your Name</label>
-                <input
-                  type="text"
-                  value={form.user.name}
-                  onChange={(e) => updateForm("user", "name", e.target.value)}
-                  placeholder="What should your companion call you?"
-                  className={inputClass}
-                />
-
-                <label className={labelClass}>About Yourself</label>
-                <textarea
-                  value={form.user.about}
-                  onChange={(e) => updateForm("user", "about", e.target.value)}
-                  placeholder="Interests, what you do, what kind of support or chemistry you like, what matters to you..."
-                  rows={5}
-                  className={`${inputClass} resize-none mb-2 rounded-3xl`}
-                />
-              </div>
-            )}
-
-            {step === 2 && (
-              <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-                <h2 className={headingClass}>Connect the brain</h2>
-                <p className={descriptionClass}>Choose the model that will drive your companion. Local endpoints keep inference on-device; remote providers receive the prompt context needed to reply.</p>
-
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mb-6 max-h-[280px] overflow-y-auto pr-1 scrollbar-thin scrollbar-thumb-slate-200">
-                  {llmPresetList.map(([id, preset]) => (
-                    <button
-                      key={id}
-                      onClick={() => selectLLMPreset(id)}
-                      className={`px-4 py-3.5 rounded-2xl text-[14px] font-semibold border transition-all ${
-                        form.llm.provider === id
-                          ? "border-blue-400 bg-blue-50 text-blue-700 shadow-sm shadow-blue-500/10 hover:-translate-y-0.5"
-                          : "border-slate-200 bg-white text-slate-500 hover:border-slate-300 hover:shadow-sm"
-                      }`}
-                    >
-                      {preset.name}
-                      {!preset.needs_key && <span className="ml-2 text-[10px] text-emerald-600">Local/no key</span>}
-                    </button>
-                  ))}
-                </div>
-
-                {form.llm.provider && (
-                  <div className="animate-in fade-in duration-300">
-                    {llmPresets[form.llm.provider]?.needs_key !== false && (
-                      <>
-                        <label className={labelClass}>API Key</label>
-                        <input
-                          type="password"
-                          value={form.llm.api_key}
-                          onChange={(e) => {
-                            updateForm("llm", "api_key", e.target.value);
-                            setTestResult(null);
-                          }}
-                          placeholder="Paste your API key"
-                          className={inputClass}
-                        />
-                      </>
-                    )}
-
-                    <LlmModelField
-                      value={form.llm.model}
-                      onChange={(model) => updateForm("llm", "model", model)}
-                      baseUrl={form.llm.base_url}
-                      apiKey={form.llm.api_key}
-                      providerId={form.llm.provider}
-                      needsKey={llmPresets[form.llm.provider]?.needs_key !== false}
-                      onInvalidateTest={() => setTestResult(null)}
-                    />
-
-                    {form.llm.provider === "custom" && (
-                      <>
-                        <label className={labelClass}>Base URL</label>
-                        <input
-                          type="text"
-                          value={form.llm.base_url}
-                          onChange={(e) => {
-                            updateForm("llm", "base_url", e.target.value);
-                            setTestResult(null);
-                          }}
-                          placeholder="https://api.example.com/v1"
-                          className={inputClass}
-                        />
-                      </>
-                    )}
-
-                    <button
-                      onClick={testConnection}
-                      disabled={testing}
-                      className="w-full py-3.5 rounded-2xl bg-white border border-slate-200 text-slate-600 text-[15px] font-medium hover:bg-slate-50 hover:border-slate-300 shadow-sm disabled:opacity-50 transition-all mb-4"
-                    >
-                      {testing ? "Testing..." : "Test Connection"}
-                    </button>
-
-                    {testResult && (
-                      <div
-                        className={`px-5 py-4 rounded-2xl text-[15px] font-medium animate-in fade-in ${
-                          testResult.success
-                            ? "bg-green-50 text-green-700 border border-green-200/50 shadow-sm"
-                            : "bg-red-50 text-red-700 border border-red-200/50 shadow-sm"
-                        }`}
-                      >
-                        {testResult.success ? "Connected successfully!" : testResult.error || "Connection failed"}
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-            )}
-
-            {step === 3 && (
-              <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-                <h2 className={headingClass}>Choose the voice</h2>
-                <p className={descriptionClass}>This is the voice your companion will use. Text for speech is sent only to the TTS provider you choose.</p>
-
-                <label className={labelClass}>TTS Provider</label>
-                <div className="flex flex-wrap gap-3 mb-6">
-                  {Object.entries(ttsPresets).map(([id, preset]) => (
-                    <button
-                      key={id}
-                      onClick={() => updateForm("tts", "provider", id)}
-                      className={`px-4 py-3 rounded-2xl text-[14px] font-semibold border transition-all ${
-                        form.tts.provider === id
-                          ? "border-blue-400 bg-blue-50 text-blue-700 shadow-sm shadow-blue-500/10 hover:-translate-y-0.5"
-                          : "border-slate-200 bg-white text-slate-500 hover:border-slate-300 hover:shadow-sm"
-                      }`}
-                    >
-                      {preset.name}
-                    </button>
-                  ))}
-                </div>
-
-                <div className="animate-in fade-in duration-300">
-                  {ttsPresets[form.tts.provider]?.needs_key && (
-                    <>
-                      <label className={labelClass}>API Key</label>
-                      <input
-                        type="password"
-                        value={form.tts.api_key}
-                        onChange={(e) => updateForm("tts", "api_key", e.target.value)}
-                        placeholder="Paste your API key"
-                        className={inputClass}
-                      />
-                    </>
-                  )}
-
-                  <label className={labelClass}>Voice</label>
-                  <div className="flex gap-3 mb-4">
-                    <div className="relative flex-1">
-                      <select
-                        value={form.tts.voice}
-                        onChange={(e) => updateForm("tts", "voice", e.target.value)}
-                        className={`${inputClass} appearance-none cursor-pointer mb-0`}
-                      >
-                        {voices.map((v) => (
-                          <option key={v.id} value={v.id}>
-                            {v.name}
-                          </option>
-                        ))}
-                      </select>
-                      <div className="absolute right-5 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
-                        <svg width="12" height="12" viewBox="0 0 16 16" fill="none">
-                          <path d="M4 6L8 10L12 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                        </svg>
-                      </div>
-                    </div>
-                    <button
-                      onClick={playSample}
-                      disabled={previewing}
-                      className="px-6 rounded-2xl bg-white border border-slate-200 text-blue-600 text-[15px] font-semibold hover:bg-slate-50 hover:border-blue-200 shadow-sm transition-all disabled:opacity-50"
-                    >
-                      {previewing ? "Loading..." : "Play Sample"}
-                    </button>
-                    {previewError && (
-                      <p className="text-red-500 text-xs mt-1">{previewError}</p>
-                    )}
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {step === 4 && (
-              <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-                <h2 className={headingClass}>Connect optional sources</h2>
-                <p className={descriptionClass}>
-                  Link services through Composio if you want GitHub READMEs, Gmail context, or other toolkits available in chat later. You can skip this and configure integrations anytime in Settings.
-                </p>
-
-                <ComposioIntegrationsPanel />
-              </div>
-            )}
-
-            {step === 5 && (
-              <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-                <h2 className={headingClass}>Build your companion</h2>
-                <p className={descriptionClass}>
-                  This step now creates a layered character profile: soul, style, rules, and user context. Pick the emotional shape first, then fine-tune the written draft.
-                </p>
-
-                <div className="mb-7 rounded-[1.8rem] border border-emerald-100 bg-gradient-to-r from-emerald-50 to-teal-50 px-5 py-4 text-sm leading-relaxed text-slate-600">
-                  <div className="text-[11px] font-semibold uppercase tracking-[0.22em] text-emerald-700 mb-2">Memory + State Aware</div>
-                  Your companion will keep local memory and relationship state after onboarding. These choices shape how that future memory feels, not just the first prompt.
-                </div>
-
-                <label className={labelClass}>Companion Name</label>
-                <input
-                  type="text"
-                  value={form.companion.name}
-                  onChange={(e) => updateForm("companion", "name", e.target.value)}
-                  placeholder="What should your companion be called?"
-                  className={inputClass}
-                />
-
-                <label className={labelClass}>Core Vibe</label>
-                <div className="grid grid-cols-2 gap-3 mb-6">
-                  {VIBES.map((vibe) => (
-                    <SelectionCard
-                      key={vibe.id}
-                      title={vibe.title}
-                      blurb={vibe.blurb}
-                      selected={form.companion.vibe === vibe.id}
-                      onClick={() => updateForm("companion", "vibe", vibe.id)}
-                    />
-                  ))}
-                </div>
-
-                <label className={labelClass}>Relationship Dynamic</label>
-                <div className="grid grid-cols-2 gap-3 mb-6">
-                  {RELATIONSHIP_STYLES.map((style) => (
-                    <SelectionCard
-                      key={style.id}
-                      title={style.title}
-                      blurb={style.blurb}
-                      selected={form.companion.relationship_style === style.id}
-                      onClick={() => updateForm("companion", "relationship_style", style.id)}
-                    />
-                  ))}
-                </div>
-
-                <label className={labelClass}>Speech Style</label>
-                <div className="grid grid-cols-2 gap-3 mb-6">
-                  {SPEECH_STYLES.map((style) => (
-                    <SelectionCard
-                      key={style.id}
-                      title={style.title}
-                      blurb={style.blurb}
-                      selected={form.companion.speech_style === style.id}
-                      onClick={() => updateForm("companion", "speech_style", style.id)}
-                    />
-                  ))}
-                </div>
-
-                <div className="mb-6 rounded-[1.7rem] border border-slate-200 bg-slate-50/80 px-5 py-4">
-                  <div className="flex flex-wrap items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-500">
-                    <span className="rounded-full bg-white px-3 py-1 shadow-sm">{form.companion.vibe}</span>
-                    <span className="rounded-full bg-white px-3 py-1 shadow-sm">{form.companion.relationship_style}</span>
-                    <span className="rounded-full bg-white px-3 py-1 shadow-sm">{form.companion.speech_style}</span>
-                    {selectedModel && <span className="rounded-full bg-white px-3 py-1 shadow-sm">{selectedModel.id}</span>}
-                  </div>
-                </div>
-
-                <label className={labelClass}>Layered Personality Draft</label>
-                <textarea
-                  value={form.companion.personality}
-                  onChange={(e) => {
-                    setPersonalityTouched(true);
-                    updateForm("companion", "personality", e.target.value);
-                  }}
-                  placeholder="Refine the auto-generated draft until it feels like a real person."
-                  rows={7}
-                  className={`${inputClass} resize-none rounded-3xl`}
-                />
-
-                <div className="flex justify-between items-center mb-6">
-                  <button
-                    onClick={() => {
-                      setPersonalityTouched(false);
-                      setForm((prev) => ({
-                        ...prev,
-                        companion: { ...prev.companion, personality: buildCompanionDraft(prev) },
-                      }));
-                    }}
-                    className="rounded-full border border-slate-200 bg-white px-4 py-2 text-[12px] font-semibold uppercase tracking-[0.18em] text-slate-600 shadow-sm transition-all hover:-translate-y-0.5"
-                  >
-                    Regenerate Draft
-                  </button>
-                  <div className="text-[12px] text-slate-400">You can still rewrite this completely.</div>
-                </div>
-
-                <label className={labelClass}>Avatar Model</label>
-                {models.length > 0 ? (
-                  <div className="relative mb-2">
-                    <select
-                      value={form.companion.model_id}
-                      onChange={(e) => updateForm("companion", "model_id", e.target.value)}
-                      className={`${inputClass} appearance-none cursor-pointer mb-0`}
-                    >
-                      {models.map((model) => (
-                        <option key={model.id} value={model.id}>
-                          {model.id} ({model.type})
-                        </option>
-                      ))}
-                    </select>
-                    <div className="absolute right-5 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
-                      <svg width="12" height="12" viewBox="0 0 16 16" fill="none">
-                        <path d="M4 6L8 10L12 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                      </svg>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="px-5 py-4 rounded-2xl bg-slate-50 border border-slate-100/80 text-slate-600 text-sm mb-2 shadow-sm font-medium">
-                    Using default model.
-                    <span className="block text-[13px] text-slate-400 font-normal mt-1.5 leading-relaxed">
-                      Add models to `models/live2d/` or `models/vrm/` and restart to expand your choices.
-                    </span>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {step === 6 && (
-              <div className="text-center py-12 animate-in fade-in zoom-in-95 duration-500">
-                <div className="w-20 h-20 bg-gradient-to-tr from-green-400 to-emerald-400 text-white shadow-lg shadow-green-500/30 rounded-full flex items-center justify-center text-4xl mx-auto mb-6">
-                  {"\u2713"}
-                </div>
-                <h2 className="text-3xl font-extrabold text-slate-800 mb-3 tracking-tight">Your companion is ready</h2>
-                <p className="text-slate-500 text-[16px] max-w-md mx-auto leading-relaxed">
-                  <span className="font-semibold text-blue-600">{form.companion.name}</span> has been created with a layered profile, local memory, and evolving relationship state. Loading them now...
-                </p>
-              </div>
-            )}
-
-            {error && (
-              <div className="mt-4 px-4 py-2.5 rounded-xl bg-red-50 text-red-700 border border-red-200 text-sm">
-                {error}
-              </div>
-            )}
-
-            {step < 6 && (
-              <div className="flex justify-between mt-10 space-x-4">
-                <button
-                  onClick={() => setStep(step - 1)}
-                  disabled={step === 0}
-                  className={`w-1/3 py-3.5 rounded-2xl bg-white border border-slate-200 text-slate-600 text-[15px] font-medium transition-all ${
-                    step === 0 ? "opacity-0 pointer-events-none" : "hover:bg-slate-50 hover:border-slate-300 shadow-sm"
-                  }`}
-                >
-                  Back
-                </button>
-                {step < 5 ? (
-                  <button
-                    onClick={() => setStep(step + 1)}
-                    disabled={!canProceed()}
-                    className="flex-1 py-3.5 rounded-2xl bg-blue-500 text-white text-[15px] font-semibold hover:bg-blue-600 shadow-md shadow-blue-500/20 disabled:opacity-50 disabled:shadow-none hover:-translate-y-0.5 transition-all active:translate-y-0"
-                  >
-                    Continue
-                  </button>
-                ) : (
-                  <button
-                    onClick={handleFinish}
-                    disabled={!canProceed() || submitting}
-                    className="flex-1 py-3.5 rounded-2xl bg-gradient-to-r from-blue-500 to-indigo-600 text-white text-[15px] font-semibold hover:from-blue-600 hover:to-indigo-700 shadow-lg shadow-blue-500/25 disabled:opacity-50 disabled:shadow-none hover:-translate-y-0.5 transition-all active:translate-y-0"
-                  >
-                    {submitting ? "Building companion..." : "Finish"}
-                  </button>
-                )}
-              </div>
-            )}
+            ))}
           </div>
         </div>
+      )}
+
+      {step === 1 && (
+        <div className="animate-in fade-in duration-500">
+          <h2 className={headingClass}>First, your name</h2>
+          <p className={descriptionClass}>So they know who they&apos;re talking to. Only saved on this device.</p>
+          <label className={labelClass}>Name</label>
+          <input
+            type="text"
+            value={form.user.name}
+            onChange={(e) => updateForm("user", "name", e.target.value)}
+            placeholder="e.g. Alex"
+            className={inputClass}
+            autoFocus
+          />
+          <label className={labelClass}>
+            Anything they should know <span className="font-normal text-slate-400">(optional)</span>
+          </label>
+          <textarea
+            value={form.user.about}
+            onChange={(e) => updateForm("user", "about", e.target.value)}
+            placeholder="A line or two about you…"
+            rows={2}
+            className={`${inputClass} resize-none rounded-2xl mb-0`}
+          />
+        </div>
+      )}
+
+      {step === 2 && (
+        <div className="animate-in fade-in duration-500">
+          <h2 className={headingClass}>Meet them</h2>
+          <p className={descriptionClass}>Name, look, and personality—in one place.</p>
+
+          <label className={labelClass}>Their name</label>
+          <input
+            type="text"
+            value={form.companion.name}
+            onChange={(e) => updateForm("companion", "name", e.target.value)}
+            placeholder="Who are you creating?"
+            className={inputClass}
+          />
+
+          <label className={labelClass}>Personality</label>
+          <div className="grid grid-cols-2 gap-2.5 mb-5">
+            {COMPANION_VIBE_PACKS.map((pack) => {
+              const selected = form.companion.vibe === pack.id;
+              return (
+                <button
+                  key={pack.id}
+                  type="button"
+                  onClick={() => selectVibePack(pack.id)}
+                  className={`flex items-center gap-2.5 rounded-2xl border px-3 py-3 text-left transition-all ${
+                    selected
+                      ? "border-indigo-400 bg-indigo-50 ring-1 ring-indigo-200/80 shadow-sm"
+                      : "border-slate-200 bg-white hover:border-slate-300"
+                  }`}
+                >
+                  <span className="text-xl">{pack.emoji}</span>
+                  <div className="min-w-0">
+                    <div className={`text-sm font-semibold ${selected ? "text-indigo-900" : "text-slate-800"}`}>
+                      {pack.title}
+                    </div>
+                    <div className={`text-xs ${selected ? "text-indigo-600/85" : "text-slate-400"}`}>
+                      {pack.subtitle}
+                    </div>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+
+          <label className={labelClass}>Look</label>
+          <ModelPicker
+            models={models}
+            selectedId={form.companion.model_id}
+            onSelect={(id) => updateForm("companion", "model_id", id)}
+          />
+        </div>
+      )}
+
+      {step === 3 && (
+        <div className="animate-in fade-in duration-500">
+          <h2 className={headingClass}>How they sound</h2>
+          <p className={descriptionClass}>Pick a voice and tap listen.</p>
+
+          <div className="grid gap-2.5 mb-5 sm:grid-cols-3">
+            {Object.entries(ttsPresets).map(([id, preset]) => {
+              const selected = form.tts.provider === id;
+              return (
+                <button
+                  key={id}
+                  type="button"
+                  onClick={() => updateForm("tts", "provider", id)}
+                  className={`rounded-2xl border px-4 py-3 text-left transition-all ${
+                    selected
+                      ? "border-indigo-400 bg-indigo-50 shadow-sm ring-1 ring-indigo-200/70"
+                      : "border-slate-200 bg-white hover:border-slate-300"
+                  }`}
+                >
+                  <div className={`text-sm font-semibold ${selected ? "text-indigo-900" : "text-slate-800"}`}>
+                    {preset.name}
+                  </div>
+                  <div className={`text-xs mt-0.5 ${selected ? "text-indigo-600/80" : "text-slate-400"}`}>
+                    {ttsPresets[id]?.hint}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+
+          {ttsPresets[form.tts.provider]?.needs_key && (
+            <>
+              <label className={labelClass}>API key</label>
+              <input
+                type="password"
+                value={form.tts.api_key}
+                onChange={(e) => updateForm("tts", "api_key", e.target.value)}
+                placeholder="Paste key from your provider"
+                className={inputClass}
+              />
+            </>
+          )}
+
+          <label className={labelClass}>Voice</label>
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-start">
+            <div className="relative flex-1">
+              <select
+                value={form.tts.voice}
+                onChange={(e) => updateForm("tts", "voice", e.target.value)}
+                className={`${inputClass} appearance-none cursor-pointer mb-0`}
+              >
+                {voices.map((v) => (
+                  <option key={v.id} value={v.id}>{v.name}</option>
+                ))}
+              </select>
+            </div>
+            <button
+              type="button"
+              onClick={playSample}
+              disabled={previewing}
+              className="shrink-0 rounded-2xl border border-slate-200 bg-white px-5 py-3.5 text-sm font-semibold text-indigo-600 shadow-sm hover:bg-slate-50 disabled:opacity-50"
+            >
+              {previewing ? "Loading…" : "Listen"}
+            </button>
+          </div>
+          {previewError && <p className="mt-2 text-xs text-red-600">{previewError}</p>}
+        </div>
+      )}
+
+      {step === 4 && (
+        <div className="animate-in fade-in duration-500">
+          <h2 className={headingClass}>Who answers for them?</h2>
+          <p className={descriptionClass}>
+            Meuxe is the face and memory. Choose the assistant on your computer that powers chat.
+          </p>
+
+          <div className="grid grid-cols-1 gap-3 mb-4">
+            {ACP_AGENT_PRESET_IDS.map((id) => (
+              <AgentPresetCard
+                key={id}
+                id={id}
+                selected={form.agent.preset === id}
+                onSelect={() =>
+                  setForm((prev) => ({
+                    ...prev,
+                    agent: { ...prev.agent, preset: id },
+                  }))
+                }
+              />
+            ))}
+          </div>
+
+          {form.agent.preset === "custom" && (
+            <>
+              <label className={labelClass}>Program to run</label>
+              <input
+                type="text"
+                value={form.agent.program}
+                onChange={(e) =>
+                  setForm((prev) => ({
+                    ...prev,
+                    agent: { ...prev.agent, program: e.target.value },
+                  }))
+                }
+                placeholder="Path or command"
+                className={inputClass}
+              />
+              <label className={labelClass}>Extra options (optional)</label>
+              <input
+                type="text"
+                value={form.agent.args}
+                onChange={(e) =>
+                  setForm((prev) => ({
+                    ...prev,
+                    agent: { ...prev.agent, args: e.target.value },
+                  }))
+                }
+                placeholder="Optional flags"
+                className={inputClass}
+              />
+            </>
+          )}
+
+          {form.agent.preset !== "custom" && (
+            <AgentSetupPanel
+              preset={form.agent.preset}
+              onStatusChange={handleAgentSetupStatus}
+              friendly
+            />
+          )}
+        </div>
+      )}
+
+      {error && (
+        <div className="mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-2.5 text-sm text-red-700">
+          {error}
+        </div>
+      )}
+
+      <div className="mt-8 flex gap-3">
+        <button
+          type="button"
+          onClick={() => setStep(step - 1)}
+          disabled={step === 0}
+          className={`rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm font-medium text-slate-600 shadow-sm transition-all ${
+            step === 0 ? "opacity-0 pointer-events-none w-0 px-0 border-0" : "hover:bg-slate-50"
+          }`}
+        >
+          Back
+        </button>
+        {step < 4 ? (
+          <button
+            type="button"
+            onClick={() => setStep(step + 1)}
+            disabled={!canProceed()}
+            className="flex-1 rounded-2xl bg-indigo-600 py-3.5 text-[15px] font-semibold text-white shadow-md shadow-indigo-600/25 hover:bg-indigo-700 disabled:opacity-40"
+          >
+            Continue
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={handleFinish}
+            disabled={!canProceed() || submitting}
+            className="flex-1 rounded-2xl bg-indigo-600 py-3.5 text-[15px] font-semibold text-white shadow-md shadow-indigo-600/25 hover:bg-indigo-700 disabled:opacity-40"
+          >
+            {submitting ? "Creating…" : "Finish"}
+          </button>
+        )}
       </div>
-    </div>
+      {stepHint() && (
+        <p className="mt-3 text-center text-xs text-slate-500">{stepHint()}</p>
+      )}
+    </OnboardingShell>
   );
 }

@@ -83,6 +83,21 @@ function appDataStaticPlugin() {
 export default defineConfig({
   plugins: [react(), tailwindcss(), appDataStaticPlugin()],
   clearScreen: false,
+  build: {
+    chunkSizeWarningLimit: 900,
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (id.includes("node_modules/three") || id.includes("@pixiv/three-vrm")) {
+            return "three-vrm";
+          }
+          if (id.includes("node_modules/pixi.js") || id.includes("pixi-live2d-display")) {
+            return "live2d-pixi";
+          }
+        },
+      },
+    },
+  },
   server: {
     port: 1420,
     strictPort: true,

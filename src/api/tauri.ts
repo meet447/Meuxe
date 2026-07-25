@@ -40,21 +40,33 @@ export async function resetAllAppData() {
   return invoke("config_reset_all");
 }
 
-export async function testLlm(provider: {
-  base_url: string;
-  api_key: string;
-  model: string;
-  provider?: string;
-}) {
-  return invoke<string>("config_test_llm", { provider });
+export async function resetOnboarding() {
+  return invoke("config_reset_onboarding");
 }
 
-export async function listLlmModels(provider: {
-  base_url: string;
-  api_key?: string;
-  provider?: string;
-}) {
-  return invoke<string[]>("config_list_llm_models", { provider });
+export interface AgentSetupStatusResponse {
+  prerequisites: {
+    node_available: boolean;
+    npx_available: boolean;
+    node_version: string | null;
+    npx_version: string | null;
+  };
+  agent: {
+    preset: string;
+    ready: boolean;
+    managed_install: boolean;
+    system_path: boolean;
+    needs_node: boolean;
+    detail: string;
+  };
+}
+
+export async function getAgentSetupStatus(preset: string) {
+  return invoke<AgentSetupStatusResponse>("agent_setup_status", { preset });
+}
+
+export async function installAgentSetup(preset: string) {
+  return invoke<AgentSetupStatusResponse>("agent_setup_install", { preset });
 }
 
 // Characters
@@ -104,8 +116,8 @@ export async function importVRMModel() {
 }
 
 // Chat
-export async function sendChat(characterId: string, message: string) {
-  return invoke("chat_send", { characterId, message });
+export async function sendChat(characterId: string, message: string, requestId: string) {
+  return invoke("chat_send", { characterId, message, requestId });
 }
 
 export async function getChatHistory(characterId: string) {
@@ -114,10 +126,6 @@ export async function getChatHistory(characterId: string) {
 
 export async function clearChat(characterId: string) {
   return invoke("chat_clear", { characterId });
-}
-
-export async function confirmToolCall(requestId: string, approved: boolean) {
-  return invoke("tool_confirm", { requestId, approved });
 }
 
 export async function transcribeVoice(audioBase64: string, mimeType: string) {
@@ -199,41 +207,6 @@ export async function exportMemoryZipDialog(characterId: string) {
 
 export async function importMemoryZipDialog(characterId: string) {
   return invoke<number | null>("memory_import_zip_dialog", { characterId });
-}
-
-export async function getComposioStatus() {
-  return invoke("composio_status");
-}
-
-export async function saveComposioConfig(
-  apiKey: string | null,
-  enabledToolkits?: string[],
-) {
-  return invoke("composio_save_config", {
-    apiKey,
-    enabledToolkits: enabledToolkits ?? [],
-  });
-}
-
-export async function authorizeComposioToolkit(toolkit: string) {
-  return invoke("composio_authorize_toolkit", { toolkit });
-}
-
-export async function refreshComposioToolkit(toolkit: string) {
-  return invoke("composio_refresh_toolkit", { toolkit });
-}
-
-export async function syncComposioGithubReadme(characterId: string, owner: string, repo: string) {
-  return invoke<number>("composio_sync_github_readme", { characterId, owner, repo });
-}
-
-export async function syncComposioGmail(characterId: string, maxResults?: number) {
-  return invoke<number>("composio_sync_gmail", { characterId, maxResults });
-}
-
-// Tools
-export async function listTools() {
-  return invoke<{ name: string; description: string; permission: string; enabled: boolean }[]>("tools_list");
 }
 
 // Expressions

@@ -1,5 +1,7 @@
 # Meuxe — Agent Development Guide
 
+See [`docs/DIRECTION.md`](docs/DIRECTION.md) for product north star and [`docs/ROADMAP.md`](docs/ROADMAP.md) for phased work.
+
 ## Cursor Cloud specific instructions
 
 ### Overview
@@ -25,11 +27,11 @@ The full desktop app (`npm run tauri dev`) requires a display. In a headless Clo
 
 See `package.json` scripts and the CI workflow at `.github/workflows/ci.yml`.
 
-- **Frontend tests:** `npm test` (Vitest, 38 tests)
+- **Frontend tests:** `npm test` (Vitest, 58 tests)
 - **Frontend build:** `npm run build` (tsc + vite build)
 - **Rust format check:** `cargo fmt --all -- --check`
 - **Rust lint:** `cargo clippy --workspace --all-targets -- -D warnings`
-- **Rust tests:** `cargo test --workspace` (55 tests across meuxe-core and tauri crate)
+- **Rust tests:** `cargo test --workspace` (65 tests across meuxe-core and tauri crate)
 
 ### Rust build environment variables
 
@@ -45,4 +47,4 @@ This mirrors the CI configuration and prevents linker errors with `libstdc++`.
 
 ### External APIs (optional)
 
-LLM (OpenAI-compatible) and TTS providers are configured at runtime through the app UI. They are not required for building, testing, or running the frontend. Without them, the app launches but AI chat responses won't work.
+Chat uses **ACP** (user-installed CLI agents such as Claude Code, Codex, or OpenCode). TTS providers are configured at runtime in Settings. Neither is required to build, test, or run the Vite frontend. Without a configured agent, the app launches but companion chat will not respond.

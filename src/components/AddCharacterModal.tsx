@@ -269,7 +269,7 @@ export function AddCharacterModal({
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-6">
       <div className="absolute inset-0 bg-slate-900/20 backdrop-blur-sm" onClick={resetAndClose} />
       <div className="relative z-[101] w-full max-w-3xl max-h-[90vh] overflow-hidden rounded-[2rem] border border-white/70 bg-white/95 shadow-[0_20px_80px_rgba(15,23,42,0.18)] ring-1 ring-slate-100/80">
-        <div className="flex items-center justify-between border-b border-slate-100/80 bg-gradient-to-r from-white to-blue-50/40 px-6 py-5">
+        <div className="flex items-center justify-between border-b border-slate-100 bg-white px-6 py-5">
           <div>
             <h2 className="text-xl font-bold tracking-tight text-slate-800">Add Character</h2>
             <p className="mt-1 text-sm text-slate-500">Create a new companion without going through onboarding again.</p>
@@ -285,7 +285,7 @@ export function AddCharacterModal({
         </div>
 
         <div className="max-h-[calc(90vh-160px)] overflow-y-auto px-6 py-6">
-          <div className="mb-6 rounded-[1.6rem] border border-blue-100 bg-gradient-to-r from-blue-50 to-indigo-50 px-5 py-4 text-sm leading-relaxed text-slate-600">
+          <div className="mb-6 rounded-[1.6rem] border border-slate-200 bg-slate-50 px-5 py-4 text-sm leading-relaxed text-slate-600">
             <div className="mb-2 text-[11px] font-semibold uppercase tracking-[0.22em] text-blue-600">Uses Current App Context</div>
             This creation flow uses your current profile and voice settings automatically.
             {userName ? <span className="block mt-2 text-slate-500">Creating for user: <span className="font-semibold text-slate-700">{userName}</span></span> : null}
@@ -450,7 +450,7 @@ export function AddCharacterModal({
           <button
             onClick={handleCreate}
             disabled={saving || !name.trim() || !personality.trim()}
-            className="rounded-2xl bg-gradient-to-r from-blue-500 to-indigo-600 px-6 py-3 text-[14px] font-semibold text-white shadow-lg shadow-blue-500/25 transition-all hover:-translate-y-0.5 hover:from-blue-600 hover:to-indigo-700 disabled:opacity-50 disabled:shadow-none"
+            className="rounded-2xl bg-blue-600 px-6 py-3 text-[14px] font-semibold text-white shadow-sm transition-all hover:bg-blue-700 disabled:opacity-50"
           >
             {saving ? "Creating..." : "Create Character"}
           </button>

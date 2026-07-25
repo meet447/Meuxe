@@ -44,7 +44,7 @@ pub async fn generate(text: &str, voice: &str) -> Result<Vec<u8>> {
         }
     }
 
-    Err(MeuxeError::Tts("All TikTok TTS endpoints failed".into()))
+    Err(MeuxeError::Tts("Meuxe TTS: all endpoints failed".into()))
 }
 
 async fn try_generate(
@@ -121,7 +121,7 @@ async fn generate_audio(text: &str, voice: &str, endpoint: &str) -> Result<Vec<u
         .timeout(std::time::Duration::from_secs(15))
         .send()
         .await
-        .map_err(|e| MeuxeError::Tts(format!("TikTok TTS request failed: {e}")))?;
+        .map_err(|e| MeuxeError::Tts(format!("Meuxe TTS request failed: {e}")))?;
 
     eprintln!(
         "[TTS] Response status: {}, url: {}",
@@ -133,7 +133,7 @@ async fn generate_audio(text: &str, voice: &str, endpoint: &str) -> Result<Vec<u
     let bytes = resp
         .bytes()
         .await
-        .map_err(|e| MeuxeError::Tts(format!("TikTok TTS read error: {e}")))?;
+        .map_err(|e| MeuxeError::Tts(format!("Meuxe TTS read error: {e}")))?;
 
     eprintln!("[TTS] Response body size: {} bytes", bytes.len());
 

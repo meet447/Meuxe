@@ -19,7 +19,13 @@ export function useVRM(canvasRef: React.RefObject<HTMLCanvasElement | null>) {
   const clockRef = useRef<THREE.Clock | null>(null);
   const animFrameRef = useRef<number>(0);
   const animatingRef = useRef(false);
-  const resizeHandlerRef = useRef<(() => void) | null>(null);
+  const viewportRef = useRef({
+    zoom: 1,
+    framing: "full" as "full" | "half",
+    offsetX: 0,
+    offsetY: 0,
+  });
+  const applyViewportRef = useRef<() => void>(() => undefined);
 
   // Animation mixer
   const mixerRef = useRef<THREE.AnimationMixer | null>(null);
@@ -49,12 +55,58 @@ export function useVRM(canvasRef: React.RefObject<HTMLCanvasElement | null>) {
     return () => {
       animatingRef.current = false;
       if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
-      if (resizeHandlerRef.current) {
-        window.removeEventListener("resize", resizeHandlerRef.current);
-        resizeHandlerRef.current = null;
-      }
     };
   }, []);
+
+  const applyViewport = useCallback(() => {
+    if (!cameraRef.current) return;
+
+    const { zoom, framing, offsetX, offsetY } = viewportRef.current;
+    let zIdx = 4.5 / zoom;
+    let yPos = 1.3;
+
+    if (framing === "half") {
+      zIdx = 2.0 / zoom;
+      yPos = 1.5;
+    }
+
+    cameraRef.current.position.set(0, yPos, zIdx);
+
+    if (vrmRef.current) {
+      vrmRef.current.scene.position.x = offsetX * 0.0025;
+      vrmRef.current.scene.position.y = -offsetY * 0.0025;
+    }
+  }, []);
+
+  const layoutRendererSize = useCallback(() => {
+    if (!cameraRef.current || !rendererRef.current || !canvasRef.current) return;
+    const w = canvasRef.current.parentElement?.clientWidth || canvasRef.current.clientWidth;
+    const h = canvasRef.current.parentElement?.clientHeight || canvasRef.current.clientHeight;
+    if (w <= 0 || h <= 0) return;
+    cameraRef.current.aspect = w / h;
+    cameraRef.current.updateProjectionMatrix();
+    rendererRef.current.setSize(w, h);
+  }, [canvasRef]);
+
+  const syncStageLayout = useCallback(() => {
+    layoutRendererSize();
+    applyViewport();
+  }, [layoutRendererSize, applyViewport]);
+
+  applyViewportRef.current = syncStageLayout;
+
+  useEffect(() => {
+    const parent = canvasRef.current?.parentElement;
+    if (!parent) return;
+
+    const observer = new ResizeObserver(() => {
+      requestAnimationFrame(() => {
+        applyViewportRef.current();
+      });
+    });
+    observer.observe(parent);
+    return () => observer.disconnect();
+  }, [canvasRef]);
 
   // Retarget Mixamo FBX animation to VRM skeleton
   const retargetAnimation = useCallback(
@@ -349,21 +401,6 @@ export function useVRM(canvasRef: React.RefObject<HTMLCanvasElement | null>) {
         camera.position.set(0, 1.3, 4.5);
         camera.lookAt(0, 1.0, 0);
         cameraRef.current = camera;
-
-        // Remove previous resize listener if any
-        if (resizeHandlerRef.current) {
-          window.removeEventListener("resize", resizeHandlerRef.current);
-        }
-        const onResize = () => {
-          if (!cameraRef.current || !rendererRef.current || !canvasRef.current) return;
-          const w = canvasRef.current.parentElement?.clientWidth || canvasRef.current.clientWidth;
-          const h = canvasRef.current.parentElement?.clientHeight || canvasRef.current.clientHeight;
-          cameraRef.current.aspect = w / h;
-          cameraRef.current.updateProjectionMatrix();
-          rendererRef.current.setSize(w, h);
-        };
-        resizeHandlerRef.current = onResize;
-        window.addEventListener("resize", onResize);
       }
 
       // Load VRM
@@ -435,6 +472,7 @@ export function useVRM(canvasRef: React.RefObject<HTMLCanvasElement | null>) {
         console.log("[VRM] Expressions:", availableExpressionsRef.current);
         console.log("[VRM] Animations:", availableMotionGroupsRef.current);
 
+        applyViewportRef.current();
         startAnimationLoop();
       } catch (err) {
         lastErrorRef.current = err instanceof Error ? err.message : String(err);
@@ -520,24 +558,9 @@ export function useVRM(canvasRef: React.RefObject<HTMLCanvasElement | null>) {
   }, [playAnimation]);
 
   const setViewport = useCallback((zoom: number, framing: "full" | "half", offsetX: number = 0, offsetY: number = 0) => {
-    if (!cameraRef.current) return;
-
-    let zIdx = 4.5 / zoom;
-    let yPos = 1.3;
-
-    if (framing === "half") {
-      zIdx = 2.0 / zoom; // zoom into half body
-      yPos = 1.5; // shift camera up slightly
-    }
-
-    cameraRef.current.position.set(0, yPos, zIdx);
-
-    if (vrmRef.current) {
-      // Convert screen pixel drag offset to rudimentary 3D world space (approx 0.0025 units per pixel)
-      vrmRef.current.scene.position.x = offsetX * 0.0025;
-      vrmRef.current.scene.position.y = -offsetY * 0.0025; // Invert Y because Three.js Y is up, screen Y is down
-    }
-  }, []);
+    viewportRef.current = { zoom, framing, offsetX, offsetY };
+    syncStageLayout();
+  }, [syncStageLayout]);
 
   const setTypingReaction = useCallback((_isTyping: boolean) => {
     // Handled by the animation system — no manual bone manipulation needed

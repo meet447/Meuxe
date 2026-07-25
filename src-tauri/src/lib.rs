@@ -1,16 +1,14 @@
+mod acp;
 mod commands;
 mod tray;
 mod window;
 
-use dashmap::DashMap;
 use meuxe_core::character::CharacterLoader;
 use meuxe_core::config::ConfigManager;
 use meuxe_core::expressions::ExpressionManager;
-use meuxe_core::llm::OpenAiCompatClient;
 use meuxe_core::memory::store::MemoryStore;
 use meuxe_core::memory_vault::MemoryVault;
 use meuxe_core::session::SessionStore;
-use meuxe_core::tools::ToolRegistry;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use tauri::Manager;
@@ -24,10 +22,7 @@ pub struct AppState {
     pub memories: MemoryStore,
     pub memory_vault: MemoryVault,
     pub expressions: ExpressionManager,
-    pub llm: OpenAiCompatClient,
     pub whisper_ctx: Option<Arc<WhisperContext>>,
-    pub tool_registry: ToolRegistry,
-    pub pending_confirmations: DashMap<String, tokio::sync::oneshot::Sender<bool>>,
     pub chat_cancel: std::sync::Mutex<Option<tokio_util::sync::CancellationToken>>,
 }
 
@@ -100,6 +95,9 @@ pub fn run() {
                 .app_data_dir()
                 .expect("Failed to get app data directory");
             std::fs::create_dir_all(&data_dir).expect("Failed to create data directory");
+            if let Err(err) = acp::ensure_companion_home(&data_dir) {
+                eprintln!("[acp] failed to create companion-home: {err}");
+            }
 
             let whisper_ctx = load_whisper_model(&data_dir);
 
@@ -111,10 +109,7 @@ pub fn run() {
                 memories: MemoryStore::new(data_dir.clone()),
                 memory_vault: MemoryVault::new(data_dir.clone()),
                 expressions: ExpressionManager::new(&data_dir),
-                llm: OpenAiCompatClient::new(),
                 whisper_ctx,
-                tool_registry: ToolRegistry::with_defaults(data_dir.clone()),
-                pending_confirmations: DashMap::new(),
                 chat_cancel: std::sync::Mutex::new(None),
             };
 
@@ -129,8 +124,7 @@ pub fn run() {
             commands::config::config_get,
             commands::config::config_save,
             commands::config::config_reset_all,
-            commands::config::config_list_llm_models,
-            commands::config::config_test_llm,
+            commands::config::config_reset_onboarding,
             commands::characters::characters_list,
             commands::characters::characters_get,
             commands::characters::characters_create,
@@ -140,8 +134,8 @@ pub fn run() {
             commands::chat::chat_send,
             commands::chat::chat_history,
             commands::chat::chat_clear,
-            commands::chat::tool_confirm,
-            commands::tools::tools_list,
+            commands::agent_setup::agent_setup_status,
+            commands::agent_setup::agent_setup_install,
             commands::memory::memory_get,
             commands::memory::memory_search,
             commands::memory::memory_clear,
@@ -160,12 +154,6 @@ pub fn run() {
             commands::memory::memory_ingest_folder_dialog,
             commands::memory::memory_export_zip_dialog,
             commands::memory::memory_import_zip_dialog,
-            commands::memory::composio_status,
-            commands::memory::composio_save_config,
-            commands::memory::composio_authorize_toolkit,
-            commands::memory::composio_refresh_toolkit,
-            commands::memory::composio_sync_github_readme,
-            commands::memory::composio_sync_gmail,
             commands::expressions::expressions_supported,
             commands::expressions::expressions_model_list,
             commands::expressions::expressions_get,

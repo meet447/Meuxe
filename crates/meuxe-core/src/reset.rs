@@ -5,6 +5,7 @@ use crate::Result;
 
 /// Remove user-generated app data while keeping imported model assets.
 pub fn reset_app_data(data_dir: &Path) -> Result<()> {
+    remove_dir_if_exists(&data_dir.join("companion-home"))?;
     remove_dir_if_exists(&data_dir.join("characters"))?;
     remove_dir_if_exists(&data_dir.join("data"))?;
     remove_dir_if_exists(&data_dir.join("models").join("expression_mappings"))?;
