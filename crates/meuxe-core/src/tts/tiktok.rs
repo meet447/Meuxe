@@ -5,7 +5,7 @@ use reqwest::Client;
 use serde_json::Value;
 
 use super::VoiceInfo;
-use crate::error::MeuxError;
+use crate::error::MeuxeError;
 use crate::Result;
 
 const ENDPOINTS: &[&str] = &[
@@ -29,7 +29,7 @@ fn client() -> &'static Client {
 // Generate TTS audio and return raw MP3 bytes.
 pub async fn generate(text: &str, voice: &str) -> Result<Vec<u8>> {
     if text.is_empty() {
-        return Err(MeuxError::Tts("Empty text".into()));
+        return Err(MeuxeError::Tts("Empty text".into()));
     }
 
     let voice = if voice.is_empty() { "jp_001" } else { voice };
@@ -44,7 +44,7 @@ pub async fn generate(text: &str, voice: &str) -> Result<Vec<u8>> {
         }
     }
 
-    Err(MeuxError::Tts("All TikTok TTS endpoints failed".into()))
+    Err(MeuxeError::Tts("All TikTok TTS endpoints failed".into()))
 }
 
 async fn try_generate(
@@ -59,7 +59,7 @@ async fn try_generate(
         let b64 = extract_base64(&audio_resp, endpoint_index)?;
         let bytes = base64::engine::general_purpose::STANDARD
             .decode(&b64)
-            .map_err(|e| MeuxError::Tts(format!("Base64 decode error: {e}")))?;
+            .map_err(|e| MeuxeError::Tts(format!("Base64 decode error: {e}")))?;
         Ok(bytes)
     } else {
         // Split into chunks, generate each
@@ -76,9 +76,9 @@ async fn try_generate(
                 let audio_resp = generate_audio(&part, &voice, &endpoint).await?;
                 let b64 = extract_base64(&audio_resp, endpoint_index)?;
                 if b64 == "error" {
-                    return Err(MeuxError::Tts("TTS returned error".into()));
+                    return Err(MeuxeError::Tts("TTS returned error".into()));
                 }
-                Ok::<(usize, String), MeuxError>((i, b64))
+                Ok::<(usize, String), MeuxeError>((i, b64))
             });
             handles.push(handle);
         }
@@ -87,13 +87,13 @@ async fn try_generate(
             match handle.await {
                 Ok(Ok((idx, b64))) => audio_parts[idx] = Some(b64),
                 Ok(Err(e)) => return Err(e),
-                Err(e) => return Err(MeuxError::Tts(format!("TTS task error: {e}"))),
+                Err(e) => return Err(MeuxeError::Tts(format!("TTS task error: {e}"))),
             }
         }
 
         // All parts must succeed
         if audio_parts.iter().any(|p| p.is_none()) {
-            return Err(MeuxError::Tts("Some TTS chunks failed".into()));
+            return Err(MeuxeError::Tts("Some TTS chunks failed".into()));
         }
 
         // Decode each part, concatenate raw bytes
@@ -101,7 +101,7 @@ async fn try_generate(
         for part in audio_parts.iter().flatten() {
             let bytes = base64::engine::general_purpose::STANDARD
                 .decode(part)
-                .map_err(|e| MeuxError::Tts(format!("Base64 decode error: {e}")))?;
+                .map_err(|e| MeuxeError::Tts(format!("Base64 decode error: {e}")))?;
             raw.extend_from_slice(&bytes);
         }
 
@@ -121,7 +121,7 @@ async fn generate_audio(text: &str, voice: &str, endpoint: &str) -> Result<Vec<u
         .timeout(std::time::Duration::from_secs(15))
         .send()
         .await
-        .map_err(|e| MeuxError::Tts(format!("TikTok TTS request failed: {e}")))?;
+        .map_err(|e| MeuxeError::Tts(format!("TikTok TTS request failed: {e}")))?;
 
     eprintln!(
         "[TTS] Response status: {}, url: {}",
@@ -133,7 +133,7 @@ async fn generate_audio(text: &str, voice: &str, endpoint: &str) -> Result<Vec<u
     let bytes = resp
         .bytes()
         .await
-        .map_err(|e| MeuxError::Tts(format!("TikTok TTS read error: {e}")))?;
+        .map_err(|e| MeuxeError::Tts(format!("TikTok TTS read error: {e}")))?;
 
     eprintln!("[TTS] Response body size: {} bytes", bytes.len());
 
@@ -150,7 +150,7 @@ fn extract_base64(audio_response: &[u8], endpoint_index: usize) -> Result<String
     );
 
     let data: Value = serde_json::from_slice(audio_response)
-        .map_err(|e| MeuxError::Tts(format!("TTS JSON parse error: {e}")))?;
+        .map_err(|e| MeuxeError::Tts(format!("TTS JSON parse error: {e}")))?;
 
     if endpoint_index == 0 {
         // First endpoint: { "data": "base64..." }
@@ -158,7 +158,7 @@ fn extract_base64(audio_response: &[u8], endpoint_index: usize) -> Result<String
             .and_then(|v| v.as_str())
             .filter(|s| !s.is_empty() && *s != "error")
             .map(|s| s.to_string())
-            .ok_or_else(|| MeuxError::Tts("No audio data in TTS response".into()))
+            .ok_or_else(|| MeuxeError::Tts("No audio data in TTS response".into()))
     } else {
         // Second endpoint: { "audio": "data:audio/mpeg;base64,..." } or { "data": "..." }
         let raw = data
@@ -166,7 +166,7 @@ fn extract_base64(audio_response: &[u8], endpoint_index: usize) -> Result<String
             .or_else(|| data.get("data"))
             .and_then(|v| v.as_str())
             .filter(|s| !s.is_empty())
-            .ok_or_else(|| MeuxError::Tts("No audio data in TTS response".into()))?;
+            .ok_or_else(|| MeuxeError::Tts("No audio data in TTS response".into()))?;
 
         // Strip data URI prefix if present
         if raw.contains(',') {

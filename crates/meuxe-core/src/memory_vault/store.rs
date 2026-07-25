@@ -11,7 +11,7 @@ use uuid::Uuid;
 use walkdir::WalkDir;
 use zip::write::SimpleFileOptions;
 
-use crate::error::{MeuxError, Result};
+use crate::error::{MeuxeError, Result};
 use crate::memory::extractor;
 use crate::memory::store::Memory;
 
@@ -157,7 +157,7 @@ impl MemoryVault {
             let _guard = self
                 ._lock
                 .write()
-                .map_err(|e| MeuxError::Memory(format!("Lock poisoned: {e}")))?;
+                .map_err(|e| MeuxeError::Memory(format!("Lock poisoned: {e}")))?;
             let conn = self.connection(user_id)?;
             let tx = conn.unchecked_transaction()?;
 
@@ -252,7 +252,7 @@ impl MemoryVault {
             let _guard = self
                 ._lock
                 .write()
-                .map_err(|e| MeuxError::Memory(format!("Lock poisoned: {e}")))?;
+                .map_err(|e| MeuxeError::Memory(format!("Lock poisoned: {e}")))?;
             let conn = self.connection(user_id)?;
             let tx = conn.unchecked_transaction()?;
             let existing = list_memories_tx(&tx, character_id, user_id, None, usize::MAX)?;
@@ -450,7 +450,7 @@ impl MemoryVault {
             let _guard = self
                 ._lock
                 .write()
-                .map_err(|e| MeuxError::Memory(format!("Lock poisoned: {e}")))?;
+                .map_err(|e| MeuxeError::Memory(format!("Lock poisoned: {e}")))?;
             let conn = self.connection(user_id)?;
             let tx = conn.unchecked_transaction()?;
             let source = insert_source_item(
@@ -528,7 +528,7 @@ impl MemoryVault {
         let _guard = self
             ._lock
             .read()
-            .map_err(|e| MeuxError::Memory(format!("Lock poisoned: {e}")))?;
+            .map_err(|e| MeuxeError::Memory(format!("Lock poisoned: {e}")))?;
         let conn = self.connection(user_id)?;
         list_memories_tx(&conn, character_id, user_id, memory_type, limit)
     }
@@ -543,7 +543,7 @@ impl MemoryVault {
         let _guard = self
             ._lock
             .read()
-            .map_err(|e| MeuxError::Memory(format!("Lock poisoned: {e}")))?;
+            .map_err(|e| MeuxeError::Memory(format!("Lock poisoned: {e}")))?;
         let conn = self.connection(user_id)?;
         let mut memories = search_memories_tx(&conn, character_id, user_id, query, limit * 4)?;
         if memories.is_empty() {
@@ -559,7 +559,7 @@ impl MemoryVault {
             let _guard = self
                 ._lock
                 .write()
-                .map_err(|e| MeuxError::Memory(format!("Lock poisoned: {e}")))?;
+                .map_err(|e| MeuxeError::Memory(format!("Lock poisoned: {e}")))?;
             let conn = self.connection(user_id)?;
             conn.execute(
                 "DELETE FROM memories WHERE user_id = ?1 AND character_id = ?2 AND id = ?3",
@@ -585,7 +585,7 @@ impl MemoryVault {
             let _guard = self
                 ._lock
                 .write()
-                .map_err(|e| MeuxError::Memory(format!("Lock poisoned: {e}")))?;
+                .map_err(|e| MeuxeError::Memory(format!("Lock poisoned: {e}")))?;
             let conn = self.connection(user_id)?;
             conn.execute(
                 "UPDATE memories SET pinned = ?1 WHERE user_id = ?2 AND character_id = ?3 AND id = ?4",
@@ -672,7 +672,7 @@ impl MemoryVault {
         {
             let path = entry.path();
             let relative = path.strip_prefix(&vault_dir).map_err(|e| {
-                MeuxError::Memory(format!(
+                MeuxeError::Memory(format!(
                     "Failed to build zip path for {}: {e}",
                     path.display()
                 ))
@@ -722,7 +722,7 @@ impl MemoryVault {
         let _guard = self
             ._lock
             .write()
-            .map_err(|e| MeuxError::Memory(format!("Lock poisoned: {e}")))?;
+            .map_err(|e| MeuxeError::Memory(format!("Lock poisoned: {e}")))?;
         let conn = self.connection(user_id)?;
         conn.execute(
             "DELETE FROM memories WHERE user_id = ?1 AND character_id = ?2",
@@ -803,7 +803,7 @@ impl MemoryVault {
         let _guard = self
             ._lock
             .write()
-            .map_err(|e| MeuxError::Memory(format!("Lock poisoned: {e}")))?;
+            .map_err(|e| MeuxeError::Memory(format!("Lock poisoned: {e}")))?;
         let conn = self.connection(user_id)?;
         let started_at = Utc::now().to_rfc3339();
         let id = Uuid::new_v4().to_string();
@@ -840,7 +840,7 @@ impl MemoryVault {
 
         let _ = self.rebuild_vault(character_id, user_id);
         self.latest_dream(character_id, user_id)?
-            .ok_or_else(|| MeuxError::Memory("Dream run was not recorded".to_string()))
+            .ok_or_else(|| MeuxeError::Memory("Dream run was not recorded".to_string()))
     }
 
     pub fn latest_dream(&self, character_id: &str, user_id: &str) -> Result<Option<DreamRun>> {

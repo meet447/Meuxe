@@ -25,10 +25,10 @@ describe('tauri api utilities', () => {
     it('uses convertFileSrc for files inside app data', async () => {
       vi.mocked(invoke).mockImplementation(async (command: string) => {
         if (command === 'resolve_asset_path') {
-          return '/data/com.meuxcompanion.app/models/vrm/demo/model.vrm';
+          return '/data/com.meuxe.app/models/vrm/demo/model.vrm';
         }
         if (command === 'get_data_dir') {
-          return '/data/com.meuxcompanion.app';
+          return '/data/com.meuxe.app';
         }
         return null;
       });
@@ -43,7 +43,7 @@ describe('tauri api utilities', () => {
           return '/workspace/models/vrm/demo/model.vrm';
         }
         if (command === 'get_data_dir') {
-          return '/data/com.meuxcompanion.app';
+          return '/data/com.meuxe.app';
         }
         return null;
       });

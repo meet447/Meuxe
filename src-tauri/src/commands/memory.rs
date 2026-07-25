@@ -1,12 +1,12 @@
 use crate::AppState;
 use chrono::Utc;
-use meux_core::composio::{
+use meuxe_core::composio::{
     client::{connection_status_from_value, extract_proxy_text, tool_payload, value_string},
     extract_github_readme_markdown, gmail_messages_to_markdown, is_composio_connected,
     status_display_label, ComposioClient, GITHUB_README_TOOL, GMAIL_FETCH_TOOL,
 };
-use meux_core::composio_toolkits::{default_enabled_toolkits, toolkit_display_name};
-use meux_core::config::types::ComposioConnectionConfig;
+use meuxe_core::composio_toolkits::{default_enabled_toolkits, toolkit_display_name};
+use meuxe_core::config::types::ComposioConnectionConfig;
 use std::sync::Arc;
 use tauri::{AppHandle, Emitter, State};
 
@@ -17,7 +17,7 @@ fn get_user_id(state: &AppState) -> String {
     } else if config.user.name.is_empty() {
         "default-user".to_string()
     } else {
-        meux_core::character::slugify(&config.user.name)
+        meuxe_core::character::slugify(&config.user.name)
     }
 }
 
@@ -44,7 +44,7 @@ pub fn memory_get(
         return vault_memories
             .into_iter()
             .map(|m| {
-                serde_json::to_value(meux_core::memory_vault::VaultMemoryRecord::from(m))
+                serde_json::to_value(meuxe_core::memory_vault::VaultMemoryRecord::from(m))
                     .map_err(|e| e.to_string())
             })
             .collect();
@@ -76,7 +76,7 @@ pub fn memory_search(
         return vault_results
             .into_iter()
             .map(|m| {
-                serde_json::to_value(meux_core::memory_vault::VaultMemoryRecord::from(m))
+                serde_json::to_value(meuxe_core::memory_vault::VaultMemoryRecord::from(m))
                     .map_err(|e| e.to_string())
             })
             .collect();
@@ -86,7 +86,7 @@ pub fn memory_search(
         .memories
         .list(&character_id, &user_id, None, usize::MAX)
         .map_err(|e| e.to_string())?;
-    let relevant = meux_core::memory::retriever::retrieve_relevant(&query, &all_memories, 4);
+    let relevant = meuxe_core::memory::retriever::retrieve_relevant(&query, &all_memories, 4);
     let values: Vec<serde_json::Value> = relevant
         .iter()
         .map(|m| serde_json::to_value(m).unwrap_or_default())
@@ -222,7 +222,7 @@ pub fn memory_sources(
         .list_sources(&character_id, &user_id, 100)
         .map_err(|e| e.to_string())?
         .into_iter()
-        .map(meux_core::memory_vault::types::MemorySourceRecord::from)
+        .map(meuxe_core::memory_vault::types::MemorySourceRecord::from)
         .collect::<Vec<_>>();
     serde_json::to_value(sources).map_err(|e| e.to_string())
 }
@@ -312,7 +312,7 @@ pub fn memory_export_zip_dialog(
 ) -> Result<Option<String>, String> {
     let user_id = get_user_id(&state);
     let Some(path) = rfd::FileDialog::new()
-        .set_file_name("meux-memory-vault.zip")
+        .set_file_name("meuxe-memory-vault.zip")
         .save_file()
     else {
         return Ok(None);

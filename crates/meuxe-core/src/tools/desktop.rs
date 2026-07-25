@@ -2,7 +2,7 @@ use async_trait::async_trait;
 use serde_json::json;
 use std::collections::HashMap;
 
-use crate::error::{MeuxError, Result};
+use crate::error::{MeuxeError, Result};
 
 use super::types::*;
 use super::Tool;
@@ -46,10 +46,12 @@ impl Tool for OpenApplicationTool {
     async fn execute(&self, arguments: serde_json::Value) -> Result<ToolResult> {
         let name = arguments["name"]
             .as_str()
-            .ok_or_else(|| MeuxError::Tool("Missing 'name' argument".to_string()))?;
+            .ok_or_else(|| MeuxeError::Tool("Missing 'name' argument".to_string()))?;
 
         if !is_valid_app_name(name) {
-            return Err(MeuxError::Tool(format!("Invalid application name: {name}")));
+            return Err(MeuxeError::Tool(format!(
+                "Invalid application name: {name}"
+            )));
         }
 
         let output = tokio::process::Command::new("open")
@@ -57,7 +59,7 @@ impl Tool for OpenApplicationTool {
             .arg(name)
             .output()
             .await
-            .map_err(|e| MeuxError::Tool(e.to_string()))?;
+            .map_err(|e| MeuxeError::Tool(e.to_string()))?;
 
         if output.status.success() {
             Ok(ToolResult {
@@ -105,11 +107,11 @@ impl Tool for OpenUrlTool {
     async fn execute(&self, arguments: serde_json::Value) -> Result<ToolResult> {
         let url = arguments["url"]
             .as_str()
-            .ok_or_else(|| MeuxError::Tool("Missing 'url' argument".to_string()))?;
+            .ok_or_else(|| MeuxeError::Tool("Missing 'url' argument".to_string()))?;
 
         let lower_url = url.trim().to_lowercase();
         if !lower_url.starts_with("http://") && !lower_url.starts_with("https://") {
-            return Err(MeuxError::Tool(
+            return Err(MeuxeError::Tool(
                 "Invalid URL scheme. Only http:// and https:// are allowed.".to_string(),
             ));
         }
@@ -118,7 +120,7 @@ impl Tool for OpenUrlTool {
             .arg(url)
             .output()
             .await
-            .map_err(|e| MeuxError::Tool(e.to_string()))?;
+            .map_err(|e| MeuxeError::Tool(e.to_string()))?;
 
         if output.status.success() {
             Ok(ToolResult {
@@ -161,7 +163,7 @@ impl Tool for OrganizeDesktopTool {
 
     async fn execute(&self, _arguments: serde_json::Value) -> Result<ToolResult> {
         let desktop = dirs::desktop_dir()
-            .ok_or_else(|| MeuxError::Tool("Could not find Desktop directory".to_string()))?;
+            .ok_or_else(|| MeuxeError::Tool("Could not find Desktop directory".to_string()))?;
 
         Self::organize_directory(&desktop)
     }
@@ -173,7 +175,7 @@ impl OrganizeDesktopTool {
         let mut moved: Vec<String> = Vec::new();
         let mut errors: Vec<String> = Vec::new();
 
-        let entries = std::fs::read_dir(desktop).map_err(|e| MeuxError::Tool(e.to_string()))?;
+        let entries = std::fs::read_dir(desktop).map_err(|e| MeuxeError::Tool(e.to_string()))?;
 
         for entry in entries {
             let entry = match entry {

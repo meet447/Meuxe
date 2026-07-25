@@ -3,7 +3,7 @@ use serde_json::json;
 use std::process::Stdio;
 use tokio::process::Command;
 
-use crate::error::{MeuxError, Result};
+use crate::error::{MeuxeError, Result};
 
 use super::types::*;
 use super::Tool;
@@ -35,7 +35,7 @@ impl Tool for ClipboardReadTool {
             .stderr(Stdio::piped())
             .output()
             .await
-            .map_err(|e| MeuxError::Tool(format!("Failed to read clipboard: {e}")))?;
+            .map_err(|e| MeuxeError::Tool(format!("Failed to read clipboard: {e}")))?;
 
         if output.status.success() {
             let content = String::from_utf8_lossy(&output.stdout).to_string();
@@ -102,25 +102,25 @@ impl Tool for ClipboardWriteTool {
     async fn execute(&self, arguments: serde_json::Value) -> Result<ToolResult> {
         let content = arguments["content"]
             .as_str()
-            .ok_or_else(|| MeuxError::Tool("Missing 'content' argument".to_string()))?;
+            .ok_or_else(|| MeuxeError::Tool("Missing 'content' argument".to_string()))?;
 
         let mut child = Command::new("pbcopy")
             .stdin(Stdio::piped())
             .spawn()
-            .map_err(|e| MeuxError::Tool(format!("Failed to write clipboard: {e}")))?;
+            .map_err(|e| MeuxeError::Tool(format!("Failed to write clipboard: {e}")))?;
 
         if let Some(mut stdin) = child.stdin.take() {
             use tokio::io::AsyncWriteExt;
             stdin
                 .write_all(content.as_bytes())
                 .await
-                .map_err(|e| MeuxError::Tool(format!("Failed to write to pbcopy stdin: {e}")))?;
+                .map_err(|e| MeuxeError::Tool(format!("Failed to write to pbcopy stdin: {e}")))?;
         }
 
         let status = child
             .wait()
             .await
-            .map_err(|e| MeuxError::Tool(format!("pbcopy failed: {e}")))?;
+            .map_err(|e| MeuxeError::Tool(format!("pbcopy failed: {e}")))?;
 
         if status.success() {
             Ok(ToolResult {
@@ -175,7 +175,7 @@ mod tests {
 
         let result = tool.execute(args).await;
         assert!(result.is_err());
-        if let Err(MeuxError::Tool(msg)) = result {
+        if let Err(MeuxeError::Tool(msg)) = result {
             assert_eq!(msg, "Missing 'content' argument");
         } else {
             panic!("Expected Tool error with missing content message");

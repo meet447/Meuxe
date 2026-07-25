@@ -1,10 +1,10 @@
-# MeuxCompanion — Agent Development Guide
+# Meuxe — Agent Development Guide
 
 ## Cursor Cloud specific instructions
 
 ### Overview
 
-MeuxCompanion is a local-first AI companion desktop app built with **Tauri 2** (Rust backend + React/Vite frontend). There are no databases, Docker containers, or microservices — it is a single self-contained desktop application.
+Meuxe is a local-first AI companion desktop app built with **Tauri 2** (Rust backend + React/Vite frontend). There are no databases, Docker containers, or microservices — it is a single self-contained desktop application.
 
 ### Project layout
 
@@ -12,7 +12,7 @@ MeuxCompanion is a local-first AI companion desktop app built with **Tauri 2** (
 |---|---|---|
 | `src/` | TypeScript/React | Vite frontend (React 19, Tailwind, Three.js, PixiJS/Live2D) |
 | `src-tauri/` | Rust | Tauri 2 shell — desktop window, system tray, Whisper voice, commands |
-| `crates/meux-core/` | Rust | Core logic — LLM client, memory, sessions, characters, TTS, tools |
+| `crates/meuxe-core/` | Rust | Core logic — LLM client, memory, sessions, characters, TTS, tools |
 
 ### Running in headless Cloud VM
 
@@ -29,7 +29,7 @@ See `package.json` scripts and the CI workflow at `.github/workflows/ci.yml`.
 - **Frontend build:** `npm run build` (tsc + vite build)
 - **Rust format check:** `cargo fmt --all -- --check`
 - **Rust lint:** `cargo clippy --workspace --all-targets -- -D warnings`
-- **Rust tests:** `cargo test --workspace` (55 tests across meux-core and tauri crate)
+- **Rust tests:** `cargo test --workspace` (55 tests across meuxe-core and tauri crate)
 
 ### Rust build environment variables
 

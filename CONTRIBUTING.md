@@ -1,10 +1,10 @@
 # Contributing
 
-Thank you for helping improve MeuxCompanion. This document explains how to get set up and what we look for in contributions.
+Thank you for helping improve Meuxe. This document explains how to get set up and what we look for in contributions.
 
 ## Before you start
 
-- **Issues first (for non-trivial work):** open or comment on an [issue](https://github.com/meet447/MeuxCompanion/issues) so maintainers can agree on direction and avoid duplicate effort.
+- **Issues first (for non-trivial work):** open or comment on an [issue](https://github.com/meet447/Meuxe/issues) so maintainers can agree on direction and avoid duplicate effort.
 - **Code of conduct:** everyone participating is expected to follow the [Code of Conduct](CODE_OF_CONDUCT.md).
 
 ## Development setup
@@ -18,8 +18,8 @@ Prerequisites:
 Clone and run in development mode:
 
 ```bash
-git clone https://github.com/meet447/MeuxCompanion.git
-cd MeuxCompanion
+git clone https://github.com/meet447/Meuxe.git
+cd Meuxe
 npm install
 npm run tauri dev
 ```
@@ -41,8 +41,8 @@ npm run tauri build
 
 - `src/` — React (Vite) frontend
 - `src-tauri/` — Tauri shell and Rust commands
-- `crates/meux-core/` — shared Rust logic (LLM, memory, state, and related services)
+- `crates/meuxe-core/` — shared Rust logic (LLM, memory, state, and related services)
 
 ## Questions
 
-Use [GitHub Discussions](https://github.com/meet447/MeuxCompanion/discussions) or an issue if something in this guide is unclear or outdated.
+Use [GitHub Discussions](https://github.com/meet447/Meuxe/discussions) or an issue if something in this guide is unclear or outdated.

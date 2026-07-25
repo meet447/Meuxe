@@ -1,6 +1,6 @@
 use crate::AppState;
 use base64::{engine::general_purpose::STANDARD, Engine as _};
-use meux_core::config::types::AppConfig;
+use meuxe_core::config::types::AppConfig;
 use reqwest::multipart::{Form, Part};
 use reqwest::Client;
 use std::collections::HashSet;

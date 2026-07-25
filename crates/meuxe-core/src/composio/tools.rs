@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 
 use crate::composio_toolkits::default_enabled_toolkits;
-use crate::error::{MeuxError, Result};
+use crate::error::{MeuxeError, Result};
 
 use super::catalog::{build_catalog, ComposioCatalogEntry};
 use super::client::{is_composio_connected, ComposioClient};
@@ -33,7 +33,7 @@ impl ComposioToolState {
             .as_ref()
             .filter(|key| !key.trim().is_empty())
             .ok_or_else(|| {
-                MeuxError::Tool(
+                MeuxeError::Tool(
                     "Composio API key is not configured. Add it in Settings → Integrations."
                         .to_string(),
                 )

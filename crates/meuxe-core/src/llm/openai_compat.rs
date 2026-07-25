@@ -5,7 +5,7 @@ use futures::Stream;
 use reqwest::Client;
 use serde_json::json;
 
-use crate::error::{MeuxError, Result};
+use crate::error::{MeuxeError, Result};
 
 use super::types::{ModelsListResponse, *};
 
@@ -46,12 +46,12 @@ impl OpenAiCompatClient {
                 .json(&body)
                 .send()
                 .await
-                .map_err(MeuxError::Http)?;
+                .map_err(MeuxeError::Http)?;
 
             if !response.status().is_success() {
                 let status = response.status();
                 let text = response.text().await.unwrap_or_default();
-                Err(MeuxError::Llm(format!("HTTP {status}: {text}")))?;
+                Err(MeuxeError::Llm(format!("HTTP {status}: {text}")))?;
                 unreachable!();
             }
 
@@ -60,7 +60,7 @@ impl OpenAiCompatClient {
 
             use futures::StreamExt;
             while let Some(chunk) = stream.next().await {
-                let chunk = chunk.map_err(MeuxError::Http)?;
+                let chunk = chunk.map_err(MeuxeError::Http)?;
                 buffer.push_str(&String::from_utf8_lossy(&chunk));
 
                 // Process complete lines from the buffer
@@ -90,7 +90,7 @@ impl OpenAiCompatClient {
                                 }
                             }
                             Err(e) => {
-                                Err(MeuxError::Llm(format!(
+                                Err(MeuxeError::Llm(format!(
                                     "Failed to parse SSE chunk: {e} — raw: {data}"
                                 )))?;
                             }
@@ -136,12 +136,12 @@ impl OpenAiCompatClient {
                 .json(&body)
                 .send()
                 .await
-                .map_err(MeuxError::Http)?;
+                .map_err(MeuxeError::Http)?;
 
             if !response.status().is_success() {
                 let status = response.status();
                 let text = response.text().await.unwrap_or_default();
-                Err(MeuxError::Llm(format!("HTTP {status}: {text}")))?;
+                Err(MeuxeError::Llm(format!("HTTP {status}: {text}")))?;
                 unreachable!();
             }
 
@@ -155,7 +155,7 @@ impl OpenAiCompatClient {
 
             use futures::StreamExt;
             while let Some(chunk) = stream.next().await {
-                let chunk = chunk.map_err(MeuxError::Http)?;
+                let chunk = chunk.map_err(MeuxeError::Http)?;
                 buffer.push_str(&String::from_utf8_lossy(&chunk));
 
                 while let Some(newline_pos) = buffer.find('\n') {
@@ -222,7 +222,7 @@ impl OpenAiCompatClient {
                                 }
                             }
                             Err(e) => {
-                                Err(MeuxError::Llm(format!(
+                                Err(MeuxeError::Llm(format!(
                                     "Failed to parse SSE chunk: {e} — raw: {data}"
                                 )))?;
                             }
@@ -251,15 +251,15 @@ impl OpenAiCompatClient {
             request = request.header("Authorization", format!("Bearer {api_key}"));
         }
 
-        let response = request.send().await.map_err(MeuxError::Http)?;
+        let response = request.send().await.map_err(MeuxeError::Http)?;
 
         if !response.status().is_success() {
             let status = response.status();
             let text = response.text().await.unwrap_or_default();
-            return Err(MeuxError::Llm(format!("HTTP {status}: {text}")));
+            return Err(MeuxeError::Llm(format!("HTTP {status}: {text}")));
         }
 
-        let body = response.text().await.map_err(MeuxError::Http)?;
+        let body = response.text().await.map_err(MeuxeError::Http)?;
         parse_models_list_body(&body)
     }
 
@@ -297,21 +297,21 @@ impl OpenAiCompatClient {
             .json(&body)
             .send()
             .await
-            .map_err(MeuxError::Http)?;
+            .map_err(MeuxeError::Http)?;
 
         if !response.status().is_success() {
             let status = response.status();
             let text = response.text().await.unwrap_or_default();
-            return Err(MeuxError::Llm(format!("HTTP {status}: {text}")));
+            return Err(MeuxeError::Llm(format!("HTTP {status}: {text}")));
         }
 
-        let completion: ChatCompletionResponse = response.json().await.map_err(MeuxError::Http)?;
+        let completion: ChatCompletionResponse = response.json().await.map_err(MeuxeError::Http)?;
 
         completion
             .choices
             .first()
             .and_then(|c| c.message.content.clone())
-            .ok_or_else(|| MeuxError::Llm("No content in response".to_string()))
+            .ok_or_else(|| MeuxeError::Llm("No content in response".to_string()))
     }
 }
 
@@ -335,7 +335,7 @@ fn parse_models_list_body(body: &str) -> Result<Vec<String>> {
         }
     }
 
-    Err(MeuxError::Llm(
+    Err(MeuxeError::Llm(
         "Models endpoint returned no recognizable model IDs".to_string(),
     ))
 }

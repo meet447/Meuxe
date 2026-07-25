@@ -1,4 +1,4 @@
-# MeuxCompanion
+# Meuxe
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
@@ -7,7 +7,7 @@ A **local-first** AI companion **desktop app** with Live2D and VRM avatars, laye
 
 > Built with [**Tauri 2**](https://v2.tauri.app/) (Rust + web frontend). Your chats and memory stay on your machine unless you configure external APIs.
 
-![MeuxCompanion demo](assets/demo.png)
+![Meuxe demo](assets/demo.png)
 
 ## Table of contents
 
@@ -52,8 +52,8 @@ A **local-first** AI companion **desktop app** with Live2D and VRM avatars, laye
 ### Install and run (development)
 
 ```bash
-git clone https://github.com/meet447/MeuxCompanion.git
-cd MeuxCompanion
+git clone https://github.com/meet447/Meuxe.git
+cd Meuxe
 npm ci
 npm run tauri dev
 ```
@@ -77,14 +77,18 @@ You choose which remote services to use, if any:
 ## Project structure
 
 ```text
-MeuxCompanion/
+Meuxe/
 ├── src/                 # React (Vite) frontend
 ├── src-tauri/           # Tauri shell and Rust commands
-├── crates/meux-core/    # Shared Rust logic (LLM, memory, state, …)
+├── crates/meuxe-core/    # Shared Rust logic (LLM, memory, state, …)
 ├── characters/          # Local companion profiles
 ├── models/              # Live2D and VRM assets
 └── data/                # Local session and memory data (created at runtime)
 ```
+
+### Upgrading from MeuxCompanion
+
+The desktop app identifier is now `com.meuxe.app` (product name **Meuxe**). Local data no longer lives under `com.meuxcompanion.app`. To keep existing sessions, memory, and config, copy your old app data directory into the new path (for example macOS `~/Library/Application Support/com.meuxe.app`).
 
 ## Development
 

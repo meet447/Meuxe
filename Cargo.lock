@@ -2432,7 +2432,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "meux-core"
+name = "meuxe-core"
 version = "0.1.0"
 dependencies = [
  "async-stream",
@@ -2460,7 +2460,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "meuxcompanion-desktop"
+name = "meuxe-desktop"
 version = "0.1.0"
 dependencies = [
  "base64 0.22.1",
@@ -2469,7 +2469,7 @@ dependencies = [
  "dashmap",
  "futures",
  "http",
- "meux-core",
+ "meuxe-core",
  "percent-encoding",
  "regex",
  "reqwest 0.12.28",

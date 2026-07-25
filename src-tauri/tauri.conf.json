@@ -1,7 +1,7 @@
 {
-  "productName": "MeuxCompanion",
+  "productName": "Meuxe",
   "version": "0.1.0",
-  "identifier": "com.meuxcompanion.app",
+  "identifier": "com.meuxe.app",
   "build": {
     "frontendDist": "../dist",
     "devUrl": "http://localhost:1420",
@@ -12,7 +12,7 @@
     "windows": [
       {
         "label": "main",
-        "title": "MeuxCompanion",
+        "title": "Meuxe",
         "width": 1200,
         "height": 800,
         "minWidth": 800,

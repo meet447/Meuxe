@@ -11,15 +11,15 @@ const host = process.env.TAURI_DEV_HOST;
 function resolveAppDataDir() {
   const home = homedir();
   if (process.platform === "darwin") {
-    return path.join(home, "Library/Application Support/com.meuxcompanion.app");
+    return path.join(home, "Library/Application Support/com.meuxe.app");
   }
   if (process.platform === "win32") {
     return path.join(
       process.env.APPDATA || path.join(home, "AppData", "Roaming"),
-      "com.meuxcompanion.app",
+      "com.meuxe.app",
     );
   }
-  return path.join(home, ".local/share/com.meuxcompanion.app");
+  return path.join(home, ".local/share/com.meuxe.app");
 }
 
 function appDataStaticPlugin() {

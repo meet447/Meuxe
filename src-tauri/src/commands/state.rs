@@ -11,7 +11,7 @@ pub fn state_get(
     let user_id = if config.user.name.is_empty() {
         "default-user".to_string()
     } else {
-        meux_core::character::slugify(&config.user.name)
+        meuxe_core::character::slugify(&config.user.name)
     };
     let rel_state = state
         .states
@@ -29,7 +29,7 @@ pub fn state_reset(
     let user_id = if config.user.name.is_empty() {
         "default-user".to_string()
     } else {
-        meux_core::character::slugify(&config.user.name)
+        meuxe_core::character::slugify(&config.user.name)
     };
     let rel_state = state.states.reset(&character_id, &user_id).map_err(|e| e.to_string())?;
     serde_json::to_value(&rel_state).map_err(|e| e.to_string())

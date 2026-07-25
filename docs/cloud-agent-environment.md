@@ -1,6 +1,6 @@
 # Cloud Agent Environment
 
-Use this baseline for Cursor Cloud agents working on MeuxCompanion.
+Use this baseline for Cursor Cloud agents working on Meuxe.
 
 ## Node
 
@@ -37,8 +37,8 @@ automatically use the pinned toolchain from the repository root.
 ## Useful validation commands
 
 ```bash
-cargo check -p meux-core
-cargo test -p meux-core memory_vault
+cargo check -p meuxe-core
+cargo test -p meuxe-core memory_vault
 npm test
 npm run build
 ```

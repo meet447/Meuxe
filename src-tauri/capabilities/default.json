@@ -1,6 +1,6 @@
 {
   "identifier": "default",
-  "description": "Default capabilities for MeuxCompanion",
+  "description": "Default capabilities for Meuxe",
   "windows": ["main", "mini"],
   "permissions": [
     "core:default",

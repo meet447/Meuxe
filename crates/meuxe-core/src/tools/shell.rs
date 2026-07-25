@@ -3,7 +3,7 @@ use serde_json::json;
 use std::process::Stdio;
 use tokio::process::Command;
 
-use crate::error::{MeuxError, Result};
+use crate::error::{MeuxeError, Result};
 
 use super::types::*;
 use super::Tool;
@@ -35,8 +35,8 @@ impl CommandRunner for DefaultCommandRunner {
                 .output(),
         )
         .await
-        .map_err(|_| MeuxError::Tool("Command timed out after 30 seconds".to_string()))?
-        .map_err(|e| MeuxError::Tool(e.to_string()))?;
+        .map_err(|_| MeuxeError::Tool("Command timed out after 30 seconds".to_string()))?
+        .map_err(|e| MeuxeError::Tool(e.to_string()))?;
 
         Ok(CommandOutput {
             stdout: output.stdout,
@@ -94,7 +94,7 @@ impl Tool for RunCommandTool {
     async fn execute(&self, arguments: serde_json::Value) -> Result<ToolResult> {
         let command = arguments["command"]
             .as_str()
-            .ok_or_else(|| MeuxError::Tool("Missing 'command' argument".to_string()))?;
+            .ok_or_else(|| MeuxeError::Tool("Missing 'command' argument".to_string()))?;
 
         let output = self.runner.run(command).await?;
 
@@ -151,7 +151,7 @@ mod tests {
 
         fn new_error(error_msg: &str) -> Self {
             Self {
-                result: Err(MeuxError::Tool(error_msg.to_string())),
+                result: Err(MeuxeError::Tool(error_msg.to_string())),
             }
         }
     }
@@ -166,7 +166,7 @@ mod tests {
                     status_code: output.status_code,
                     success: output.success,
                 }),
-                Err(e) => Err(MeuxError::Tool(e.to_string())),
+                Err(e) => Err(MeuxeError::Tool(e.to_string())),
             }
         }
     }
@@ -200,10 +200,10 @@ mod tests {
         let result = tool.execute(json!({})).await;
 
         assert!(result.is_err());
-        if let Err(MeuxError::Tool(msg)) = result {
+        if let Err(MeuxeError::Tool(msg)) = result {
             assert_eq!(msg, "Missing 'command' argument");
         } else {
-            panic!("Expected MeuxError::Tool");
+            panic!("Expected MeuxeError::Tool");
         }
     }
 
@@ -250,10 +250,10 @@ mod tests {
         let result = tool.execute(json!({"command": "sleep 100"})).await;
 
         assert!(result.is_err());
-        if let Err(MeuxError::Tool(msg)) = result {
+        if let Err(MeuxeError::Tool(msg)) = result {
             assert_eq!(msg, "Tool error: Command timed out after 30 seconds");
         } else {
-            panic!("Expected MeuxError::Tool");
+            panic!("Expected MeuxeError::Tool");
         }
     }
 }

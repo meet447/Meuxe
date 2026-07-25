@@ -2,7 +2,7 @@ use async_trait::async_trait;
 use serde_json::json;
 use std::path::Path;
 
-use crate::error::{MeuxError, Result};
+use crate::error::{MeuxeError, Result};
 
 use super::types::*;
 use super::Tool;
@@ -38,7 +38,7 @@ impl Tool for ReadFileTool {
     async fn execute(&self, arguments: serde_json::Value) -> Result<ToolResult> {
         let path = arguments["path"]
             .as_str()
-            .ok_or_else(|| MeuxError::Tool("Missing 'path' argument".to_string()))?;
+            .ok_or_else(|| MeuxeError::Tool("Missing 'path' argument".to_string()))?;
 
         let expanded = shellexpand::tilde(path).to_string();
         let path = Path::new(&expanded);
@@ -51,11 +51,11 @@ impl Tool for ReadFileTool {
             });
         }
 
-        let metadata = std::fs::metadata(path).map_err(|e| MeuxError::Tool(e.to_string()))?;
+        let metadata = std::fs::metadata(path).map_err(|e| MeuxeError::Tool(e.to_string()))?;
         if metadata.len() > 100_000 {
             // Read first 100KB
             let content =
-                std::fs::read_to_string(path).map_err(|e| MeuxError::Tool(e.to_string()))?;
+                std::fs::read_to_string(path).map_err(|e| MeuxeError::Tool(e.to_string()))?;
             let truncated: String = content.chars().take(100_000).collect();
             return Ok(ToolResult {
                 tool_call_id: String::new(),
@@ -68,7 +68,7 @@ impl Tool for ReadFileTool {
             });
         }
 
-        let content = std::fs::read_to_string(path).map_err(|e| MeuxError::Tool(e.to_string()))?;
+        let content = std::fs::read_to_string(path).map_err(|e| MeuxeError::Tool(e.to_string()))?;
         Ok(ToolResult {
             tool_call_id: String::new(),
             content,
@@ -107,7 +107,7 @@ impl Tool for ListDirectoryTool {
     async fn execute(&self, arguments: serde_json::Value) -> Result<ToolResult> {
         let path = arguments["path"]
             .as_str()
-            .ok_or_else(|| MeuxError::Tool("Missing 'path' argument".to_string()))?;
+            .ok_or_else(|| MeuxeError::Tool("Missing 'path' argument".to_string()))?;
 
         let expanded = shellexpand::tilde(path).to_string();
         let dir = Path::new(&expanded);
@@ -121,14 +121,14 @@ impl Tool for ListDirectoryTool {
         }
 
         let mut entries = Vec::new();
-        let read_dir = std::fs::read_dir(dir).map_err(|e| MeuxError::Tool(e.to_string()))?;
+        let read_dir = std::fs::read_dir(dir).map_err(|e| MeuxeError::Tool(e.to_string()))?;
 
         for entry in read_dir {
-            let entry = entry.map_err(|e| MeuxError::Tool(e.to_string()))?;
+            let entry = entry.map_err(|e| MeuxeError::Tool(e.to_string()))?;
             let name = entry.file_name().to_string_lossy().to_string();
             let file_type = entry
                 .file_type()
-                .map_err(|e| MeuxError::Tool(e.to_string()))?;
+                .map_err(|e| MeuxeError::Tool(e.to_string()))?;
             if file_type.is_dir() {
                 entries.push(format!("{name}/"));
             } else {
@@ -175,7 +175,7 @@ impl Tool for SummarizeFileTool {
     async fn execute(&self, arguments: serde_json::Value) -> Result<ToolResult> {
         let path = arguments["path"]
             .as_str()
-            .ok_or_else(|| MeuxError::Tool("Missing 'path' argument".to_string()))?;
+            .ok_or_else(|| MeuxeError::Tool("Missing 'path' argument".to_string()))?;
 
         let expanded = shellexpand::tilde(path).to_string();
         let path = Path::new(&expanded);
@@ -188,7 +188,7 @@ impl Tool for SummarizeFileTool {
             });
         }
 
-        let content = std::fs::read_to_string(path).map_err(|e| MeuxError::Tool(e.to_string()))?;
+        let content = std::fs::read_to_string(path).map_err(|e| MeuxeError::Tool(e.to_string()))?;
         // Truncate to ~50K chars to leave room for LLM to summarize
         let truncated: String = content.chars().take(50_000).collect();
         let was_truncated = content.len() > 50_000;
@@ -251,20 +251,20 @@ impl Tool for WriteFileTool {
     async fn execute(&self, arguments: serde_json::Value) -> Result<ToolResult> {
         let path = arguments["path"]
             .as_str()
-            .ok_or_else(|| MeuxError::Tool("Missing 'path' argument".to_string()))?;
+            .ok_or_else(|| MeuxeError::Tool("Missing 'path' argument".to_string()))?;
         let content = arguments["content"]
             .as_str()
-            .ok_or_else(|| MeuxError::Tool("Missing 'content' argument".to_string()))?;
+            .ok_or_else(|| MeuxeError::Tool("Missing 'content' argument".to_string()))?;
 
         let expanded = shellexpand::tilde(path).to_string();
         let file_path = Path::new(&expanded);
 
         // Create parent directories if needed
         if let Some(parent) = file_path.parent() {
-            std::fs::create_dir_all(parent).map_err(|e| MeuxError::Tool(e.to_string()))?;
+            std::fs::create_dir_all(parent).map_err(|e| MeuxeError::Tool(e.to_string()))?;
         }
 
-        std::fs::write(file_path, content).map_err(|e| MeuxError::Tool(e.to_string()))?;
+        std::fs::write(file_path, content).map_err(|e| MeuxeError::Tool(e.to_string()))?;
 
         Ok(ToolResult {
             tool_call_id: String::new(),
@@ -308,10 +308,10 @@ impl Tool for FindFilesTool {
     async fn execute(&self, arguments: serde_json::Value) -> Result<ToolResult> {
         let directory = arguments["directory"]
             .as_str()
-            .ok_or_else(|| MeuxError::Tool("Missing 'directory' argument".to_string()))?;
+            .ok_or_else(|| MeuxeError::Tool("Missing 'directory' argument".to_string()))?;
         let pattern = arguments["pattern"]
             .as_str()
-            .ok_or_else(|| MeuxError::Tool("Missing 'pattern' argument".to_string()))?;
+            .ok_or_else(|| MeuxeError::Tool("Missing 'pattern' argument".to_string()))?;
 
         let expanded = shellexpand::tilde(directory).to_string();
         let dir = Path::new(&expanded);
@@ -432,13 +432,13 @@ impl Tool for EditFileTool {
     async fn execute(&self, arguments: serde_json::Value) -> Result<ToolResult> {
         let path = arguments["path"]
             .as_str()
-            .ok_or_else(|| MeuxError::Tool("Missing 'path' argument".to_string()))?;
+            .ok_or_else(|| MeuxeError::Tool("Missing 'path' argument".to_string()))?;
         let find = arguments["find"]
             .as_str()
-            .ok_or_else(|| MeuxError::Tool("Missing 'find' argument".to_string()))?;
+            .ok_or_else(|| MeuxeError::Tool("Missing 'find' argument".to_string()))?;
         let replace = arguments["replace"]
             .as_str()
-            .ok_or_else(|| MeuxError::Tool("Missing 'replace' argument".to_string()))?;
+            .ok_or_else(|| MeuxeError::Tool("Missing 'replace' argument".to_string()))?;
         let replace_all = arguments["all"].as_bool().unwrap_or(false);
 
         let expanded = shellexpand::tilde(path).to_string();
@@ -453,7 +453,7 @@ impl Tool for EditFileTool {
         }
 
         let content =
-            std::fs::read_to_string(file_path).map_err(|e| MeuxError::Tool(e.to_string()))?;
+            std::fs::read_to_string(file_path).map_err(|e| MeuxeError::Tool(e.to_string()))?;
 
         if !content.contains(find) {
             return Ok(ToolResult {
@@ -470,7 +470,7 @@ impl Tool for EditFileTool {
             (content.replacen(find, replace, 1), 1)
         };
 
-        std::fs::write(file_path, &new_content).map_err(|e| MeuxError::Tool(e.to_string()))?;
+        std::fs::write(file_path, &new_content).map_err(|e| MeuxeError::Tool(e.to_string()))?;
 
         Ok(ToolResult {
             tool_call_id: String::new(),
@@ -517,15 +517,15 @@ impl Tool for MoveFileTool {
     async fn execute(&self, arguments: serde_json::Value) -> Result<ToolResult> {
         let source = arguments["source"]
             .as_str()
-            .ok_or_else(|| MeuxError::Tool("Missing 'source' argument".to_string()))?;
+            .ok_or_else(|| MeuxeError::Tool("Missing 'source' argument".to_string()))?;
         let destination = arguments["destination"]
             .as_str()
-            .ok_or_else(|| MeuxError::Tool("Missing 'destination' argument".to_string()))?;
+            .ok_or_else(|| MeuxeError::Tool("Missing 'destination' argument".to_string()))?;
 
         let src = shellexpand::tilde(source).to_string();
         let dst = shellexpand::tilde(destination).to_string();
 
-        std::fs::rename(&src, &dst).map_err(|e| MeuxError::Tool(e.to_string()))?;
+        std::fs::rename(&src, &dst).map_err(|e| MeuxeError::Tool(e.to_string()))?;
 
         Ok(ToolResult {
             tool_call_id: String::new(),
@@ -574,7 +574,7 @@ impl Tool for DeleteFileTool {
     async fn execute(&self, arguments: serde_json::Value) -> Result<ToolResult> {
         let path = arguments["path"]
             .as_str()
-            .ok_or_else(|| MeuxError::Tool("Missing 'path' argument".to_string()))?;
+            .ok_or_else(|| MeuxeError::Tool("Missing 'path' argument".to_string()))?;
 
         let expanded = shellexpand::tilde(path).to_string();
         let path = Path::new(&expanded);
@@ -591,12 +591,12 @@ impl Tool for DeleteFileTool {
         // Canonicalize both the requested path and the base directory to resolve any ".." or symlinks.
         let canonical_path = path
             .canonicalize()
-            .map_err(|e| MeuxError::Tool(format!("Failed to canonicalize path: {e}")))?;
+            .map_err(|e| MeuxeError::Tool(format!("Failed to canonicalize path: {e}")))?;
 
         let canonical_base = if self.base_dir.exists() {
             self.base_dir
                 .canonicalize()
-                .map_err(|e| MeuxError::Tool(format!("Failed to canonicalize base_dir: {e}")))?
+                .map_err(|e| MeuxeError::Tool(format!("Failed to canonicalize base_dir: {e}")))?
         } else {
             self.base_dir.clone() // Fallback if base_dir doesn't exist (though it should)
         };
@@ -613,9 +613,9 @@ impl Tool for DeleteFileTool {
         }
 
         if path.is_dir() {
-            std::fs::remove_dir(path).map_err(|e| MeuxError::Tool(e.to_string()))?;
+            std::fs::remove_dir(path).map_err(|e| MeuxeError::Tool(e.to_string()))?;
         } else {
-            std::fs::remove_file(path).map_err(|e| MeuxError::Tool(e.to_string()))?;
+            std::fs::remove_file(path).map_err(|e| MeuxeError::Tool(e.to_string()))?;
         }
 
         Ok(ToolResult {

@@ -3,7 +3,7 @@ use std::sync::OnceLock;
 use reqwest::Client;
 
 use super::VoiceInfo;
-use crate::error::MeuxError;
+use crate::error::MeuxeError;
 use crate::Result;
 
 fn client() -> &'static Client {
@@ -29,7 +29,7 @@ pub async fn generate(text: &str, voice: &str, api_key: &str) -> Result<Vec<u8>>
         .send()
         .await?
         .error_for_status()
-        .map_err(|e| MeuxError::Tts(format!("OpenAI TTS request failed: {e}")))?;
+        .map_err(|e| MeuxeError::Tts(format!("OpenAI TTS request failed: {e}")))?;
 
     let bytes = resp.bytes().await?.to_vec();
     Ok(bytes)

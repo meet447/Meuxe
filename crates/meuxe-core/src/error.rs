@@ -1,7 +1,7 @@
 use thiserror::Error;
 
 #[derive(Error, Debug)]
-pub enum MeuxError {
+pub enum MeuxeError {
     #[error("IO error: {0}")]
     Io(#[from] std::io::Error),
     #[error("JSON error: {0}")]
@@ -28,9 +28,9 @@ pub enum MeuxError {
     Tool(String),
 }
 
-pub type Result<T> = std::result::Result<T, MeuxError>;
+pub type Result<T> = std::result::Result<T, MeuxeError>;
 
-impl serde::Serialize for MeuxError {
+impl serde::Serialize for MeuxeError {
     fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
     where
         S: serde::Serializer,
