@@ -55,19 +55,19 @@ export const FloatingChatInput = memo(function FloatingChatInput({
   return (
     <div className="pointer-events-auto flex w-full max-w-md flex-col items-center gap-2">
       {statusLabel && (
-        <div className="rounded-full border border-white/10 bg-black/40 px-3 py-1 text-[10px] font-semibold uppercase tracking-wider text-white/60 backdrop-blur-md">
+        <div className="rounded-full border border-slate-200 bg-white/90 px-3 py-1 text-[10px] font-semibold uppercase tracking-wider text-slate-500 shadow-sm backdrop-blur-md">
           {statusLabel}
         </div>
       )}
       <div
-        className="rounded-full border border-white/10 bg-zinc-800/55 px-3 py-1.5 text-sm text-white/70 backdrop-blur-xl"
+        className="rounded-full border border-slate-200/80 bg-white/80 px-3 py-1.5 text-sm text-slate-600 shadow-sm backdrop-blur-xl"
         title="Companion mood"
       >
         — {moodLabel}
       </div>
       <form
         onSubmit={handleSubmit}
-        className="flex w-full items-center gap-1 rounded-full border border-white/10 bg-zinc-900/70 py-1 pl-1 pr-1.5 shadow-[0_8px_40px_rgba(0,0,0,0.45)] backdrop-blur-xl"
+        className="flex w-full items-center gap-1 rounded-full border border-slate-200/90 bg-white/90 py-1 pl-1 pr-1.5 shadow-[0_8px_32px_rgba(15,23,42,0.12)] backdrop-blur-xl ring-1 ring-slate-100"
       >
         <MicButton listening={listening} onToggle={onMicToggle} variant="stage" />
         <input
@@ -77,16 +77,16 @@ export const FloatingChatInput = memo(function FloatingChatInput({
           onChange={handleInputChange}
           placeholder="Type a message..."
           disabled={isProcessing}
-          className="min-w-0 flex-1 bg-transparent px-2 py-2.5 text-[15px] text-white outline-none placeholder:text-white/35 disabled:opacity-50"
+          className="min-w-0 flex-1 bg-transparent px-2 py-2.5 text-[15px] text-slate-800 outline-none placeholder:text-slate-400 disabled:opacity-50"
         />
         <button
           type="submit"
           disabled={isProcessing || !input.trim()}
-          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/15 text-white transition-all hover:bg-white/25 disabled:opacity-30"
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-blue-600 text-white transition-all hover:bg-blue-700 disabled:opacity-30"
           title="Send"
         >
           {isProcessing ? (
-            <span className="h-4 w-4 rounded-full border-2 border-white/30 border-t-white animate-spin" />
+            <span className="h-4 w-4 rounded-full border-2 border-white/40 border-t-white animate-spin" />
           ) : (
             <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5" />

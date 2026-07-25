@@ -16,10 +16,10 @@ function CornerButton({
       type="button"
       title={title}
       onClick={onClick}
-      className={`flex h-10 w-10 items-center justify-center rounded-xl border backdrop-blur-md transition-all ${
+      className={`flex h-10 w-10 items-center justify-center rounded-xl border backdrop-blur-md transition-all shadow-sm ${
         active
-          ? "border-white/20 bg-white/15 text-white"
-          : "border-white/10 bg-black/35 text-white/75 hover:bg-black/50 hover:text-white"
+          ? "border-blue-200 bg-white/90 text-blue-600 ring-1 ring-blue-100"
+          : "border-slate-200/80 bg-white/75 text-slate-600 hover:bg-white hover:text-slate-900"
       }`}
     >
       {children}

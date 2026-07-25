@@ -19,6 +19,7 @@ interface Props {
   onFramingChange: (framing: "full" | "half") => void;
   onBackgroundChange: (bg: string) => void;
   getAudioLevels?: () => { volume: number; mouthOpen: number; mouthForm: number };
+  hideAvatarControls?: boolean;
 }
 
 export const VRMCanvas = memo(function VRMCanvas({
@@ -35,6 +36,7 @@ export const VRMCanvas = memo(function VRMCanvas({
   onFramingChange,
   onBackgroundChange,
   getAudioLevels,
+  hideAvatarControls = false,
 }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const { loadModel, setExpression, startLipSync, stopLipSync, setViewport, setTypingReaction, getDebug } =
@@ -46,7 +48,7 @@ export const VRMCanvas = memo(function VRMCanvas({
   const [debugInfo, setDebugInfo] = useState<DebugInfo | null>(null);
   const [modelLoading, setModelLoading] = useState(false);
   const [moveMode, setMoveMode] = useState(false);
-  const [showControls, setShowControls] = useState(true);
+  const [showControls, setShowControls] = useState(!hideAvatarControls);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   const isDraggingRef = useRef(false);
   const lastPosRef = useRef({ x: 0, y: 0 });
@@ -171,7 +173,7 @@ export const VRMCanvas = memo(function VRMCanvas({
       )}
 
       {/* Controls */}
-      {!showMiniUi && showControls && (
+      {!showMiniUi && !hideAvatarControls && showControls && (
         <div className="absolute bottom-4 left-4 flex items-center gap-3">
           <div className="relative">
             <button
@@ -252,7 +254,7 @@ export const VRMCanvas = memo(function VRMCanvas({
       )}
 
       {/* Visibility toggle */}
-      {!showMiniUi && modelPath && !showDebug && (
+      {!showMiniUi && !hideAvatarControls && modelPath && !showDebug && (
         <button
           onClick={() => setShowControls(!showControls)}
           className="absolute bottom-4 right-4 bg-white/60 hover:bg-white/90 backdrop-blur-md text-slate-500 hover:text-slate-700 p-2.5 rounded-full ring-1 ring-slate-200/50 shadow-sm transition-all"

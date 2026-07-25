@@ -24,15 +24,15 @@ export function CharacterSelect({
     <>
       <div className="fixed inset-0 z-40" onClick={onToggle} />
       <div
-        className={`z-50 w-80 overflow-hidden rounded-2xl border border-white/10 bg-zinc-900/95 shadow-2xl backdrop-blur-xl ring-1 ring-white/10 animate-in fade-in slide-in-from-top-2 duration-300 ${
+        className={`z-50 w-80 overflow-hidden rounded-2xl border border-slate-200 bg-white/95 shadow-2xl backdrop-blur-xl ring-1 ring-slate-100 animate-in fade-in slide-in-from-top-2 duration-300 ${
           menuOnly ? "fixed left-5 top-28" : "absolute right-0 top-full mt-3"
         }`}
       >
-        <div className="border-b border-white/10 px-5 py-4">
-          <h3 className="text-[15px] font-bold tracking-tight text-white">Characters</h3>
-          <p className="mt-1 text-xs text-white/45">Switch companion</p>
+        <div className="border-b border-slate-100 px-5 py-4">
+          <h3 className="text-[15px] font-bold tracking-tight text-slate-900">Characters</h3>
+          <p className="mt-1 text-xs text-slate-500">Switch companion</p>
         </div>
-        <div className="max-h-72 overflow-y-auto p-3 scrollbar-thin scrollbar-thumb-white/20 scrollbar-track-transparent">
+        <div className="max-h-72 overflow-y-auto p-3 scrollbar-thin">
           {characters.map((char) => (
             <button
               key={char.id}
@@ -42,21 +42,21 @@ export function CharacterSelect({
               }}
               className={`mb-1.5 flex w-full items-center justify-between rounded-2xl px-4 py-3.5 text-left transition-all ${
                 selected === char.id
-                  ? "bg-white/10 font-medium text-white ring-1 ring-white/20"
-                  : "text-white/70 hover:bg-white/5 hover:text-white"
+                  ? "bg-blue-50 font-medium text-blue-900 ring-1 ring-blue-100"
+                  : "text-slate-700 hover:bg-slate-50 hover:text-slate-900"
               }`}
             >
               <div className="flex items-center gap-3.5">
                 <div
                   className={`flex h-9 w-9 items-center justify-center rounded-xl text-sm font-bold ${
-                    selected === char.id ? "bg-indigo-500 text-white" : "bg-white/10 text-white/70"
+                    selected === char.id ? "bg-indigo-500 text-white" : "bg-slate-100 text-slate-600"
                   }`}
                 >
                   {char.name.charAt(0).toUpperCase()}
                 </div>
                 <div>
                   <div className="text-[14px] font-semibold">{char.name}</div>
-                  <div className="mt-0.5 text-xs text-white/40">{char.live2d_model || "default"}</div>
+                  <div className="mt-0.5 text-xs text-slate-400">{char.live2d_model || "default"}</div>
                 </div>
               </div>
             </button>
@@ -66,7 +66,7 @@ export function CharacterSelect({
               onToggle();
               onAddCharacter();
             }}
-            className="mb-1.5 flex w-full items-center gap-3.5 rounded-2xl border border-dashed border-white/20 px-4 py-3.5 text-left text-white/80 hover:bg-white/5"
+            className="mb-1.5 flex w-full items-center gap-3.5 rounded-2xl border border-dashed border-slate-200 px-4 py-3.5 text-left text-slate-700 hover:bg-slate-50"
           >
             <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-indigo-500 text-sm font-bold text-white">
               +

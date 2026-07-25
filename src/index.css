@@ -1,5 +1,138 @@
-.companion-dot-grid {
-  background-color: #1a1a1c;
-  background-image: radial-gradient(rgba(255, 255, 255, 0.07) 1px, transparent 1px);
-  background-size: 22px 22px;
+@import "tailwindcss";
+
+/* ─── Global Design Tokens ─── */
+:root {
+  --transition-smooth: cubic-bezier(0.4, 0, 0.2, 1);
+  --shadow-glow-blue: 0 0 20px rgba(59, 130, 246, 0.15);
+}
+
+/* ─── Companion stage (light) ─── */
+.companion-stage-light {
+  background-color: #f8fafc;
+  background-image:
+    radial-gradient(rgba(15, 23, 42, 0.06) 1px, transparent 1px),
+    linear-gradient(180deg, #f8fafc 0%, #f1f5f9 55%, #eef2ff 100%);
+  background-size: 22px 22px, 100% 100%;
+}
+
+/* ─── Base & Typography ─── */
+body {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overflow: hidden;
+}
+
+/* ─── Scrollbar Styling ─── */
+.scrollbar-thin::-webkit-scrollbar {
+  width: 6px;
+}
+
+.scrollbar-thin::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb {
+  background: #e2e8f0;
+  border-radius: 999px;
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb:hover {
+  background: #cbd5e1;
+}
+
+/* ─── Focus Ring ─── */
+*:focus-visible {
+  outline: 2px solid rgba(59, 130, 246, 0.5);
+  outline-offset: 2px;
+  border-radius: 8px;
+}
+
+/* ─── Animations ─── */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes scaleIn {
+  from { opacity: 0; transform: scale(0.95); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+@keyframes pulseRing {
+  0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.5); }
+  70% { box-shadow: 0 0 0 8px rgba(239, 68, 68, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-4px); }
+}
+
+/* Tailwind animate-in support */
+.animate-in {
+  animation-duration: 0.3s;
+  animation-timing-function: var(--transition-smooth);
+  animation-fill-mode: both;
+}
+
+.fade-in {
+  animation-name: fadeIn;
+}
+
+.slide-in-from-bottom-2 {
+  animation-name: slideUp;
+}
+
+.slide-in-from-bottom-4 {
+  animation-name: slideUp;
+}
+
+.zoom-in-95 {
+  animation-name: scaleIn;
+}
+
+.duration-300 {
+  animation-duration: 0.3s;
+}
+
+.duration-500 {
+  animation-duration: 0.5s;
+}
+
+/* ─── MicButton Pulse Ring ─── */
+.mic-pulse-ring {
+  animation: pulseRing 1.5s infinite;
+}
+
+/* ─── Floating animation ─── */
+.animate-float {
+  animation: float 3s ease-in-out infinite;
+}
+
+/* ─── Selection Colors ─── */
+::selection {
+  background: rgba(59, 130, 246, 0.2);
+  color: #1e293b;
+}
+
+/* ─── Dropdown/Select styling ─── */
+select {
+  background-image: none;
+}
+
+/* ─── Smooth transitions on interactive elements ─── */
+button, a, input, select, textarea {
+  transition-timing-function: var(--transition-smooth);
 }

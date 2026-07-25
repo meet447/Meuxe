@@ -472,6 +472,7 @@ function App() {
       onBackgroundChange: setBackground,
       onFramingChange: setFraming,
       getAudioLevels,
+      hideAvatarControls: !isMiniMode,
     }),
     [modelPath, currentExpression, speaking, userTyping, isMiniMode, background, zoom, framing, getAudioLevels]
   );
@@ -556,25 +557,25 @@ function App() {
   }
 
   return (
-    <div className="companion-dot-grid relative flex h-screen flex-col overflow-hidden font-sans text-white">
+    <div className="companion-stage-light relative flex h-screen flex-col overflow-hidden font-sans text-slate-900">
       <div className="relative flex min-h-0 flex-1">
         <main className="relative min-h-0 min-w-0 flex-1">
           {expressionsConfigured === null ? (
             <div className="flex h-full items-center justify-center">
               <div className="flex gap-2">
-                <span className="h-2.5 w-2.5 rounded-full bg-white/40 animate-bounce [animation-delay:-0.3s]" />
-                <span className="h-2.5 w-2.5 rounded-full bg-white/40 animate-bounce [animation-delay:-0.15s]" />
-                <span className="h-2.5 w-2.5 rounded-full bg-white/40 animate-bounce" />
+                <span className="h-2.5 w-2.5 rounded-full bg-slate-400/60 animate-bounce [animation-delay:-0.3s]" />
+                <span className="h-2.5 w-2.5 rounded-full bg-slate-400/60 animate-bounce [animation-delay:-0.15s]" />
+                <span className="h-2.5 w-2.5 rounded-full bg-slate-400/60 animate-bounce" />
               </div>
             </div>
           ) : !expressionsConfigured ? (
             <div className="flex h-full flex-col items-center justify-center p-8 text-center">
-              <p className="mb-6 max-w-sm text-sm text-white/50 leading-relaxed">
+              <p className="mb-6 max-w-sm text-sm text-slate-500 leading-relaxed">
                 Map avatar expressions in Settings before you chat.
               </p>
               <button
                 onClick={() => setSettingsOpen(true)}
-                className="rounded-full border border-white/15 bg-white/10 px-6 py-3 text-sm font-semibold text-white hover:bg-white/15"
+                className="rounded-full border border-slate-200 bg-white px-6 py-3 text-sm font-semibold text-slate-800 shadow-sm hover:bg-slate-50"
               >
                 Open Settings
               </button>
@@ -613,7 +614,7 @@ function App() {
               />
 
               <div className="pointer-events-none absolute bottom-6 left-5 z-20 hidden sm:block">
-                <p className="text-sm font-semibold text-white/90">{charName}</p>
+                <p className="text-sm font-semibold text-slate-800">{charName}</p>
               </div>
 
               <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20 flex flex-col items-center px-4 pb-6 pt-16">
@@ -646,7 +647,7 @@ function App() {
           >
             <ChatPanel
               hideInput
-              appearance="dark"
+              appearance="light"
               timeline={timeline}
               loading={isStreaming}
               streamingText={streamingText}

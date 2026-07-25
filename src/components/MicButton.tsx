@@ -18,7 +18,7 @@ export function MicButton({ listening, onToggle, variant = "default" }: Props) {
             ? "bg-red-500/20 text-red-400 mic-pulse-ring"
             : "bg-red-100 text-red-500 mic-pulse-ring shadow-sm shadow-red-500/20 scale-110"
           : stage
-            ? "text-white/50 hover:bg-white/10 hover:text-white"
+            ? "text-slate-400 hover:bg-slate-100 hover:text-blue-600"
             : "text-slate-400 hover:text-blue-500 hover:bg-blue-50 hover:scale-110 active:scale-95"
       }`}
       title={listening ? "Stop listening" : "Start voice input"}
