@@ -12,6 +12,7 @@ interface CurrentPlayback {
 
 export function useAudioQueue() {
   const [speaking, setSpeaking] = useState(false);
+  const [speakingSentence, setSpeakingSentence] = useState<string | null>(null);
   const queueRef = useRef(new OrderedAudioQueue());
   const playingRef = useRef(false);
   const currentPlaybackRef = useRef<CurrentPlayback | null>(null);
@@ -126,6 +127,7 @@ export function useAudioQueue() {
         }
 
         setSpeaking(true);
+        setSpeakingSentence(action.task.text);
         onExpressionChangeRef.current?.(action.task.expression);
         await playAudioChunk(action.audio);
         if (queueRef.current.activeRequestId() !== action.requestId) break;
@@ -134,6 +136,7 @@ export function useAudioQueue() {
     } finally {
       playingRef.current = false;
       setSpeaking(false);
+      setSpeakingSentence(null);
       onExpressionChangeRef.current?.(neutralExpressionRef.current);
       if (queueRef.current.peekNext().kind !== "wait") {
         queueMicrotask(() => processQueueRef.current());
@@ -155,6 +158,7 @@ export function useAudioQueue() {
     stopCurrentAudio();
     queueRef.current.begin(requestId);
     setSpeaking(false);
+    setSpeakingSentence(null);
     processQueueRef.current();
   }, [stopCurrentAudio]);
 
@@ -182,6 +186,7 @@ export function useAudioQueue() {
     stopCurrentAudio();
     queueRef.current.clear();
     setSpeaking(false);
+    setSpeakingSentence(null);
     onExpressionChangeRef.current?.(neutralExpressionRef.current);
   }, [stopCurrentAudio]);
 
@@ -204,6 +209,7 @@ export function useAudioQueue() {
 
   return {
     speaking,
+    speakingSentence,
     beginRequest,
     addSentence,
     addAudio,

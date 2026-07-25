@@ -10,7 +10,7 @@ import { CharacterSelect } from "./components/CharacterSelect";
 import { Onboarding } from "./components/Onboarding";
 import { Settings } from "./components/Settings";
 import { MiniWidget } from "./components/MiniWidget";
-import { useChat } from "./hooks/useChat";
+import { useChat, cleanCompanionDisplayText } from "./hooks/useChat";
 import { useAudioQueue } from "./hooks/useAudioQueue";
 import { useVoice } from "./hooks/useVoice";
 import { useWindow } from "./hooks/useWindow";
@@ -153,6 +153,7 @@ function App() {
   const { listening, startListening, stopListening } = useVoice();
   const {
     speaking,
+    speakingSentence,
     beginRequest,
     addSentence,
     addAudio,
@@ -521,6 +522,16 @@ function App() {
 
   const charName = selectedChar?.name || "Companion";
 
+  const stageCaption = useMemo(() => {
+    if (speaking && speakingSentence?.trim()) {
+      return cleanCompanionDisplayText(speakingSentence);
+    }
+    if (isStreaming && streamingText.trim()) {
+      return cleanCompanionDisplayText(streamingText);
+    }
+    return null;
+  }, [speaking, speakingSentence, isStreaming, streamingText]);
+
   if (onboardingComplete === null) {
     return (
       <div className="h-screen flex items-center justify-center bg-slate-50">
@@ -626,9 +637,9 @@ function App() {
                   listening={listening}
                   onMicToggle={handleMicToggle}
                   inputRef={fullChatInputRef}
-                  statusLabel={
-                    speaking ? "Speaking" : isStreaming ? "Thinking…" : null
-                  }
+                  caption={stageCaption}
+                  captionSpeaker={stageCaption ? charName : undefined}
+                  statusLabel={stageCaption ? null : isStreaming ? "Thinking…" : null}
                 />
               </div>
             </>

@@ -64,6 +64,10 @@ const cleanExpressionTags = (text: string) =>
     .replace(/<<\/?[^>]*>>\s*/g, "")
     .replace(/\[(?:expression:\s*)?[a-zA-Z0-9_\-]+\]\s*/g, "");
 
+export function cleanCompanionDisplayText(text: string) {
+  return cleanExpressionTags(text).trim();
+}
+
 function timelineToMessages(items: ChatTimelineItem[]): Message[] {
   return items.flatMap((item) => {
     if (item.kind === "tool") return [];

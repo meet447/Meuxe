@@ -10,6 +10,8 @@ type Props = {
   onMicToggle: () => void;
   inputRef: RefObject<HTMLInputElement | null>;
   statusLabel?: string | null;
+  caption?: string | null;
+  captionSpeaker?: string;
 };
 
 export const FloatingChatInput = memo(function FloatingChatInput({
@@ -20,6 +22,8 @@ export const FloatingChatInput = memo(function FloatingChatInput({
   onMicToggle,
   inputRef,
   statusLabel,
+  caption,
+  captionSpeaker,
 }: Props) {
   const [input, setInput] = useState("");
   const typingTimeoutRef = useRef<number | null>(null);
@@ -52,6 +56,14 @@ export const FloatingChatInput = memo(function FloatingChatInput({
 
   return (
     <div className="pointer-events-auto flex w-full max-w-md flex-col items-center gap-2">
+      {caption && (
+        <div className="w-full max-w-lg rounded-2xl border border-slate-200 bg-white/95 px-4 py-3 shadow-sm backdrop-blur-sm">
+          {captionSpeaker && (
+            <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-slate-400">{captionSpeaker}</p>
+          )}
+          <p className="text-center text-[15px] leading-snug text-slate-800">{caption}</p>
+        </div>
+      )}
       {statusLabel && (
         <div className="rounded-full border border-slate-200 bg-white/90 px-3 py-1 text-[10px] font-semibold uppercase tracking-wider text-slate-500 shadow-sm backdrop-blur-md">
           {statusLabel}
