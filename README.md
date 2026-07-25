@@ -3,9 +3,9 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
 
-A **desktop companion**—a character on your screen who remembers you, speaks, and grows with you over time. Built with [**Tauri 2**](https://v2.tauri.app/) (Rust + React). Memories and relationship state stay on your machine unless you connect optional cloud AI or voice services.
+A **desktop companion**—a character on your screen who remembers you, speaks, and grows with you over time. Built with [**Tauri 2**](https://v2.tauri.app/) (Rust + React). Chat runs through your **ACP CLI agent** (Claude Code, Codex, OpenCode, or custom); memories, persona, and relationship state stay on your machine. Optional cloud **TTS** only if you enable it.
 
-Product direction: [`docs/DIRECTION.md`](docs/DIRECTION.md) · Roadmap: [`docs/ROADMAP.md`](docs/ROADMAP.md)
+Product direction: [`docs/DIRECTION.md`](docs/DIRECTION.md) · Roadmap: [`docs/ROADMAP.md`](docs/ROADMAP.md) · ACP presets: [`docs/acp-agents.md`](docs/acp-agents.md)
 
 ![Meuxe demo](assets/demo.png)
 
@@ -13,6 +13,8 @@ Product direction: [`docs/DIRECTION.md`](docs/DIRECTION.md) · Roadmap: [`docs/R
 
 - [Features](#features)
 - [Quick start](#quick-start)
+- [ACP agents (chat)](#acp-agents-chat)
+- [Providers (optional)](#providers-optional)
 - [Development](#development)
 - [Releases](#releases)
 - [Contributing](#contributing)
@@ -23,15 +25,16 @@ Product direction: [`docs/DIRECTION.md`](docs/DIRECTION.md) · Roadmap: [`docs/R
 
 ### Companion core
 
+- **ACP-backed chat** — Meuxe is the [Agent Client Protocol](https://agentclientprotocol.com) client; reasoning runs in the CLI agent you install and select
 - **Layered characters** — written as `.yaml` and `.md` files (`soul.md`, `style.md`, `rules.md`, etc.)
 - **Session history** — local persistence of chats
 - **Local long-term memory** — semantic, episodic, and reflection-style memories (local storage)
 - **Relationship state** — trust, affection, mood, and energy evolve over time
-- **Expression-aware streaming** — parses LLM output for emotion tags in real time (`<<expression>>`)
+- **Expression-aware streaming** — parses agent replies for emotion tags in real time (`<<expression>>`)
 
 ### Interaction
 
-- **Streaming chat** — real-time text over ACP-backed agent sessions
+- **Streaming chat** — real-time text over ACP agent sessions
 - **Speech subtitles** — per-sentence captions on the main stage and in mini mode while TTS plays
 - **Parallel TTS** — synthesizes speech segments in parallel for lower latency
 - **Voice input** — microphone capture, VAD, and optional Whisper-based transcription
@@ -52,6 +55,7 @@ Product direction: [`docs/DIRECTION.md`](docs/DIRECTION.md) · Roadmap: [`docs/R
 - **Node.js** 22 recommended (see [`.nvmrc`](.nvmrc))
 - **Rust** 1.88.0 with **Cargo** (pinned in [`rust-toolchain.toml`](rust-toolchain.toml); see [Tauri prerequisites](https://v2.tauri.app/start/prerequisites/) for OS-specific packages)
 - **Linux:** WebKitGTK and related dev packages (the same set [used in CI](.github/workflows/release.yml) is a good reference)
+- **An ACP agent** for chat — pick one during onboarding or in Settings → Agent (see [ACP agents (chat)](#acp-agents-chat))
 
 ### Install and run (development)
 
@@ -62,6 +66,8 @@ npm ci
 npm run tauri dev
 ```
 
+On first launch, complete onboarding (companion, voice, then **install/link your CLI agent**). Without a configured ACP agent, the UI runs but chat will not respond.
+
 For Cursor Cloud agents and repeatable setup details, see
 [`docs/cloud-agent-environment.md`](docs/cloud-agent-environment.md).
 
@@ -71,20 +77,33 @@ For Cursor Cloud agents and repeatable setup details, see
 npm run tauri build
 ```
 
+## ACP agents (chat)
+
+Meuxe does **not** embed an OpenAI-compatible LLM client for chat. Every message goes to a subprocess speaking **ACP**:
+
+| Preset | Typical install |
+|--------|-------------------|
+| **OpenCode** | `opencode` CLI (`npm i -g opencode-ai`), launched as `opencode acp` |
+| **Claude Code** | `npx -y @agentclientprotocol/claude-agent-acp@latest` |
+| **Codex** | `npx -y @agentclientprotocol/codex-acp@latest` |
+| **Custom** | Any ACP agent — command and args in Settings |
+
+Before each turn, Meuxe writes persona, memory, and relationship context under `companion-home/` in your app data directory and uses that tree as the agent working directory. Details: [`docs/companion-home.md`](docs/companion-home.md) and [`docs/acp-agents.md`](docs/acp-agents.md).
+
 ## Providers (optional)
 
-You choose which services to use, if any:
+You choose which optional services to use:
 
-- **Chat (ACP)** — companion reasoning runs in your configured CLI agent (Claude Code, Codex, OpenCode, or custom ACP). Install and pick the agent in Settings → Agent; nothing runs until you complete onboarding.
-- **TTS** — built-in Meuxe TTS (no key), plus ElevenLabs and OpenAI TTS when configured.
+- **Chat** — always via your **ACP CLI agent** (see above). No separate “LLM API” setting in Meuxe.
+- **TTS** — built-in Meuxe TTS (no key), plus ElevenLabs and OpenAI TTS when configured in Settings → Voice.
 
 ## Project structure
 
 ```text
 Meuxe/
 ├── src/                 # React (Vite) frontend
-├── src-tauri/           # Tauri shell and Rust commands
-├── crates/meuxe-core/    # Shared Rust logic (LLM, memory, state, …)
+├── src-tauri/           # Tauri shell, ACP client, Rust commands
+├── crates/meuxe-core/   # Shared Rust logic (persona, memory, sessions, TTS, …)
 ├── characters/          # Local companion profiles
 ├── models/              # Live2D and VRM assets
 └── data/                # Local session and memory data (created at runtime)
