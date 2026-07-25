@@ -32,9 +32,6 @@ const SETTINGS_TTS_PRESETS: Record<string, { name: string; needs_key: boolean }>
 const ProfileIcon = () => (
   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
 );
-const BrainIcon = () => (
-  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" /></svg>
-);
 const SpeakerIcon = () => (
   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" /></svg>
 );
@@ -55,8 +52,6 @@ const MENU_ITEMS: { id: SettingsPage & string; label: string; description: strin
   { id: "privacy", label: "Privacy", description: "What stays on your device", icon: ShieldIcon },
   { id: "memory", label: "Memory", description: "What your companion remembers", icon: ArchiveIcon },
   { id: "avatar", label: "Avatar on screen", description: "Zoom, framing, background", icon: FrameIcon },
-  { id: "tts", label: "Voice", description: "How they sound when they speak", icon: SpeakerIcon },
-  { id: "llm", label: "CLI Agent", description: "OpenCode, Claude, Codex, custom", icon: BrainIcon },
   { id: "expressions", label: "Expressions", description: "Emotions on their avatar", icon: MaskIcon },
   ];
 
@@ -242,33 +237,43 @@ export function Settings({ onClose, characterId, characterName, modelId, onPrevi
         </div>
 
         <div className="mb-5 grid grid-cols-2 gap-3">
-          <div className="rounded-2xl border border-slate-100 bg-white p-3.5 shadow-sm">
+          <button
+            type="button"
+            onClick={() => setPage("llm")}
+            className="rounded-2xl border border-slate-100 bg-white p-3.5 shadow-sm text-left transition-all hover:border-indigo-100 hover:shadow-md group"
+          >
             <div className="flex items-center gap-3">
               <AgentPresetIcon
                 id={(config.agent?.preset as AcpAgentPresetId) || "opencode"}
                 size="sm"
               />
-              <div className="min-w-0">
+              <div className="min-w-0 flex-1">
                 <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Agent</div>
-                <div className="text-sm font-bold text-slate-800 truncate">
+                <div className="text-sm font-bold text-slate-800 truncate group-hover:text-blue-600">
                   {ACP_AGENT_PRESETS[(config.agent?.preset as AcpAgentPresetId) || "opencode"]?.title || "—"}
                 </div>
               </div>
+              <svg className="w-4 h-4 shrink-0 text-slate-300 group-hover:text-blue-400" fill="none" viewBox="0 0 16 16"><path d="M6 4L10 8L6 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
             </div>
-          </div>
-          <div className="rounded-2xl border border-slate-100 bg-white p-3.5 shadow-sm">
+          </button>
+          <button
+            type="button"
+            onClick={() => setPage("tts")}
+            className="rounded-2xl border border-slate-100 bg-white p-3.5 shadow-sm text-left transition-all hover:border-indigo-100 hover:shadow-md group"
+          >
             <div className="flex items-center gap-3">
               <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 text-white shadow-md shadow-blue-500/20">
                 <SpeakerIcon />
               </div>
-              <div className="min-w-0">
+              <div className="min-w-0 flex-1">
                 <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Voice</div>
-                <div className="text-sm font-bold text-slate-800 truncate">
+                <div className="text-sm font-bold text-slate-800 truncate group-hover:text-blue-600">
                   {TTS_PRESETS_UI[config.tts?.provider]?.name || config.tts?.provider || "—"}
                 </div>
               </div>
+              <svg className="w-4 h-4 shrink-0 text-slate-300 group-hover:text-blue-400" fill="none" viewBox="0 0 16 16"><path d="M6 4L10 8L6 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
             </div>
-          </div>
+          </button>
         </div>
 
         <div className="space-y-3">
@@ -279,11 +284,7 @@ export function Settings({ onClose, characterId, characterName, modelId, onPrevi
               className="w-full flex items-center gap-4 px-4 py-3.5 rounded-2xl border border-slate-100/80 bg-white shadow-sm shadow-slate-900/5 hover:border-indigo-100 hover:shadow-md transition-all text-left group"
             >
               <div className="w-11 h-11 rounded-2xl bg-slate-50 group-hover:bg-indigo-50 flex items-center justify-center text-slate-500 group-hover:text-indigo-600 transition-colors shadow-sm shrink-0">
-                {item.id === "llm" ? (
-                  <AgentPresetIcon id={(config.agent?.preset as AcpAgentPresetId) || "opencode"} size="sm" />
-                ) : (
-                  <item.icon />
-                )}
+                <item.icon />
               </div>
               <div className="flex-1 min-w-0">
                 <div className="text-[15px] font-semibold text-slate-700 group-hover:text-blue-600 transition-colors">{item.label}</div>
