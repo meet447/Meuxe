@@ -2,9 +2,9 @@ import { useState, useEffect, useCallback, useRef, useMemo, lazy, Suspense } fro
 import { listen } from "@tauri-apps/api/event";
 import { register, unregister } from "@tauri-apps/plugin-global-shortcut";
 import { ChatPanel } from "./components/ChatPanel";
-import { ChatHistorySidebar } from "./components/chat/ChatHistorySidebar";
+import { HistoryDrawer } from "./components/chat/HistoryDrawer";
+import { StageCornerToolbar } from "./components/chat/StageCornerToolbar";
 import { FloatingChatInput } from "./components/chat/FloatingChatInput";
-import { MeuxeMark } from "./components/ui/MeuxeMark";
 import { AddCharacterModal } from "./components/AddCharacterModal";
 import { CharacterSelect } from "./components/CharacterSelect";
 import { Onboarding } from "./components/Onboarding";
@@ -131,7 +131,7 @@ function App() {
   const [background, setBackground] = useState("transparent");
   const [zoom, setZoom] = useState(1.1);
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [historyOpen, setHistoryOpen] = useState(true);
+  const [historyOpen, setHistoryOpen] = useState(false);
   const [expressionsConfigured, setExpressionsConfigured] = useState<boolean | null>(null);
   const [onboardingComplete, setOnboardingComplete] = useState<boolean | null>(null);
   const [userTyping, setUserTyping] = useState(false);
@@ -556,49 +556,97 @@ function App() {
   }
 
   return (
-    <div className="flex h-screen flex-col bg-gradient-to-b from-slate-100 via-white to-indigo-50/40 font-sans text-slate-800">
-      <header className="relative z-20 flex shrink-0 items-center justify-between gap-4 border-b border-slate-200/60 bg-white/70 px-4 py-3 backdrop-blur-md sm:px-6">
-        <div className="flex min-w-0 items-center gap-3">
-          <MeuxeMark className="h-9 w-9 shrink-0" />
-          <div className="min-w-0">
-            <h1 className="truncate text-lg font-bold tracking-tight text-slate-800">{charName}</h1>
-            {selectedChar?.source_type === "directory" && (
-              <span className="text-[10px] font-semibold uppercase tracking-wide text-emerald-600">Layered soul</span>
-            )}
-          </div>
-        </div>
-        <div className="flex items-center gap-2 rounded-full bg-white/90 px-2 py-1 shadow-sm ring-1 ring-slate-100">
-          <button
-            onClick={() => toggleMini(selectedCharId)}
-            className="rounded-full px-3 py-1.5 text-sm font-medium text-violet-600 hover:bg-violet-50"
-            title="Switch to mini mode"
-          >
-            Mini
-          </button>
-          <button
-            onClick={() => (settingsOpen ? handleSettingsClose() : setSettingsOpen(true))}
-            className={`rounded-full px-3 py-1.5 text-sm font-medium transition-colors ${
-              settingsOpen ? "bg-indigo-100 text-indigo-700" : "text-slate-600 hover:bg-slate-100"
-            }`}
-          >
-            Settings
-          </button>
-          <CharacterSelect
-            characters={characters}
-            selected={selectedCharId}
-            onSelect={handleCharacterChange}
-            onAddCharacter={() => setAddCharacterOpen(true)}
-            open={charSelectOpen}
-            onToggle={() => setCharSelectOpen(!charSelectOpen)}
-          />
-        </div>
-      </header>
-
+    <div className="companion-dot-grid relative flex h-screen flex-col overflow-hidden font-sans text-white">
       <div className="relative flex min-h-0 flex-1">
-        {!settingsOpen && expressionsConfigured && (
-          <ChatHistorySidebar open={historyOpen} onToggle={() => setHistoryOpen((o) => !o)}>
+        <main className="relative min-h-0 min-w-0 flex-1">
+          {expressionsConfigured === null ? (
+            <div className="flex h-full items-center justify-center">
+              <div className="flex gap-2">
+                <span className="h-2.5 w-2.5 rounded-full bg-white/40 animate-bounce [animation-delay:-0.3s]" />
+                <span className="h-2.5 w-2.5 rounded-full bg-white/40 animate-bounce [animation-delay:-0.15s]" />
+                <span className="h-2.5 w-2.5 rounded-full bg-white/40 animate-bounce" />
+              </div>
+            </div>
+          ) : !expressionsConfigured ? (
+            <div className="flex h-full flex-col items-center justify-center p-8 text-center">
+              <p className="mb-6 max-w-sm text-sm text-white/50 leading-relaxed">
+                Map avatar expressions in Settings before you chat.
+              </p>
+              <button
+                onClick={() => setSettingsOpen(true)}
+                className="rounded-full border border-white/15 bg-white/10 px-6 py-3 text-sm font-semibold text-white hover:bg-white/15"
+              >
+                Open Settings
+              </button>
+            </div>
+          ) : (
+            <>
+              <div className="absolute inset-0">{avatarCanvas}</div>
+
+              <StageCornerToolbar
+                historyOpen={historyOpen}
+                onHistoryToggle={() => {
+                  setHistoryOpen((o) => !o);
+                  setCharSelectOpen(false);
+                }}
+                onMini={() => toggleMini(selectedCharId)}
+                onSettings={() => {
+                  setSettingsOpen((o) => !o);
+                  setCharSelectOpen(false);
+                }}
+                settingsOpen={settingsOpen}
+                onCharacters={() => {
+                  setCharSelectOpen((o) => !o);
+                  setHistoryOpen(false);
+                }}
+                charSelectOpen={charSelectOpen}
+              />
+
+              <CharacterSelect
+                menuOnly
+                characters={characters}
+                selected={selectedCharId}
+                onSelect={handleCharacterChange}
+                onAddCharacter={() => setAddCharacterOpen(true)}
+                open={charSelectOpen}
+                onToggle={() => setCharSelectOpen(false)}
+              />
+
+              <div className="pointer-events-none absolute bottom-6 left-5 z-20 hidden sm:block">
+                <p className="text-sm font-semibold text-white/90">{charName}</p>
+              </div>
+
+              <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20 flex flex-col items-center px-4 pb-6 pt-16">
+                <FloatingChatInput
+                  isProcessing={isStreaming}
+                  onSend={handleSend}
+                  onTypingChange={handleTypingChange}
+                  listening={listening}
+                  onMicToggle={handleMicToggle}
+                  inputRef={fullChatInputRef}
+                  moodLabel={
+                    currentExpression && currentExpression !== "neutral"
+                      ? currentExpression
+                      : "Just normal"
+                  }
+                  statusLabel={
+                    speaking ? "Speaking" : isStreaming ? "Thinking…" : null
+                  }
+                />
+              </div>
+            </>
+          )}
+        </main>
+
+        {expressionsConfigured && (
+          <HistoryDrawer
+            open={historyOpen}
+            onClose={() => setHistoryOpen(false)}
+            title={`Chat with ${charName}`}
+          >
             <ChatPanel
               hideInput
+              appearance="dark"
               timeline={timeline}
               loading={isStreaming}
               streamingText={streamingText}
@@ -609,70 +657,12 @@ function App() {
               onMicToggle={handleMicToggle}
               onToolConfirm={handleConfirm}
             />
-          </ChatHistorySidebar>
+          </HistoryDrawer>
         )}
-
-        <main className="relative flex min-h-0 min-w-0 flex-1 flex-col">
-          {expressionsConfigured === null ? (
-            <div className="flex flex-1 items-center justify-center">
-              <div className="flex gap-2">
-                <span className="h-2.5 w-2.5 rounded-full bg-indigo-400 animate-bounce [animation-delay:-0.3s]" />
-                <span className="h-2.5 w-2.5 rounded-full bg-indigo-400 animate-bounce [animation-delay:-0.15s]" />
-                <span className="h-2.5 w-2.5 rounded-full bg-indigo-400 animate-bounce" />
-              </div>
-            </div>
-          ) : !expressionsConfigured ? (
-            <div className="flex flex-1 flex-col items-center justify-center p-8 text-center">
-              <div className="mb-6 flex h-16 w-16 items-center justify-center rounded-full bg-orange-100 text-2xl font-bold text-orange-500">
-                !
-              </div>
-              <h3 className="mb-2 text-lg font-semibold text-slate-800">Map expressions first</h3>
-              <p className="mb-6 max-w-sm text-sm text-slate-500 leading-relaxed">
-                Your avatar needs emotion mapping before chat. It only takes a minute in Settings.
-              </p>
-              <button
-                onClick={() => setSettingsOpen(true)}
-                className="rounded-2xl bg-indigo-600 px-6 py-3 text-sm font-semibold text-white shadow-md shadow-indigo-600/20 hover:bg-indigo-700"
-              >
-                Open Settings
-              </button>
-            </div>
-          ) : (
-            <>
-              <div className="relative min-h-0 flex-1 overflow-hidden rounded-none sm:m-3 sm:rounded-[2rem] sm:ring-1 sm:ring-slate-200/80 sm:shadow-inner">
-                {avatarCanvas}
-                <div
-                  className="pointer-events-none absolute inset-x-0 bottom-0 z-20 flex flex-col items-center gap-2 px-4 pb-5 pt-8 sm:pb-7"
-                  style={{
-                    background:
-                      "linear-gradient(to top, rgba(15,23,42,0.35) 0%, rgba(15,23,42,0.08) 45%, transparent 100%)",
-                  }}
-                >
-                  {(speaking || isStreaming) && (
-                    <div
-                      className="pointer-events-auto flex items-center gap-2 rounded-full bg-white/90 px-3 py-1 text-[10px] font-semibold uppercase tracking-wider text-indigo-600 shadow-sm ring-1 ring-white/80"
-                    >
-                      {speaking && <span className="h-1.5 w-1.5 rounded-full bg-indigo-400 animate-ping" />}
-                      <span>{speaking ? "Speaking" : "Thinking…"}</span>
-                    </div>
-                  )}
-                  <FloatingChatInput
-                    isProcessing={isStreaming}
-                    onSend={handleSend}
-                    onTypingChange={handleTypingChange}
-                    listening={listening}
-                    onMicToggle={handleMicToggle}
-                    inputRef={fullChatInputRef}
-                  />
-                </div>
-              </div>
-            </>
-          )}
-        </main>
 
         {settingsOpen && (
           <aside
-            className="absolute inset-y-0 right-0 z-30 flex w-full max-w-[420px] flex-col border-l border-slate-200/80 bg-white/95 shadow-2xl shadow-slate-900/10 backdrop-blur-xl"
+            className="absolute inset-y-0 right-0 z-30 flex w-full max-w-[420px] flex-col border-l border-white/10 bg-zinc-950/95 shadow-2xl backdrop-blur-xl"
           >
             <Settings
               characterId={selectedCharId}

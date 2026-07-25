@@ -7,6 +7,8 @@ interface Props {
   onAddCharacter: () => void;
   open: boolean;
   onToggle: () => void;
+  /** Corner toolbar mode — no trigger button, fixed panel */
+  menuOnly?: boolean;
 }
 
 export function CharacterSelect({
@@ -16,105 +18,94 @@ export function CharacterSelect({
   onAddCharacter,
   open,
   onToggle,
+  menuOnly = false,
 }: Props) {
+  const panel = open && (
+    <>
+      <div className="fixed inset-0 z-40" onClick={onToggle} />
+      <div
+        className={`z-50 w-80 overflow-hidden rounded-2xl border border-white/10 bg-zinc-900/95 shadow-2xl backdrop-blur-xl ring-1 ring-white/10 animate-in fade-in slide-in-from-top-2 duration-300 ${
+          menuOnly ? "fixed left-5 top-28" : "absolute right-0 top-full mt-3"
+        }`}
+      >
+        <div className="border-b border-white/10 px-5 py-4">
+          <h3 className="text-[15px] font-bold tracking-tight text-white">Characters</h3>
+          <p className="mt-1 text-xs text-white/45">Switch companion</p>
+        </div>
+        <div className="max-h-72 overflow-y-auto p-3 scrollbar-thin scrollbar-thumb-white/20 scrollbar-track-transparent">
+          {characters.map((char) => (
+            <button
+              key={char.id}
+              onClick={() => {
+                onSelect(char.id);
+                onToggle();
+              }}
+              className={`mb-1.5 flex w-full items-center justify-between rounded-2xl px-4 py-3.5 text-left transition-all ${
+                selected === char.id
+                  ? "bg-white/10 font-medium text-white ring-1 ring-white/20"
+                  : "text-white/70 hover:bg-white/5 hover:text-white"
+              }`}
+            >
+              <div className="flex items-center gap-3.5">
+                <div
+                  className={`flex h-9 w-9 items-center justify-center rounded-xl text-sm font-bold ${
+                    selected === char.id ? "bg-indigo-500 text-white" : "bg-white/10 text-white/70"
+                  }`}
+                >
+                  {char.name.charAt(0).toUpperCase()}
+                </div>
+                <div>
+                  <div className="text-[14px] font-semibold">{char.name}</div>
+                  <div className="mt-0.5 text-xs text-white/40">{char.live2d_model || "default"}</div>
+                </div>
+              </div>
+            </button>
+          ))}
+          <button
+            onClick={() => {
+              onToggle();
+              onAddCharacter();
+            }}
+            className="mb-1.5 flex w-full items-center gap-3.5 rounded-2xl border border-dashed border-white/20 px-4 py-3.5 text-left text-white/80 hover:bg-white/5"
+          >
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-indigo-500 text-sm font-bold text-white">
+              +
+            </div>
+            <div>
+              <div className="text-[14px] font-semibold">Add character</div>
+            </div>
+          </button>
+        </div>
+      </div>
+    </>
+  );
+
+  if (menuOnly) {
+    return <div className="relative">{panel}</div>;
+  }
+
   return (
     <div className="relative flex items-center">
       <button
         onClick={onToggle}
         className={`flex items-center gap-1.5 rounded-full px-4 py-1.5 text-sm font-medium transition-all ${
-          open
-            ? "bg-blue-50 text-blue-600"
-            : "hover:bg-slate-100/80 text-slate-600"
+          open ? "bg-blue-50 text-blue-600" : "hover:bg-slate-100/80 text-slate-600"
         }`}
       >
-        <svg className="w-4 h-4 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+        <svg className="w-4 h-4 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
         </svg>
         Characters
-        <svg className={`w-3.5 h-3.5 ml-0.5 transition-transform duration-200 ${open ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+        <svg
+          className={`ml-0.5 h-3.5 w-3.5 transition-transform duration-200 ${open ? "rotate-180" : ""}`}
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
         </svg>
       </button>
-
-      {open && (
-        <>
-          <div className="fixed inset-0 z-40" onClick={onToggle} />
-          <div className="absolute right-0 top-full mt-3 w-80 backdrop-blur-xl bg-white/95 border border-slate-100/80 rounded-[1.5rem] shadow-[0_12px_40px_rgb(0,0,0,0.08)] shadow-blue-900/5 z-50 overflow-hidden ring-1 ring-slate-200/50 animate-in fade-in slide-in-from-bottom-2 duration-300">
-            <div className="px-5 py-4 border-b border-slate-100/80 bg-gradient-to-r from-slate-50/80 to-blue-50/30">
-              <h3 className="text-slate-800 font-bold text-[15px] tracking-tight">
-                Select Character
-              </h3>
-              <p className="text-slate-400 text-xs mt-1">Switch your active companion</p>
-            </div>
-            <div className="max-h-72 overflow-y-auto p-3 scrollbar-thin scrollbar-thumb-slate-200 scrollbar-track-transparent">
-              {characters.map((char) => (
-                <button
-                  key={char.id}
-                  onClick={() => {
-                    onSelect(char.id);
-                    onToggle();
-                  }}
-                  className={`w-full text-left px-4 py-3.5 transition-all rounded-2xl mb-1.5 flex items-center justify-between group ${
-                    selected === char.id
-                      ? "bg-blue-50 text-blue-700 font-medium ring-1 ring-blue-200/60 shadow-sm shadow-blue-500/5"
-                      : "text-slate-600 hover:bg-slate-50 hover:text-slate-900 hover:shadow-sm"
-                  }`}
-                >
-                  <div className="flex items-center gap-3.5">
-                    <div className={`w-9 h-9 rounded-xl flex items-center justify-center text-sm font-bold transition-colors ${
-                      selected === char.id
-                        ? "bg-blue-500 text-white shadow-sm shadow-blue-500/20"
-                        : "bg-slate-100 text-slate-500 group-hover:bg-blue-50 group-hover:text-blue-600"
-                    }`}>
-                      {char.name.charAt(0).toUpperCase()}
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <div className={`text-[14px] ${selected === char.id ? "font-semibold" : "font-medium group-hover:text-blue-600 transition-colors"}`}>{char.name}</div>
-                        {char.source_type === "directory" && (
-                          <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.18em] text-emerald-600">
-                            layered
-                          </span>
-                        )}
-                      </div>
-                      <div className={`text-xs mt-0.5 ${selected === char.id ? "text-blue-500/80" : "text-slate-400"}`}>
-                        {char.live2d_model || "default model"}
-                      </div>
-                    </div>
-                  </div>
-                  {selected === char.id && (
-                    <div className="w-2.5 h-2.5 rounded-full bg-blue-500 shadow-sm shadow-blue-500/30"></div>
-                  )}
-                </button>
-              ))}
-              <button
-                onClick={() => {
-                  onToggle();
-                  onAddCharacter();
-                }}
-                className="w-full text-left px-4 py-3.5 transition-all rounded-2xl mb-1.5 flex items-center gap-3.5 border border-dashed border-blue-200 bg-blue-50/70 text-blue-700 hover:border-blue-300 hover:bg-blue-50"
-              >
-                <div className="w-9 h-9 rounded-xl flex items-center justify-center text-sm font-bold bg-blue-500 text-white shadow-sm shadow-blue-500/20">
-                  +
-                </div>
-                <div>
-                  <div className="text-[14px] font-semibold">Add Character</div>
-                  <div className="text-xs mt-0.5 text-blue-500/80">Create a new companion profile</div>
-                </div>
-              </button>
-              {characters.length === 0 && (
-                <div className="px-5 py-8 text-center text-slate-500 text-sm bg-slate-50/50 rounded-2xl m-1 border border-dashed border-slate-200">
-                  <div className="mb-3 flex justify-center">
-                    <svg className="w-8 h-8 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
-                  </div>
-                  No characters found.<br/>
-                  <span className="text-xs text-slate-400">Complete onboarding to create one</span>
-                </div>
-              )}
-            </div>
-          </div>
-        </>
-      )}
+      {panel}
     </div>
   );
 }

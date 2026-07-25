@@ -20,6 +20,7 @@ interface Props {
   inputRef?: React.RefObject<HTMLInputElement | null>;
   /** Timeline only — for sidebar layout with external input bar */
   hideInput?: boolean;
+  appearance?: "light" | "dark";
 }
 
 // Markdown component config — shared between messages and streaming
@@ -119,41 +120,51 @@ const MessageBubble = memo(function MessageBubble({
   text,
   expression,
   characterName,
+  dark = false,
 }: {
   role: "user" | "assistant";
   text: string;
   expression?: string;
   characterName: string;
+  dark?: boolean;
 }) {
   const isUser = role === "user";
 
   return (
     <div className={`flex flex-col ${isUser ? "items-end" : "items-start"} animate-in fade-in slide-in-from-bottom-1 duration-200`}>
       {isUser && (
-        <span className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider mb-1 px-2">
+        <span className={`mb-1 px-2 text-[10px] font-semibold uppercase tracking-wider ${dark ? "text-white/35" : "text-slate-400"}`}>
           You
         </span>
       )}
       <div
         className={`max-w-[88%] rounded-3xl px-5 py-3 ${
           isUser
-            ? "bg-gradient-to-br from-blue-500 to-blue-600 text-white rounded-tr-lg shadow-md shadow-blue-500/20"
-            : "bg-white text-slate-700 rounded-tl-lg border border-slate-100 shadow-sm"
+            ? dark
+              ? "rounded-tr-lg bg-indigo-600 text-white shadow-md shadow-indigo-900/30"
+              : "rounded-tr-lg bg-gradient-to-br from-blue-500 to-blue-600 text-white shadow-md shadow-blue-500/20"
+            : dark
+              ? "rounded-tl-lg border border-white/10 bg-white/10 text-white/90 shadow-sm"
+              : "rounded-tl-lg border border-slate-100 bg-white text-slate-700 shadow-sm"
         }`}
       >
         {!isUser && (
-          <div className="flex items-center gap-2 mb-1.5">
-            <span className="text-[11px] text-blue-500 font-semibold tracking-wide uppercase">
+          <div className="mb-1.5 flex items-center gap-2">
+            <span className={`text-[11px] font-semibold uppercase tracking-wide ${dark ? "text-indigo-300" : "text-blue-500"}`}>
               {characterName}
             </span>
             {expression && expression !== "neutral" && (
-              <span className="text-[10px] text-slate-400 font-normal capitalize bg-slate-50 px-2 py-0.5 rounded-full">
+              <span
+                className={`rounded-full px-2 py-0.5 text-[10px] font-normal capitalize ${dark ? "bg-white/10 text-white/50" : "bg-slate-50 text-slate-400"}`}
+              >
                 {expression}
               </span>
             )}
           </div>
         )}
-        <div className={`text-[14px] leading-relaxed break-words ${isUser ? "text-white/95" : "text-slate-700"}`}>
+        <div
+          className={`text-[14px] leading-relaxed break-words ${isUser ? "text-white/95" : dark ? "text-white/85" : "text-slate-700"}`}
+        >
           {isUser ? (
             <p>{text}</p>
           ) : (
@@ -289,7 +300,9 @@ export function ChatPanel({
   onToolConfirm,
   inputRef: externalInputRef,
   hideInput = false,
+  appearance = "light",
 }: Props) {
+  const dark = appearance === "dark";
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const internalInputRef = useRef<HTMLInputElement>(null);
   const inputRef = externalInputRef || internalInputRef;
@@ -334,6 +347,7 @@ export function ChatPanel({
           text={msg.text}
           expression={msg.expression}
           characterName={characterName}
+          dark={dark}
         />
       );
     });
@@ -342,16 +356,24 @@ export function ChatPanel({
   return (
     <div className="flex-1 flex flex-col bg-transparent relative h-full">
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-5 space-y-4 scrollbar-thin scrollbar-thumb-slate-200 scrollbar-track-transparent">
+      <div
+        className={`flex-1 overflow-y-auto p-5 space-y-4 scrollbar-thin scrollbar-thumb-slate-200 scrollbar-track-transparent ${
+          dark ? "scrollbar-thumb-white/20" : ""
+        }`}
+      >
         {timeline.length === 0 && !streamingText && (
-          <div className="text-slate-400 text-center mt-16 flex flex-col items-center">
-            <div className="w-14 h-14 bg-gradient-to-br from-blue-50 to-indigo-50 text-blue-300 rounded-2xl flex items-center justify-center mb-4 shadow-sm">
+          <div className={`mt-16 flex flex-col items-center text-center ${dark ? "text-white/40" : "text-slate-400"}`}>
+            <div
+              className={`mb-4 flex h-14 w-14 items-center justify-center rounded-2xl shadow-sm ${
+                dark ? "bg-white/10 text-white/30" : "bg-gradient-to-br from-blue-50 to-indigo-50 text-blue-300"
+              }`}
+            >
               <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
               </svg>
             </div>
-            <p className="text-sm font-medium text-slate-500">Say hello to {characterName}</p>
-            <p className="text-xs text-slate-400 mt-1 max-w-xs leading-relaxed">
+            <p className={`text-sm font-medium ${dark ? "text-white/60" : "text-slate-500"}`}>Say hello to {characterName}</p>
+            <p className={`mt-1 max-w-xs text-xs leading-relaxed ${dark ? "text-white/35" : "text-slate-400"}`}>
               Share what&apos;s on your mind—a small update, a worry, or just because you want company.
             </p>
           </div>
@@ -362,9 +384,15 @@ export function ChatPanel({
         {/* Streaming text — always the latest assistant turn */}
         {streamingText && (
           <div className="flex flex-col items-start animate-in fade-in duration-150">
-            <div className="max-w-[88%] rounded-3xl rounded-tl-lg px-5 py-3 bg-white border border-slate-100 shadow-sm text-slate-700">
-              <div className="flex items-center gap-2 mb-1.5">
-                <span className="text-[11px] text-blue-500 font-semibold tracking-wide uppercase">
+            <div
+              className={`max-w-[88%] rounded-3xl rounded-tl-lg px-5 py-3 ${
+                dark
+                  ? "border border-white/10 bg-white/10 text-white/90 shadow-sm"
+                  : "border border-slate-100 bg-white text-slate-700 shadow-sm"
+              }`}
+            >
+              <div className="mb-1.5 flex items-center gap-2">
+                <span className={`text-[11px] font-semibold uppercase tracking-wide ${dark ? "text-indigo-300" : "text-blue-500"}`}>
                   {characterName}
                 </span>
                 <span className="flex gap-0.5">
