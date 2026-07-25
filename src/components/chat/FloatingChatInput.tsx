@@ -9,7 +9,6 @@ type Props = {
   listening: boolean;
   onMicToggle: () => void;
   inputRef: RefObject<HTMLInputElement | null>;
-  moodLabel?: string;
   statusLabel?: string | null;
 };
 
@@ -20,7 +19,6 @@ export const FloatingChatInput = memo(function FloatingChatInput({
   listening,
   onMicToggle,
   inputRef,
-  moodLabel = "Just normal",
   statusLabel,
 }: Props) {
   const [input, setInput] = useState("");
@@ -59,12 +57,6 @@ export const FloatingChatInput = memo(function FloatingChatInput({
           {statusLabel}
         </div>
       )}
-      <div
-        className="rounded-full border border-slate-200/80 bg-white/80 px-3 py-1.5 text-sm text-slate-600 shadow-sm backdrop-blur-xl"
-        title="Companion mood"
-      >
-        — {moodLabel}
-      </div>
       <form
         onSubmit={handleSubmit}
         className="flex w-full items-center gap-1 rounded-full border border-slate-200/90 bg-white/90 py-1 pl-1 pr-1.5 shadow-[0_8px_32px_rgba(15,23,42,0.12)] backdrop-blur-xl ring-1 ring-slate-100"

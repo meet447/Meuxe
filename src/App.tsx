@@ -624,11 +624,6 @@ function App() {
                   listening={listening}
                   onMicToggle={handleMicToggle}
                   inputRef={fullChatInputRef}
-                  moodLabel={
-                    currentExpression && currentExpression !== "neutral"
-                      ? currentExpression
-                      : "Just normal"
-                  }
                   statusLabel={
                     speaking ? "Speaking" : isStreaming ? "Thinking…" : null
                   }
