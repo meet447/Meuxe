@@ -201,18 +201,21 @@ export function useChat() {
       const unlistenSentence = await listen<SentencePayload>(
         "chat:sentence",
         (event) => {
+          if (event.payload.request_id !== requestId) return;
           lastExpressionRef.current = event.payload.expression;
           onSentenceRef.current?.(event.payload);
         },
       );
 
       const unlistenAudio = await listen<AudioPayload>("chat:audio", (event) => {
+        if (event.payload.request_id !== requestId) return;
         onAudioRef.current?.(event.payload);
       });
 
       const unlistenAudioFailed = await listen<AudioFailedPayload>(
         "chat:audio-failed",
         (event) => {
+          if (event.payload.request_id !== requestId) return;
           onAudioFailedRef.current?.(event.payload);
         },
       );
