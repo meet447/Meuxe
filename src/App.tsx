@@ -154,6 +154,7 @@ function App() {
   const {
     speaking,
     speakingSentence,
+    speechSessionActive,
     beginRequest,
     addSentence,
     addAudio,
@@ -526,11 +527,8 @@ function App() {
     if (speaking && speakingSentence?.trim()) {
       return cleanCompanionDisplayText(speakingSentence);
     }
-    if (isStreaming && streamingText.trim()) {
-      return cleanCompanionDisplayText(streamingText);
-    }
     return null;
-  }, [speaking, speakingSentence, isStreaming, streamingText]);
+  }, [speaking, speakingSentence]);
 
   if (onboardingComplete === null) {
     return (
@@ -639,7 +637,13 @@ function App() {
                   inputRef={fullChatInputRef}
                   caption={stageCaption}
                   captionSpeaker={stageCaption ? charName : undefined}
-                  statusLabel={stageCaption ? null : isStreaming ? "Thinking…" : null}
+                  statusLabel={
+                    stageCaption
+                      ? null
+                      : isStreaming || (speechSessionActive && !speaking)
+                        ? "Thinking…"
+                        : null
+                  }
                 />
               </div>
             </>

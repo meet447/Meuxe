@@ -13,6 +13,7 @@ interface CurrentPlayback {
 export function useAudioQueue() {
   const [speaking, setSpeaking] = useState(false);
   const [speakingSentence, setSpeakingSentence] = useState<string | null>(null);
+  const [speechSessionActive, setSpeechSessionActive] = useState(false);
   const queueRef = useRef(new OrderedAudioQueue());
   const playingRef = useRef(false);
   const currentPlaybackRef = useRef<CurrentPlayback | null>(null);
@@ -118,6 +119,7 @@ export function useAudioQueue() {
         if (action.kind === "wait") break;
         if (action.kind === "complete") {
           queueRef.current.acknowledgeComplete(action.requestId);
+          setSpeechSessionActive(false);
           onAudioDoneRef.current?.(action.requestId);
           break;
         }
@@ -159,6 +161,7 @@ export function useAudioQueue() {
     queueRef.current.begin(requestId);
     setSpeaking(false);
     setSpeakingSentence(null);
+    setSpeechSessionActive(true);
     processQueueRef.current();
   }, [stopCurrentAudio]);
 
@@ -179,7 +182,11 @@ export function useAudioQueue() {
   }, [processAcceptedMutation]);
 
   const failRequest = useCallback((requestId: string) => {
-    return processAcceptedMutation(queueRef.current.failPendingAndMarkDone(requestId));
+    const result = processAcceptedMutation(queueRef.current.failPendingAndMarkDone(requestId));
+    if (result === "accepted") {
+      setSpeechSessionActive(false);
+    }
+    return result;
   }, [processAcceptedMutation]);
 
   const clearQueue = useCallback(() => {
@@ -187,6 +194,7 @@ export function useAudioQueue() {
     queueRef.current.clear();
     setSpeaking(false);
     setSpeakingSentence(null);
+    setSpeechSessionActive(false);
     onExpressionChangeRef.current?.(neutralExpressionRef.current);
   }, [stopCurrentAudio]);
 
@@ -210,6 +218,7 @@ export function useAudioQueue() {
   return {
     speaking,
     speakingSentence,
+    speechSessionActive,
     beginRequest,
     addSentence,
     addAudio,
