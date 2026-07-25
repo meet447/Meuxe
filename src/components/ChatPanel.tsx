@@ -174,6 +174,7 @@ const ChatInput = memo(function ChatInput({
   listening,
   onMicToggle,
   inputRef,
+  floating = false,
 }: {
   isProcessing: boolean;
   onSend: (text: string) => void;
@@ -181,6 +182,7 @@ const ChatInput = memo(function ChatInput({
   listening: boolean;
   onMicToggle: () => void;
   inputRef: React.RefObject<HTMLInputElement | null>;
+  floating?: boolean;
 }) {
   const [input, setInput] = useState("");
   const typingTimeoutRef = useRef<number | null>(null);
@@ -218,16 +220,23 @@ const ChatInput = memo(function ChatInput({
   );
 
   return (
-    <div className="w-full bg-transparent pb-2 pt-1">
-      <form onSubmit={handleSubmit} className="px-4 flex items-center gap-2">
-        <div className="flex-1 relative group">
+    <div className={floating ? "w-full" : "w-full bg-transparent pb-2 pt-1"}>
+      <form
+        onSubmit={handleSubmit}
+        className={`flex items-center gap-2 ${floating ? "px-1" : "px-4"}`}
+      >
+        <div className="relative flex-1 group">
           <input
             ref={inputRef}
             type="text"
             value={input}
             onChange={handleInputChange}
             placeholder="Say something..."
-            className="w-full bg-slate-50 hover:bg-slate-100/80 text-slate-700 rounded-2xl pl-5 pr-12 py-3 text-[14px] outline-none transition-all placeholder-slate-400 border border-slate-100 disabled:opacity-50 focus:bg-white focus:ring-2 focus:ring-blue-100 focus:border-blue-200"
+            className={`w-full text-slate-700 rounded-2xl pl-5 pr-12 py-3 text-[14px] outline-none transition-all placeholder-slate-400 disabled:opacity-50 ${
+              floating
+                ? "border border-white/60 bg-white/95 shadow-inner shadow-slate-900/5 focus:bg-white focus:ring-2 focus:ring-indigo-100 focus:border-indigo-200"
+                : "bg-slate-50 hover:bg-slate-100/80 border border-slate-100 focus:bg-white focus:ring-2 focus:ring-blue-100 focus:border-blue-200"
+            }`}
             disabled={isProcessing}
           />
           <div className="absolute right-2 top-1/2 -translate-y-1/2">
@@ -237,7 +246,11 @@ const ChatInput = memo(function ChatInput({
         <button
           type="submit"
           disabled={isProcessing || !input.trim()}
-          className="bg-blue-500 hover:bg-blue-600 disabled:bg-slate-100 disabled:text-slate-400 disabled:shadow-none text-white rounded-2xl w-11 h-11 flex items-center justify-center transition-all shadow-md shadow-blue-500/20 hover:-translate-y-0.5 active:translate-y-0"
+          className={`flex h-11 w-11 items-center justify-center rounded-2xl text-white transition-all disabled:bg-slate-100 disabled:text-slate-400 disabled:shadow-none ${
+            floating
+              ? "bg-indigo-600 shadow-md shadow-indigo-600/30 hover:bg-indigo-700"
+              : "bg-blue-500 shadow-md shadow-blue-500/20 hover:bg-blue-600 hover:-translate-y-0.5 active:translate-y-0"
+          }`}
         >
           {isProcessing ? (
             <span className="w-4 h-4 border-2 border-slate-300 border-t-white rounded-full animate-spin" />

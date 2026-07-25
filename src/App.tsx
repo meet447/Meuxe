@@ -1,8 +1,9 @@
 import { useState, useEffect, useCallback, useRef, useMemo, lazy, Suspense } from "react";
 import { listen } from "@tauri-apps/api/event";
 import { register, unregister } from "@tauri-apps/plugin-global-shortcut";
-import { ChatPanel, ChatInputBar } from "./components/ChatPanel";
+import { ChatPanel } from "./components/ChatPanel";
 import { ChatHistorySidebar } from "./components/chat/ChatHistorySidebar";
+import { FloatingChatInput } from "./components/chat/FloatingChatInput";
 import { MeuxeMark } from "./components/ui/MeuxeMark";
 import { AddCharacterModal } from "./components/AddCharacterModal";
 import { CharacterSelect } from "./components/CharacterSelect";
@@ -640,22 +641,30 @@ function App() {
             <>
               <div className="relative min-h-0 flex-1 overflow-hidden rounded-none sm:m-3 sm:rounded-[2rem] sm:ring-1 sm:ring-slate-200/80 sm:shadow-inner">
                 {avatarCanvas}
-              </div>
-              {(speaking || isStreaming) && (
-                <div className="mx-3 mb-1 flex items-center justify-center gap-2 text-[10px] font-semibold uppercase tracking-wider text-indigo-500/80">
-                  {speaking && <span className="h-1.5 w-1.5 rounded-full bg-indigo-400 animate-ping" />}
-                  <span>{speaking ? "Speaking" : "Thinking…"}</span>
+                <div
+                  className="pointer-events-none absolute inset-x-0 bottom-0 z-20 flex flex-col items-center gap-2 px-4 pb-5 pt-8 sm:pb-7"
+                  style={{
+                    background:
+                      "linear-gradient(to top, rgba(15,23,42,0.35) 0%, rgba(15,23,42,0.08) 45%, transparent 100%)",
+                  }}
+                >
+                  {(speaking || isStreaming) && (
+                    <div
+                      className="pointer-events-auto flex items-center gap-2 rounded-full bg-white/90 px-3 py-1 text-[10px] font-semibold uppercase tracking-wider text-indigo-600 shadow-sm ring-1 ring-white/80"
+                    >
+                      {speaking && <span className="h-1.5 w-1.5 rounded-full bg-indigo-400 animate-ping" />}
+                      <span>{speaking ? "Speaking" : "Thinking…"}</span>
+                    </div>
+                  )}
+                  <FloatingChatInput
+                    isProcessing={isStreaming}
+                    onSend={handleSend}
+                    onTypingChange={handleTypingChange}
+                    listening={listening}
+                    onMicToggle={handleMicToggle}
+                    inputRef={fullChatInputRef}
+                  />
                 </div>
-              )}
-              <div className="shrink-0 border-t border-slate-200/80 bg-white/90 backdrop-blur-md px-3 pb-3 pt-2 sm:px-4">
-                <ChatInputBar
-                  isProcessing={isStreaming}
-                  onSend={handleSend}
-                  onTypingChange={handleTypingChange}
-                  listening={listening}
-                  onMicToggle={handleMicToggle}
-                  inputRef={fullChatInputRef}
-                />
               </div>
             </>
           )}
