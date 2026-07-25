@@ -68,8 +68,8 @@ const MENU_ITEMS: { id: SettingsPage & string; label: string; description: strin
   { id: "llm", label: "AI Connection", description: "Model that powers replies", icon: BrainIcon },
   { id: "expressions", label: "Expressions", description: "Emotions on their avatar", icon: MaskIcon },
   { id: "search", label: "Web Search (advanced)", description: "Optional search API keys", icon: SearchIcon },
-  { id: "integrations", label: "Integrations (advanced)", description: "External apps via Composio", icon: PlugIcon },
-  { id: "tools", label: "Agent Tools (advanced)", description: "Built-in tools for the legacy agent", icon: ToolsIcon },
+  { id: "integrations", label: "Integrations (advanced)", description: "Optional Gmail, GitHub, and other apps", icon: PlugIcon },
+  { id: "tools", label: "Agent Tools (advanced)", description: "Built-in chat tools (file, search, shell)", icon: ToolsIcon },
 ];
 
 const PERMISSION_STYLES: Record<string, { label: string; color: string }> = {
@@ -218,7 +218,7 @@ function LocalFirstNotice({ variant = "blue" }: { variant?: "blue" | "emerald" |
   return (
     <div className={`mb-6 rounded-[1.5rem] border px-5 py-4 text-sm leading-relaxed ${colors[variant]}`}>
       <div className="mb-1 text-[11px] font-semibold uppercase tracking-[0.22em]">Local-first boundary</div>
-      Memory, chat history, character files, vault exports, and relationship state stay on this device. Only prompts, tool requests, audio text, or search queries needed for enabled external services leave the machine.
+      Memories, chat history, character files, and relationship state stay on this device. Only prompts, tool requests, speech text, or search queries needed for enabled external services leave the machine.
     </div>
   );
 }
@@ -442,7 +442,7 @@ export function Settings({ onClose, characterId, characterName, modelId, onPrevi
         <div className="mb-6 rounded-[2rem] border border-emerald-100 bg-gradient-to-r from-emerald-50 to-blue-50 px-5 py-5 shadow-sm">
           <div className="text-[11px] font-semibold uppercase tracking-[0.24em] text-emerald-700">Local-first setup</div>
           <p className="mt-2 text-sm leading-relaxed text-slate-600">
-            Your vault, character profiles, sessions, and relationship state are local. External keys only enable selected capabilities: LLM responses, TTS audio, web search, and Composio integrations.
+            Your memories, character profiles, chat history, and relationship state stay on this device. External keys only enable what you turn on: AI replies, voice, web search, and optional app integrations.
           </p>
           <div className="mt-4 grid grid-cols-2 gap-3">
             <div className="rounded-2xl bg-white/80 px-4 py-3">
@@ -458,7 +458,7 @@ export function Settings({ onClose, characterId, characterName, modelId, onPrevi
               <div className="mt-1 text-sm font-bold text-slate-700">{config.search?.provider || "duckduckgo"}</div>
             </div>
             <div className="rounded-2xl bg-white/80 px-4 py-3">
-              <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-400">Composio</div>
+              <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-400">Integrations</div>
               <div className="mt-1 text-sm font-bold text-slate-700">{config.composio?.api_key ? "configured" : "not set"}</div>
             </div>
           </div>
@@ -837,7 +837,7 @@ export function Settings({ onClose, characterId, characterName, modelId, onPrevi
           <div className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500">Composio</div>
           <h3 className="mt-2 text-lg font-bold text-slate-800">OAuth and connected sources</h3>
           <ComposioIntegrationsPanel
-            optionalHint="Composio is optional. Save your API key first, then connect services with OAuth. Connected Gmail and GitHub accounts can be used live in chat (for example, “check my mail”)."
+            optionalHint="Optional. Save your integration API key first, then connect services with OAuth. Connected Gmail and GitHub accounts can be used in chat (for example, “check my mail”)."
           />
         </div>
       </div>
@@ -870,14 +870,14 @@ export function Settings({ onClose, characterId, characterName, modelId, onPrevi
       <div className="flex-1 overflow-y-auto p-6 scrollbar-thin scrollbar-thumb-slate-200 scrollbar-track-transparent">
         <SubHeader title="Local-First Privacy" />
         <div className="space-y-4">
-          <PrivacyCard title="Always local" items={["SQLite memory vault", "Markdown vault projection", "Character files", "Session history", "Relationship state", "Imported notes/transcripts"]} tone="emerald" />
-          <PrivacyCard title="Leaves only when enabled" items={["LLM prompts and retrieved memory snippets", "TTS text sent for speech generation", "Search queries sent to selected search provider", "Composio toolkit requests for connected sources"]} tone="blue" />
+          <PrivacyCard title="Always local" items={["Memory database and exports", "Character persona files", "Chat session history", "Relationship state", "Imported notes and transcripts"]} tone="emerald" />
+          <PrivacyCard title="Leaves only when enabled" items={["LLM prompts and retrieved memory snippets", "TTS text sent for speech generation", "Search queries sent to selected search provider", "Connected app requests (Gmail, GitHub, etc.)"]} tone="blue" />
           <PrivacyCard title="Never store in plaintext intentionally" items={["API keys are masked in settings reads", "Blank key fields preserve existing values", "Generated exports are local files you control"]} tone="amber" />
 
           <section className="rounded-[1.75rem] border border-red-200 bg-red-50 px-5 py-5 text-red-800">
             <h3 className="text-lg font-bold">Reset everything</h3>
             <p className="mt-2 text-sm leading-relaxed text-red-700/90">
-              Deletes your profile, companions, chat history, memory vault, API keys, integrations, and settings, then returns you to onboarding. Imported Live2D and VRM models stay on disk.
+              Deletes your profile, companions, chat history, saved memories, API keys, integrations, and settings, then returns you to onboarding. Imported Live2D and VRM models stay on disk.
             </p>
             {resetError && (
               <p className="mt-3 rounded-2xl border border-red-300 bg-white/70 px-4 py-3 text-sm font-medium text-red-700">

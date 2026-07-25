@@ -332,8 +332,10 @@ export function ChatPanel({
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
               </svg>
             </div>
-            <p className="text-sm font-medium text-slate-500">Say hello to {characterName}!</p>
-            <p className="text-xs text-slate-400 mt-1">Ask me anything or give me a task</p>
+            <p className="text-sm font-medium text-slate-500">Say hello to {characterName}</p>
+            <p className="text-xs text-slate-400 mt-1 max-w-xs leading-relaxed">
+              Share what&apos;s on your mind—a small update, a worry, or just because you want company.
+            </p>
           </div>
         )}
 
