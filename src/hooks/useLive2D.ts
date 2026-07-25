@@ -42,6 +42,7 @@ export function useLive2D(canvasRef: React.RefObject<HTMLCanvasElement | null>) 
   const appRef = useRef<PIXI.Application | null>(null);
   const modelRef = useRef<any>(null);
   const baseScaleRef = useRef(1);
+  const modelSizeRef = useRef({ width: 0, height: 0 });
   const mappingRef = useRef<ModelMapping | null>(null);
   const debugRef = useRef<DebugInfo>({
     modelLoaded: false,
@@ -93,24 +94,37 @@ export function useLive2D(canvasRef: React.RefObject<HTMLCanvasElement | null>) 
     const app = appRef.current;
     if (!model || !app) return;
 
-    const scaleX = app.screen.width / model.width;
-    const scaleY = app.screen.height / model.height;
+    const parent = canvasRef.current?.parentElement;
+    if (parent) {
+      const w = parent.clientWidth;
+      const h = parent.clientHeight;
+      if (w > 0 && h > 0) {
+        app.renderer.resize(w, h);
+      }
+    }
+
+    const intrinsicW = modelSizeRef.current.width;
+    const intrinsicH = modelSizeRef.current.height;
+    if (intrinsicW <= 0 || intrinsicH <= 0) return;
+
+    const scaleX = app.screen.width / intrinsicW;
+    const scaleY = app.screen.height / intrinsicH;
     baseScaleRef.current = Math.min(scaleX, scaleY);
 
     const { zoom, framing, offsetX, offsetY } = viewportRef.current;
-    let targetScale = baseScaleRef.current * zoom;
-    let targetY = app.screen.height / 2;
+    const baseScale = baseScaleRef.current * zoom;
+    let targetScale = baseScale;
+    let targetY = app.screen.height / 2 + offsetY;
 
     if (framing === "half") {
-      const framingZoom = 2.2;
-      targetScale *= framingZoom;
-      targetY = (app.screen.height / 2) * framingZoom;
+      targetScale = baseScale * 1.85;
+      targetY = app.screen.height * 0.58 + offsetY;
     }
 
     model.scale.set(targetScale);
     model.x = app.screen.width / 2 + offsetX;
-    model.y = targetY + offsetY;
-  }, []);
+    model.y = targetY;
+  }, [canvasRef]);
 
   applyModelLayoutRef.current = applyModelLayout;
 
@@ -355,6 +369,7 @@ export function useLive2D(canvasRef: React.RefObject<HTMLCanvasElement | null>) 
         }
         oldModel.destroy();
         modelRef.current = null;
+        modelSizeRef.current = { width: 0, height: 0 };
       }
 
       let app = appRef.current;
@@ -381,6 +396,9 @@ export function useLive2D(canvasRef: React.RefObject<HTMLCanvasElement | null>) 
         });
 
         modelRef.current = model;
+
+        model.scale.set(1);
+        modelSizeRef.current = { width: model.width, height: model.height };
 
         model.anchor.set(0.5, 0.5);
         model.interactive = true;
