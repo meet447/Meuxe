@@ -5,6 +5,9 @@ import {
   getVoices,
   previewVoice,
   listModels,
+  getAgentSetupStatus,
+  installAgentSetup,
+  type AgentSetupStatusResponse,
 } from "../api/tauri";
 import {
   ACP_AGENT_PRESET_IDS,
@@ -185,6 +188,10 @@ export function Onboarding({ onComplete }: { onComplete: () => void }) {
   const [error, setError] = useState("");
   const [personalityTouched, setPersonalityTouched] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const [agentSetup, setAgentSetup] = useState<AgentSetupStatusResponse | null>(null);
+  const [agentSetupLoading, setAgentSetupLoading] = useState(false);
+  const [agentInstalling, setAgentInstalling] = useState(false);
+  const [agentSetupError, setAgentSetupError] = useState("");
 
   const ttsPresets = TTS_PRESETS;
 
@@ -218,6 +225,47 @@ export function Onboarding({ onComplete }: { onComplete: () => void }) {
       })
       .catch(console.error);
   }, [form.tts.provider]);
+
+  useEffect(() => {
+    if (step !== 4 || form.agent.preset === "custom") {
+      setAgentSetup(null);
+      setAgentSetupError("");
+      return;
+    }
+    let cancelled = false;
+    setAgentSetupLoading(true);
+    setAgentSetupError("");
+    getAgentSetupStatus(form.agent.preset)
+      .then((status) => {
+        if (!cancelled) setAgentSetup(status);
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          setAgentSetupError(err?.message || String(err));
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setAgentSetupLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [step, form.agent.preset]);
+
+  const runAgentInstall = async () => {
+    if (form.agent.preset === "custom") return;
+    setAgentInstalling(true);
+    setAgentSetupError("");
+    try {
+      const status = await installAgentSetup(form.agent.preset);
+      setAgentSetup(status);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setAgentSetupError(msg);
+    } finally {
+      setAgentInstalling(false);
+    }
+  };
 
   useEffect(() => {
     if (personalityTouched && form.companion.personality.trim()) return;
@@ -295,7 +343,8 @@ export function Onboarding({ onComplete }: { onComplete: () => void }) {
         if (form.agent.preset === "custom") {
           return form.agent.program.trim() !== "";
         }
-        return true;
+        if (agentSetupLoading) return false;
+        return agentSetup?.agent.ready === true;
       default:
         return false;
     }
@@ -498,8 +547,99 @@ export function Onboarding({ onComplete }: { onComplete: () => void }) {
                   </>
                 )}
 
+                {form.agent.preset !== "custom" && (
+                  <div className="mb-6 rounded-2xl border border-slate-200 bg-slate-50/90 px-5 py-4">
+                    <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-500 mb-3">
+                      Setup check
+                    </div>
+                    {agentSetupLoading && (
+                      <p className="text-sm text-slate-500">Checking Node.js and agent…</p>
+                    )}
+                    {agentSetup && !agentSetupLoading && (
+                      <div className="space-y-3 text-sm">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span
+                            className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                              agentSetup.agent.ready
+                                ? "bg-emerald-100 text-emerald-800"
+                                : "bg-amber-100 text-amber-900"
+                            }`}
+                          >
+                            {ACP_AGENT_PRESETS[form.agent.preset].title} ACP adapter{" "}
+                            {agentSetup.agent.ready ? "ready" : "not installed"}
+                          </span>
+                          <span
+                            className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                              agentSetup.prerequisites.node_available
+                                ? "bg-emerald-100 text-emerald-800"
+                                : "bg-amber-100 text-amber-900"
+                            }`}
+                          >
+                            Node.js {agentSetup.prerequisites.node_available ? "ready" : "missing"}
+                          </span>
+                          {agentSetup.prerequisites.node_version && (
+                            <span className="text-xs text-slate-500">{agentSetup.prerequisites.node_version}</span>
+                          )}
+                          <span
+                            className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                              agentSetup.prerequisites.npx_available
+                                ? "bg-emerald-100 text-emerald-800"
+                                : "bg-slate-200 text-slate-600"
+                            }`}
+                          >
+                            npx {agentSetup.prerequisites.npx_available ? "ready" : "missing"}
+                          </span>
+                        </div>
+                        <p className="text-slate-600 leading-relaxed">{agentSetup.agent.detail}</p>
+                        <div className="flex flex-wrap gap-2">
+                          {!agentSetup.prerequisites.node_available && (
+                            <button
+                              type="button"
+                              onClick={() => window.open("https://nodejs.org/en/download", "_blank")}
+                              className="rounded-xl border border-amber-200 bg-white px-4 py-2 text-sm font-semibold text-amber-900 hover:bg-amber-50"
+                            >
+                              Get Node.js
+                            </button>
+                          )}
+                          {agentSetup.prerequisites.node_available && !agentSetup.agent.ready && (
+                              <button
+                                type="button"
+                                onClick={runAgentInstall}
+                                disabled={agentInstalling}
+                                className="rounded-xl bg-violet-600 px-4 py-2 text-sm font-semibold text-white hover:bg-violet-700 disabled:opacity-50"
+                              >
+                                {agentInstalling ? "Installing…" : `Install ${ACP_AGENT_PRESETS[form.agent.preset].title}`}
+                              </button>
+                            )}
+                          {agentSetup.prerequisites.node_available &&
+                            agentSetup.agent.ready &&
+                            !agentSetup.agent.managed_install && (
+                              <button
+                                type="button"
+                                onClick={runAgentInstall}
+                                disabled={agentInstalling}
+                                className="rounded-xl border border-violet-200 bg-white px-4 py-2 text-sm font-semibold text-violet-800 hover:bg-violet-50 disabled:opacity-50"
+                              >
+                                {agentInstalling ? "Installing…" : "Install into Meuxe folder"}
+                              </button>
+                            )}
+                          {agentSetup.agent.ready && agentSetup.agent.managed_install && (
+                            <span className="text-xs font-semibold text-emerald-700">Installed for Meuxe</span>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                    {agentSetupError && (
+                      <p className="mt-2 text-sm text-red-600">{agentSetupError}</p>
+                    )}
+                    <p className="mt-3 text-xs text-slate-500 leading-relaxed">
+                      Meuxe uses the Agent Client Protocol (ACP) built into the app. Your agent runs as a local CLI; we install adapters into your Meuxe data folder when you tap Install.
+                    </p>
+                  </div>
+                )}
+
                 <div className="rounded-2xl border border-violet-100 bg-violet-50/80 px-5 py-4 text-sm leading-relaxed text-violet-900/90">
-                  Install and sign in to your agent in the terminal first. Meuxe injects persona and memory into companion-home before each reply.
+                  After setup, sign in to your agent in the terminal if it asks. Meuxe injects persona and memory into companion-home before each reply.
                 </div>
               </div>
             )}

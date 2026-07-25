@@ -29,11 +29,37 @@ pub fn ensure_companion_home(data_dir: &Path) -> std::io::Result<()> {
     Ok(())
 }
 
-pub fn resolve_acp_agent(config: &AgentConfig) -> Result<AcpAgent, String> {
+pub fn resolve_acp_agent(config: &AgentConfig, data_dir: &Path) -> Result<AcpAgent, String> {
+    let bin_dir = crate::commands::agent_setup::managed_npm_bin_dir(data_dir);
+
     match config.preset.as_str() {
-        "opencode" => AcpAgent::from_args(["opencode", "acp"]).map_err(|e| e.to_string()),
-        "claude" => Ok(AcpAgent::claude_agent()),
-        "codex" => Ok(AcpAgent::codex()),
+        "opencode" => {
+            let managed = bin_dir.join("opencode");
+            if managed.is_file() {
+                let path = managed.to_string_lossy().into_owned();
+                AcpAgent::from_args([path, "acp".to_string()]).map_err(|e| e.to_string())
+            } else {
+                AcpAgent::from_args(["opencode", "acp"]).map_err(|e| e.to_string())
+            }
+        }
+        "claude" => {
+            let managed = bin_dir.join("claude-agent-acp");
+            if managed.is_file() {
+                let path = managed.to_string_lossy().into_owned();
+                AcpAgent::from_args([path]).map_err(|e| e.to_string())
+            } else {
+                Ok(AcpAgent::claude_agent())
+            }
+        }
+        "codex" => {
+            let managed = bin_dir.join("codex-acp");
+            if managed.is_file() {
+                let path = managed.to_string_lossy().into_owned();
+                AcpAgent::from_args([path]).map_err(|e| e.to_string())
+            } else {
+                Ok(AcpAgent::codex())
+            }
+        }
         "custom" => {
             if config.program.is_empty() {
                 return Err("Custom ACP agent requires a command in Settings.".into());
@@ -64,7 +90,7 @@ pub async fn run_acp_chat_stream(
     let persona_path = companion_home.join("persona").join("context.md");
     std::fs::write(&persona_path, &persona_context).map_err(|e| e.to_string())?;
 
-    let agent = resolve_acp_agent(&agent_config)?;
+    let agent = resolve_acp_agent(&agent_config, &state.data_dir)?;
     let user_id = derive_user_id_from_state(&state)?;
 
     let app_emit = app.clone();

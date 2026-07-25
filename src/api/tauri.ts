@@ -40,6 +40,31 @@ export async function resetAllAppData() {
   return invoke("config_reset_all");
 }
 
+export interface AgentSetupStatusResponse {
+  prerequisites: {
+    node_available: boolean;
+    npx_available: boolean;
+    node_version: string | null;
+    npx_version: string | null;
+  };
+  agent: {
+    preset: string;
+    ready: boolean;
+    managed_install: boolean;
+    system_path: boolean;
+    needs_node: boolean;
+    detail: string;
+  };
+}
+
+export async function getAgentSetupStatus(preset: string) {
+  return invoke<AgentSetupStatusResponse>("agent_setup_status", { preset });
+}
+
+export async function installAgentSetup(preset: string) {
+  return invoke<AgentSetupStatusResponse>("agent_setup_install", { preset });
+}
+
 export async function testLlm(provider: {
   base_url: string;
   api_key: string;

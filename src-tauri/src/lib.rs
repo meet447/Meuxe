@@ -141,6 +141,8 @@ pub fn run() {
             commands::chat::chat_send,
             commands::chat::chat_history,
             commands::chat::chat_clear,
+            commands::agent_setup::agent_setup_status,
+            commands::agent_setup::agent_setup_install,
             commands::tools::tools_list,
             commands::memory::memory_get,
             commands::memory::memory_search,

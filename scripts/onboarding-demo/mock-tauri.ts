@@ -57,6 +57,25 @@ export async function invoke<T>(cmd: string, args?: Record<string, unknown>): Pr
         toolkit: (args?.toolkit as string) ?? "github",
         status: "active",
       } as T;
+    case "agent_setup_status":
+      return {
+        prerequisites: {
+          node_available: true,
+          npx_available: true,
+          node_version: "v20.0.0",
+          npx_version: "10.0.0",
+        },
+        agent: {
+          preset: (args?.preset as string) ?? "opencode",
+          ready: true,
+          managed_install: false,
+          system_path: true,
+          needs_node: false,
+          detail: "Demo: agent ready.",
+        },
+      } as T;
+    case "agent_setup_install":
+      return invoke("agent_setup_status", args);
     default:
       console.warn(`[onboarding-demo] unhandled invoke: ${cmd}`, args);
       return null as T;
