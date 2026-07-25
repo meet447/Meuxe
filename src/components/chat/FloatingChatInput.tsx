@@ -59,7 +59,7 @@ export const FloatingChatInput = memo(function FloatingChatInput({
       )}
       <form
         onSubmit={handleSubmit}
-        className="flex w-full items-center gap-1 rounded-full border border-slate-200/90 bg-white/90 py-1 pl-1 pr-1.5 shadow-[0_8px_32px_rgba(15,23,42,0.12)] backdrop-blur-xl ring-1 ring-slate-100"
+        className="flex w-full items-center gap-1 rounded-full border border-slate-200/90 bg-white/90 py-1 pl-1 pr-1.5 shadow-[0_8px_32px_rgba(15,23,42,0.12)] backdrop-blur-xl ring-1 ring-slate-100 focus-within:ring-1 focus-within:ring-slate-100"
       >
         <MicButton listening={listening} onToggle={onMicToggle} variant="stage" />
         <input
@@ -69,7 +69,7 @@ export const FloatingChatInput = memo(function FloatingChatInput({
           onChange={handleInputChange}
           placeholder="Type a message..."
           disabled={isProcessing}
-          className="min-w-0 flex-1 bg-transparent px-2 py-2.5 text-[15px] text-slate-800 outline-none placeholder:text-slate-400 disabled:opacity-50"
+          className="companion-chat-input min-w-0 flex-1 bg-transparent px-2 py-2.5 text-[15px] text-slate-800 outline-none ring-0 placeholder:text-slate-400 focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0 disabled:opacity-50"
         />
         <button
           type="submit"

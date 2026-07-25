@@ -48,6 +48,11 @@ body {
   border-radius: 8px;
 }
 
+.companion-chat-input:focus-visible {
+  outline: none;
+  outline-offset: 0;
+}
+
 /* ─── Animations ─── */
 @keyframes fadeIn {
   from { opacity: 0; }

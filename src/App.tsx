@@ -600,6 +600,8 @@ function App() {
                   setHistoryOpen(false);
                 }}
                 charSelectOpen={charSelectOpen}
+                framing={framing}
+                onFramingChange={setFraming}
               />
 
               <CharacterSelect

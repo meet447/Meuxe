@@ -35,6 +35,8 @@ export function StageCornerToolbar({
   settingsOpen,
   onCharacters,
   charSelectOpen,
+  framing,
+  onFramingChange,
 }: {
   historyOpen: boolean;
   onHistoryToggle: () => void;
@@ -43,6 +45,8 @@ export function StageCornerToolbar({
   settingsOpen: boolean;
   onCharacters: () => void;
   charSelectOpen: boolean;
+  framing: "full" | "half";
+  onFramingChange: (framing: "full" | "half") => void;
 }) {
   return (
     <>
@@ -81,6 +85,33 @@ export function StageCornerToolbar({
               <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
             </svg>
           </CornerButton>
+          <div
+            className="flex flex-col overflow-hidden rounded-xl border border-slate-200/80 bg-white/75 shadow-sm backdrop-blur-md"
+            title="Avatar framing"
+          >
+            <button
+              type="button"
+              onClick={() => onFramingChange("full")}
+              className={`px-2 py-2 text-[10px] font-bold tracking-wide transition-colors ${
+                framing === "full"
+                  ? "bg-blue-500 text-white"
+                  : "text-slate-600 hover:bg-white hover:text-slate-900"
+              }`}
+            >
+              FULL
+            </button>
+            <button
+              type="button"
+              onClick={() => onFramingChange("half")}
+              className={`border-t border-slate-200/80 px-2 py-2 text-[10px] font-bold tracking-wide transition-colors ${
+                framing === "half"
+                  ? "bg-blue-500 text-white"
+                  : "text-slate-600 hover:bg-white hover:text-slate-900"
+              }`}
+            >
+              HALF
+            </button>
+          </div>
         </div>
       </div>
     </>
