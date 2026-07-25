@@ -15,13 +15,15 @@ export function OnboardingShell({
   const showPreview = preview && step >= 2 && step <= 3;
 
   return (
-    <div className="relative min-h-screen overflow-y-auto bg-gradient-to-b from-indigo-50/80 via-white to-slate-50">
+    <div
+      className="fixed inset-0 z-[200] overflow-x-hidden overflow-y-auto bg-gradient-to-b from-indigo-50/80 via-white to-slate-50 scrollbar-thin scrollbar-thumb-slate-200 scrollbar-track-transparent overscroll-y-contain"
+    >
       <div className="pointer-events-none fixed inset-0 overflow-hidden">
         <div className="absolute -left-[15%] top-[-10%] h-[45%] w-[45%] rounded-full bg-indigo-200/30 blur-[100px]" />
         <div className="absolute bottom-[-10%] right-[-10%] h-[50%] w-[50%] rounded-full bg-blue-200/25 blur-[120px]" />
       </div>
 
-      <div className="relative z-10 flex min-h-screen flex-col items-center px-4 py-8 sm:px-6 sm:py-10">
+      <div className="relative z-10 flex min-h-full flex-col items-center px-4 py-8 sm:px-6 sm:py-10">
         <div className="mb-6 flex items-center gap-2.5">
           <MeuxeMark className="h-9 w-9" />
           <span className="text-sm font-bold tracking-tight text-slate-800">Meuxe setup</span>
