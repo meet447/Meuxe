@@ -663,7 +663,7 @@ function App() {
 
         {settingsOpen && (
           <aside
-            className="absolute inset-y-0 right-0 z-30 flex w-full max-w-[420px] flex-col border-l border-white/10 bg-zinc-950/95 shadow-2xl backdrop-blur-xl"
+            className="absolute inset-y-0 right-0 z-30 flex w-full max-w-[420px] flex-col border-l border-slate-200 bg-white/95 shadow-2xl backdrop-blur-xl"
           >
             <Settings
               characterId={selectedCharId}
