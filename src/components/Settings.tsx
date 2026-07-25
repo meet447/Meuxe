@@ -6,6 +6,7 @@ import {
   getConfig,
   saveConfig,
   resetAllAppData,
+  resetOnboarding,
   getVoices,
 } from "../api/tauri";
 import { ComposioIntegrationsPanel } from "./ComposioIntegrationsPanel";
@@ -102,7 +103,7 @@ function PrivacyCard({ title, items, tone }: { title: string; items: string[]; t
   );
 }
 
-export function Settings({ onClose, characterId, characterName, modelId, onPreviewExpression, onExpressionsSaved, onConversationCleared, onResetAll }: {
+export function Settings({ onClose, characterId, characterName, modelId, onPreviewExpression, onExpressionsSaved, onConversationCleared, onResetAll, onResetOnboarding }: {
   onClose: () => void;
   characterId?: string;
   characterName: string;
@@ -111,6 +112,7 @@ export function Settings({ onClose, characterId, characterName, modelId, onPrevi
   onExpressionsSaved?: () => void;
   onConversationCleared?: () => void;
   onResetAll?: () => void;
+  onResetOnboarding?: () => void;
 }) {
   const [page, setPage] = useState<SettingsPage>(null);
   const [config, setConfig] = useState<any>(null);
@@ -136,6 +138,8 @@ export function Settings({ onClose, characterId, characterName, modelId, onPrevi
   const [confirmReset, setConfirmReset] = useState(false);
   const [resetting, setResetting] = useState(false);
   const [resetError, setResetError] = useState<string | null>(null);
+  const [resettingOnboarding, setResettingOnboarding] = useState(false);
+  const [onboardingResetError, setOnboardingResetError] = useState<string | null>(null);
 
   const deriveConfigured = (cfg: any) => {
     const ttsConfigured: Record<string, { configured: boolean; voice: string }> = {};
@@ -622,6 +626,20 @@ export function Settings({ onClose, characterId, characterName, modelId, onPrevi
       }
     };
 
+    const handleResetOnboarding = async () => {
+      setResettingOnboarding(true);
+      setOnboardingResetError(null);
+      try {
+        await resetOnboarding();
+        onResetOnboarding?.();
+      } catch (err) {
+        console.error("Onboarding reset failed:", err);
+        setOnboardingResetError(err instanceof Error ? err.message : "Could not reset onboarding.");
+      } finally {
+        setResettingOnboarding(false);
+      }
+    };
+
     return (
       <div className="flex-1 overflow-y-auto p-6 scrollbar-thin scrollbar-thumb-slate-200 scrollbar-track-transparent">
         <SubHeader title="Local-First Privacy" />
@@ -629,6 +647,26 @@ export function Settings({ onClose, characterId, characterName, modelId, onPrevi
           <PrivacyCard title="Always local" items={["Memory database and exports", "Character persona files", "Chat session history", "Relationship state", "Imported notes and transcripts"]} tone="emerald" />
           <PrivacyCard title="Leaves only when enabled" items={["LLM prompts and retrieved memory snippets", "TTS text sent for speech generation", "Search queries sent to selected search provider", "Connected app requests (Gmail, GitHub, etc.)"]} tone="blue" />
           <PrivacyCard title="Never store in plaintext intentionally" items={["API keys are masked in settings reads", "Blank key fields preserve existing values", "Generated exports are local files you control"]} tone="amber" />
+
+          <section className="rounded-[1.75rem] border border-violet-200 bg-violet-50 px-5 py-5 text-violet-900">
+            <h3 className="text-lg font-bold">Run onboarding again</h3>
+            <p className="mt-2 text-sm leading-relaxed text-violet-800/90">
+              Reopen the first-run setup to change your companion, voice, or CLI agent. Your chat history, memories, and API keys stay on this device.
+            </p>
+            {onboardingResetError && (
+              <p className="mt-3 rounded-2xl border border-violet-300 bg-white/70 px-4 py-3 text-sm font-medium text-violet-900">
+                {onboardingResetError}
+              </p>
+            )}
+            <button
+              type="button"
+              onClick={handleResetOnboarding}
+              disabled={resettingOnboarding}
+              className="mt-4 rounded-2xl bg-violet-600 px-5 py-3 text-sm font-semibold text-white shadow-sm shadow-violet-600/20 transition-all hover:bg-violet-700 disabled:opacity-50"
+            >
+              {resettingOnboarding ? "Opening onboarding…" : "Run onboarding again"}
+            </button>
+          </section>
 
           <section className="rounded-[1.75rem] border border-red-200 bg-red-50 px-5 py-5 text-red-800">
             <h3 className="text-lg font-bold">Reset everything</h3>

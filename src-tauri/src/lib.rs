@@ -130,6 +130,7 @@ pub fn run() {
             commands::config::config_get,
             commands::config::config_save,
             commands::config::config_reset_all,
+            commands::config::config_reset_onboarding,
             commands::config::config_list_llm_models,
             commands::config::config_test_llm,
             commands::characters::characters_list,

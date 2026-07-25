@@ -40,6 +40,10 @@ export async function resetAllAppData() {
   return invoke("config_reset_all");
 }
 
+export async function resetOnboarding() {
+  return invoke("config_reset_onboarding");
+}
+
 export interface AgentSetupStatusResponse {
   prerequisites: {
     node_available: boolean;

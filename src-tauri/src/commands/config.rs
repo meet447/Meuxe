@@ -30,6 +30,11 @@ pub fn config_reset_all(state: State<Arc<AppState>>) -> Result<(), String> {
     state.config.reset_to_default().map_err(|e| e.to_string())
 }
 
+#[tauri::command]
+pub fn config_reset_onboarding(state: State<Arc<AppState>>) -> Result<(), String> {
+    state.config.reset_onboarding().map_err(|e| e.to_string())
+}
+
 fn provider_fields(provider: &serde_json::Value) -> (String, String, Option<String>) {
     let base_url = provider
         .get("base_url")

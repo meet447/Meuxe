@@ -250,6 +250,13 @@ impl ConfigManager {
         self.save_fresh(&AppConfig::default())
     }
 
+    /// Show onboarding again without deleting companions, chat, or API keys.
+    pub fn reset_onboarding(&self) -> Result<()> {
+        let mut config = self.load()?;
+        config.onboarding_complete = false;
+        self.save_fresh(&config)
+    }
+
     fn save_fresh(&self, config: &AppConfig) -> Result<()> {
         if let Some(parent) = self.config_path.parent() {
             std::fs::create_dir_all(parent)?;
@@ -465,6 +472,22 @@ mod tests {
         assert_eq!(loaded.llm.provider, "openai");
         assert_eq!(loaded.llm.api_key, Some("sk-test-key-12345678".to_string()));
         assert!(loaded.onboarding_complete);
+    }
+
+    #[test]
+    fn test_reset_onboarding_keeps_user_data() {
+        let tmp = TempDir::new().unwrap();
+        let mgr = ConfigManager::new(tmp.path());
+
+        let mut config = AppConfig::default();
+        config.user.name = "Bob".to_string();
+        config.onboarding_complete = true;
+        mgr.save(&config).unwrap();
+
+        mgr.reset_onboarding().unwrap();
+        let loaded = mgr.load().unwrap();
+        assert!(!loaded.onboarding_complete);
+        assert_eq!(loaded.user.name, "Bob");
     }
 
     #[test]

@@ -642,6 +642,10 @@ function App() {
                 setExpressionsConfigured(null);
                 setCurrentExpression("neutral");
               }}
+              onResetOnboarding={() => {
+                setSettingsOpen(false);
+                setOnboardingComplete(false);
+              }}
               onClose={handleSettingsClose}
             />
           ) : expressionsConfigured === null ? (
