@@ -116,7 +116,7 @@ pub async fn run_acp_chat_stream(
     let request_id_session = request_id.clone();
     let model_id_session = model_id.clone();
     let tts_config_session = tts_config.clone();
-    let agent_prompt_send = build_acp_prompt_for_send(&agent_prompt);
+    let agent_prompt_send = agent_prompt.clone();
 
     Client
         .builder()
