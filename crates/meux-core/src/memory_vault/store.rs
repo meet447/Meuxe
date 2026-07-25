@@ -1347,8 +1347,7 @@ fn score_memory(query_tokens: &HashSet<String>, memory: &VaultMemory) -> f64 {
     let memory_tokens = token_set(&memory.summary);
     let overlap = query_tokens
         .intersection(&memory_tokens)
-        .map(|token| if token.starts_with("cjk:") { 2.0 } else { 1.0 })
-        .sum::<f64>();
+        .count() as f64;
     let tag_overlap = memory
         .tags
         .iter()

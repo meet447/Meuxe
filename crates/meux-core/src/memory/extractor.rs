@@ -339,30 +339,7 @@ pub fn extract_tokens(text: &str) -> HashSet<String> {
         cjk_run.clear();
     }
 
-    add_concept_token(
-        text,
-        &mut tokens,
-        "cjk:name",
-        &["名字", "称呼", "我叫", "叫我"],
-    );
-    add_concept_token(
-        text,
-        &mut tokens,
-        "cjk:occupation",
-        &["职业", "一名", "产品经理"],
-    );
-    add_concept_token(text, &mut tokens, "cjk:coffee", &["咖啡", "冰美式", "拿铁"]);
-    if text.to_ascii_lowercase().contains("tts") {
-        tokens.insert("cjk:tts_metric".to_string());
-    }
-
     tokens
-}
-
-fn add_concept_token(text: &str, tokens: &mut HashSet<String>, token: &str, phrases: &[&str]) {
-    if phrases.iter().any(|phrase| text.contains(phrase)) {
-        tokens.insert(token.to_string());
-    }
 }
 
 pub(crate) fn contains_cjk(text: &str) -> bool {
