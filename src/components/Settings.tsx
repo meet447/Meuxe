@@ -9,7 +9,6 @@ import {
   resetOnboarding,
   getVoices,
 } from "../api/tauri";
-import { ComposioIntegrationsPanel } from "./ComposioIntegrationsPanel";
 import { ACP_AGENT_PRESET_IDS, ACP_AGENT_PRESETS } from "../lib/agentPresets";
 interface Voice {
   id: string;
@@ -21,7 +20,7 @@ interface TTSPreset {
   needs_key: boolean;
 }
 
-type SettingsPage = null | "profile" | "llm" | "tts" | "search" | "integrations" | "privacy" | "expressions" | "memory";
+type SettingsPage = null | "profile" | "llm" | "tts" | "privacy" | "expressions" | "memory";
 
 const TTS_PRESETS: Record<string, TTSPreset> = {
   tiktok: { name: "TikTok TTS", needs_key: false },
@@ -40,19 +39,12 @@ const SpeakerIcon = () => (
 const MaskIcon = () => (
   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M14.828 14.828a4 4 0 01-5.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
 );
-const SearchIcon = () => (
-  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+const ShieldIcon = () => (
+  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M12 3l7 4v5c0 4.5-2.8 7.7-7 9-4.2-1.3-7-4.5-7-9V7l7-4z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M9 12l2 2 4-4" /></svg>
 );
 const ArchiveIcon = () => (
   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M5 8h14M5 12h10M5 16h8M4 4h16v16H4z" /></svg>
 );
-const ShieldIcon = () => (
-  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M12 3l7 4v5c0 4.5-2.8 7.7-7 9-4.2-1.3-7-4.5-7-9V7l7-4z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M9 12l2 2 4-4" /></svg>
-);
-const PlugIcon = () => (
-  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M7 7l10 10M8 16l-2 2m10-10l2-2M8 8l-2 2 8 8 2-2M9 3v4m6 10v4" /></svg>
-);
-
 const MENU_ITEMS: { id: SettingsPage & string; label: string; description: string; icon: () => JSX.Element }[] = [
   { id: "profile", label: "Your Profile", description: "Name and about yourself", icon: ProfileIcon },
   { id: "privacy", label: "Privacy", description: "What stays on your device", icon: ShieldIcon },
@@ -60,9 +52,7 @@ const MENU_ITEMS: { id: SettingsPage & string; label: string; description: strin
   { id: "tts", label: "Voice", description: "How they sound when they speak", icon: SpeakerIcon },
   { id: "llm", label: "CLI Agent", description: "Claude Code, Codex, or custom ACP", icon: BrainIcon },
   { id: "expressions", label: "Expressions", description: "Emotions on their avatar", icon: MaskIcon },
-  { id: "search", label: "Web Search (advanced)", description: "Optional search API keys", icon: SearchIcon },
-  { id: "integrations", label: "Integrations (advanced)", description: "Optional Gmail, GitHub, and other apps", icon: PlugIcon },
-];
+  ];
 
 const inputClass = "w-full px-5 py-3.5 rounded-2xl bg-slate-50 hover:bg-slate-100/50 text-slate-700 text-[15px] outline-none transition-all placeholder-slate-400 border border-slate-100 focus:bg-white focus:ring-2 focus:ring-blue-100 focus:border-blue-300 mb-5";
 const labelClass = "block text-sm font-semibold text-slate-700 tracking-wide mb-2 pl-1";
@@ -77,7 +67,7 @@ function LocalFirstNotice({ variant = "blue" }: { variant?: "blue" | "emerald" |
   return (
     <div className={`mb-6 rounded-[1.5rem] border px-5 py-4 text-sm leading-relaxed ${colors[variant]}`}>
       <div className="mb-1 text-[11px] font-semibold uppercase tracking-[0.22em]">Local-first boundary</div>
-      Memories, chat history, character files, and relationship state stay on this device. Only prompts, tool requests, speech text, or search queries needed for enabled external services leave the machine.
+      Memories, chat history, character files, and relationship state stay on this device. Speech (TTS) and your CLI agent may use external services when configured.
     </div>
   );
 }
@@ -129,9 +119,6 @@ export function Settings({ onClose, characterId, characterName, modelId, onPrevi
   const [ttsProvider, setTtsProvider] = useState("tiktok");
   const [ttsApiKey, setTtsApiKey] = useState("");
   const [ttsVoice, setTtsVoice] = useState("jp_001");
-  const [searchProvider, setSearchProvider] = useState("duckduckgo");
-  const [serpApiKey, setSerpApiKey] = useState("");
-  const [exaApiKey, setExaApiKey] = useState("");
   const [agentPreset, setAgentPreset] = useState("opencode");
   const [agentProgram, setAgentProgram] = useState("");
   const [agentArgs, setAgentArgs] = useState("");
@@ -170,9 +157,6 @@ export function Settings({ onClose, characterId, characterName, modelId, onPrevi
         setTtsProvider(cfg.tts?.provider || "tiktok");
         setTtsApiKey("");
         setTtsVoice(cfg.tts?.voice || "jp_001");
-        setSearchProvider(cfg.search?.provider || "duckduckgo");
-        setSerpApiKey("");
-        setExaApiKey("");
         setAgentPreset(cfg.agent?.preset || "opencode");
         setAgentProgram(cfg.agent?.program || "");
         setAgentArgs((cfg.agent?.args || []).join(" "));
@@ -191,7 +175,6 @@ export function Settings({ onClose, characterId, characterName, modelId, onPrevi
     const update: any = {
       user: { name: userName, about: userAbout },
       tts: { provider: ttsProvider, voice: ttsVoice },
-      search: { provider: searchProvider },
       agent: {
         preset: agentPreset,
         program: agentProgram,
@@ -199,9 +182,6 @@ export function Settings({ onClose, characterId, characterName, modelId, onPrevi
       },
     };
     if (ttsApiKey) update.tts.api_key = ttsApiKey;
-    if (serpApiKey) update.search.serp_api_key = serpApiKey;
-    if (exaApiKey) update.search.exa_api_key = exaApiKey;
-
     try {
       await saveConfig(update);
 
@@ -250,7 +230,7 @@ export function Settings({ onClose, characterId, characterName, modelId, onPrevi
         <div className="mb-6 rounded-[2rem] border border-emerald-100 bg-gradient-to-r from-emerald-50 to-blue-50 px-5 py-5 shadow-sm">
           <div className="text-[11px] font-semibold uppercase tracking-[0.24em] text-emerald-700">Local-first setup</div>
           <p className="mt-2 text-sm leading-relaxed text-slate-600">
-            Your memories, character profiles, chat history, and relationship state stay on this device. External keys only enable what you turn on: AI replies, voice, web search, and optional app integrations.
+            Your memories, character profiles, chat history, and relationship state stay on this device. Voice and your CLI agent use external services only when you configure them.
           </p>
           <div className="mt-4 grid grid-cols-2 gap-3">
             <div className="rounded-2xl bg-white/80 px-4 py-3">
@@ -264,14 +244,6 @@ export function Settings({ onClose, characterId, characterName, modelId, onPrevi
             <div className="rounded-2xl bg-white/80 px-4 py-3">
               <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-400">TTS</div>
               <div className="mt-1 text-sm font-bold text-slate-700">{config.tts?.provider || "not set"}</div>
-            </div>
-            <div className="rounded-2xl bg-white/80 px-4 py-3">
-              <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-400">Search</div>
-              <div className="mt-1 text-sm font-bold text-slate-700">{config.search?.provider || "duckduckgo"}</div>
-            </div>
-            <div className="rounded-2xl bg-white/80 px-4 py-3">
-              <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-400">Integrations</div>
-              <div className="mt-1 text-sm font-bold text-slate-700">{config.composio?.api_key ? "configured" : "not set"}</div>
             </div>
           </div>
         </div>
@@ -505,105 +477,6 @@ export function Settings({ onClose, characterId, characterName, modelId, onPrevi
     );
   }
 
-  // ========== WEB SEARCH PAGE ==========
-  if (page === "search") {
-    const SEARCH_PRESETS: Record<string, { name: string; description: string; needsKey: boolean }> = {
-      duckduckgo: { name: "DuckDuckGo", description: "Free, no API key needed", needsKey: false },
-      serpapi: { name: "SerpAPI", description: "Google results via serpapi.com", needsKey: true },
-      exa: { name: "Exa", description: "AI-powered search via exa.ai", needsKey: true },
-    };
-
-    return (
-      <div className="flex-1 overflow-y-auto p-6 scrollbar-thin scrollbar-thumb-slate-200 scrollbar-track-transparent">
-        <SubHeader title="Web Search" />
-        <LocalFirstNotice variant={searchProvider === "duckduckgo" ? "emerald" : "blue"} />
-
-        <label className={labelClass}>Search Provider</label>
-        <div className="space-y-2 mb-6">
-          {Object.entries(SEARCH_PRESETS).map(([id, preset]) => (
-            <button
-              key={id}
-              onClick={() => setSearchProvider(id)}
-              className={`w-full flex items-center gap-4 px-5 py-4 rounded-2xl text-left border transition-all ${
-                searchProvider === id
-                  ? "border-blue-400 bg-blue-50 shadow-sm shadow-blue-500/10"
-                  : "border-slate-200 bg-white hover:border-slate-300 hover:shadow-sm"
-              }`}
-            >
-              <div className="flex-1">
-                <div className={`text-[14px] font-semibold ${searchProvider === id ? "text-blue-700" : "text-slate-700"}`}>
-                  {preset.name}
-                </div>
-                <div className="text-[12px] text-slate-400 mt-0.5">{preset.description}</div>
-              </div>
-              {searchProvider === id && (
-                <svg className="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" /></svg>
-              )}
-            </button>
-          ))}
-        </div>
-
-        {searchProvider === "serpapi" && (
-          <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
-            <label className={labelClass}>SerpAPI Key</label>
-            <input
-              type="password"
-              value={serpApiKey}
-              onChange={(e) => setSerpApiKey(e.target.value)}
-              placeholder="Paste your SerpAPI key (blank to keep current)"
-              className={inputClass}
-            />
-            <p className="text-[12px] text-slate-400 -mt-3 mb-5 pl-1">
-              Get your key at <span className="text-blue-500">serpapi.com</span> — 100 free searches/month
-            </p>
-          </div>
-        )}
-
-        {searchProvider === "exa" && (
-          <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
-            <label className={labelClass}>Exa API Key</label>
-            <input
-              type="password"
-              value={exaApiKey}
-              onChange={(e) => setExaApiKey(e.target.value)}
-              placeholder="Paste your Exa API key (blank to keep current)"
-              className={inputClass}
-            />
-            <p className="text-[12px] text-slate-400 -mt-3 mb-5 pl-1">
-              Get your key at <span className="text-blue-500">exa.ai</span> — AI-powered neural search
-            </p>
-          </div>
-        )}
-
-        <button
-          onClick={handleSave}
-          disabled={saving}
-          className={buttonClass}
-        >
-          {saving ? "Saving..." : saved ? "Saved!" : "Save Configuration"}
-        </button>
-      </div>
-    );
-  }
-
-  // ========== TOOLS PAGE ==========
-  if (page === "integrations") {
-    return (
-      <div className="flex-1 overflow-y-auto p-6 scrollbar-thin scrollbar-thumb-slate-200 scrollbar-track-transparent">
-        <SubHeader title="Integrations" />
-        <LocalFirstNotice variant="amber" />
-
-        <div className="mb-6 min-w-0 rounded-[1.75rem] border border-slate-200 bg-white px-5 py-5 shadow-sm">
-          <div className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500">Composio</div>
-          <h3 className="mt-2 text-lg font-bold text-slate-800">OAuth and connected sources</h3>
-          <ComposioIntegrationsPanel
-            optionalHint="Optional. Save your integration API key first, then connect services with OAuth. Connected Gmail and GitHub accounts can be used in chat (for example, “check my mail”)."
-          />
-        </div>
-      </div>
-    );
-  }
-
   if (page === "privacy") {
     const handleResetAll = async () => {
       if (!confirmReset) {
@@ -645,7 +518,7 @@ export function Settings({ onClose, characterId, characterName, modelId, onPrevi
         <SubHeader title="Local-First Privacy" />
         <div className="space-y-4">
           <PrivacyCard title="Always local" items={["Memory database and exports", "Character persona files", "Chat session history", "Relationship state", "Imported notes and transcripts"]} tone="emerald" />
-          <PrivacyCard title="Leaves only when enabled" items={["LLM prompts and retrieved memory snippets", "TTS text sent for speech generation", "Search queries sent to selected search provider", "Connected app requests (Gmail, GitHub, etc.)"]} tone="blue" />
+          <PrivacyCard title="Leaves only when enabled" items={["LLM prompts and retrieved memory snippets", "TTS text sent for speech generation", "Outbound calls made by your CLI agent", "CLI agent tool calls (handled by your agent, not Meuxe)"]} tone="blue" />
           <PrivacyCard title="Never store in plaintext intentionally" items={["API keys are masked in settings reads", "Blank key fields preserve existing values", "Generated exports are local files you control"]} tone="amber" />
 
           <section className="rounded-[1.75rem] border border-violet-200 bg-violet-50 px-5 py-5 text-violet-900">

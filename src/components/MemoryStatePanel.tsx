@@ -18,15 +18,8 @@ import {
   ingestMemoryFolderDialog,
   exportMemoryZipDialog,
   importMemoryZipDialog,
-  getComposioStatus,
-  saveComposioConfig,
-  syncComposioGithubReadme,
-  syncComposioGmail,
 } from "../api/tauri";
-import { ComposioToolkitIcon } from "./ComposioToolkitIcon";
-import { DEFAULT_ENABLED_COMPOSIO_TOOLKITS } from "../lib/composioToolkits";
 import type {
-  ComposioToolkitStatus,
   DreamRun,
   MemoryRecord,
   MemorySourceRecord,
@@ -50,41 +43,34 @@ export function MemoryStatePanel({ characterId, characterName, onConversationCle
   const [overview, setOverview] = useState<MemoryVaultOverview | null>(null);
   const [sources, setSources] = useState<MemorySourceRecord[]>([]);
   const [topics, setTopics] = useState<TopicSummary[]>([]);
-  const [composioStatus, setComposioStatus] = useState<ComposioToolkitStatus[]>([]);
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<MemoryRecord[]>([]);
   const [noteTitle, setNoteTitle] = useState("");
   const [noteBody, setNoteBody] = useState("");
   const [transcriptTitle, setTranscriptTitle] = useState("");
   const [transcriptBody, setTranscriptBody] = useState("");
-  const [composioApiKey, setComposioApiKey] = useState("");
-  const [composioToolkits] = useState<string[]>(DEFAULT_ENABLED_COMPOSIO_TOOLKITS);
-  const [githubOwner, setGithubOwner] = useState("");
-  const [githubRepo, setGithubRepo] = useState("");
   const [loading, setLoading] = useState(false);
   const [searching, setSearching] = useState(false);
   const [activeTab, setActiveTab] = useState<MemoryTab>("overview");
   const [lastDream, setLastDream] = useState<DreamRun | null>(null);
   const [statusMessage, setStatusMessage] = useState("");
-  const [busyAction, setBusyAction] = useState<null | "memories" | "conversation" | "dream" | "rebuild" | "ingest" | "export" | "composio">(null);
+  const [busyAction, setBusyAction] = useState<null | "memories" | "conversation" | "dream" | "rebuild" | "ingest" | "export" >(null);
 
   const refresh = useCallback(async () => {
     if (!characterId) return;
     setLoading(true);
     try {
-      const [memoryData, overviewData, sourceData, topicData, composioData] = await Promise.all([
+      const [memoryData, overviewData, sourceData, topicData] = await Promise.all([
         getMemory(characterId),
         getMemoryOverview(characterId).catch(() => null),
         getMemorySources(characterId).catch(() => []),
         getMemoryTopics(characterId).catch(() => []),
-        getComposioStatus().catch(() => []),
       ]);
       const mems = (memoryData as MemoryRecord[]) || [];
       setMemories(mems);
       setOverview((overviewData as MemoryVaultOverview | null) || null);
       setSources((sourceData as MemorySourceRecord[]) || []);
       setTopics((topicData as TopicSummary[]) || []);
-      setComposioStatus((composioData as ComposioToolkitStatus[]) || []);
       setResults([]);
     } catch (err) {
       console.error("Memory panel refresh error:", err);
@@ -93,7 +79,6 @@ export function MemoryStatePanel({ characterId, characterName, onConversationCle
       setOverview(null);
       setSources([]);
       setTopics([]);
-      setComposioStatus([]);
     } finally {
       setLoading(false);
     }
@@ -305,41 +290,6 @@ export function MemoryStatePanel({ characterId, characterName, onConversationCle
     }
   }, [characterId, refresh]);
 
-  const saveComposio = useCallback(async () => {
-    setBusyAction("composio");
-    try {
-      await saveComposioConfig(composioApiKey.trim() || null, composioToolkits);
-      setStatusMessage("Composio configuration saved.");
-      setComposioApiKey("");
-      await refresh();
-    } finally {
-      setBusyAction(null);
-    }
-  }, [composioApiKey, composioToolkits, refresh]);
-
-  const syncGmail = useCallback(async () => {
-    if (!characterId) return;
-    setBusyAction("composio");
-    try {
-      const count = await syncComposioGmail(characterId, 20);
-      setStatusMessage(`Synced Gmail with ${count} memory entr${count === 1 ? "y" : "ies"}.`);
-      await refresh();
-    } finally {
-      setBusyAction(null);
-    }
-  }, [characterId, refresh]);
-
-  const syncGithub = useCallback(async () => {
-    if (!characterId || !githubOwner.trim() || !githubRepo.trim()) return;
-    setBusyAction("composio");
-    try {
-      const count = await syncComposioGithubReadme(characterId, githubOwner.trim(), githubRepo.trim());
-      setStatusMessage(`Synced GitHub README with ${count} memory entr${count === 1 ? "y" : "ies"}.`);
-      await refresh();
-    } finally {
-      setBusyAction(null);
-    }
-  }, [characterId, githubOwner, githubRepo, refresh]);
 
   if (!characterId) {
     return (
@@ -545,42 +495,6 @@ export function MemoryStatePanel({ characterId, characterName, onConversationCle
                 <button onClick={ingestFile} disabled={busyAction !== null} className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-xs font-semibold uppercase tracking-[0.18em] text-slate-600 disabled:opacity-50">Import File</button>
                 <button onClick={ingestFolder} disabled={busyAction !== null} className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-xs font-semibold uppercase tracking-[0.18em] text-slate-600 disabled:opacity-50">Import Folder</button>
                 <button onClick={migrateLegacy} disabled={busyAction !== null} className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-xs font-semibold uppercase tracking-[0.18em] text-slate-600 disabled:opacity-50">Migrate JSONL</button>
-              </div>
-            </section>
-
-            <section className={sectionCardClass}>
-              <div className="mb-4">
-                <div className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500">Composio</div>
-                <h4 className="mt-2 text-lg font-bold text-slate-800">Authenticated Composio sync</h4>
-                <p className="mt-2 text-sm leading-relaxed text-slate-500">
-                  GitHub README and Gmail imports run through your connected Composio accounts instead of anonymous public APIs.
-                </p>
-              </div>
-              <div className="grid gap-3 md:grid-cols-[1fr_auto]">
-                <input value={composioApiKey} onChange={(e) => setComposioApiKey(e.target.value)} type="password" placeholder="Composio API key" className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-blue-300 focus:bg-white" />
-                <button onClick={saveComposio} disabled={busyAction !== null} className="rounded-2xl bg-slate-900 px-4 py-3 text-xs font-semibold uppercase tracking-[0.18em] text-white disabled:opacity-50">Save</button>
-              </div>
-              <div className="mt-4 grid gap-3 md:grid-cols-2">
-                {composioStatus.map((toolkit) => (
-                  <div key={toolkit.slug} className="rounded-2xl border border-slate-100 bg-slate-50 px-4 py-3">
-                    <div className="flex items-center gap-2">
-                      <ComposioToolkitIcon slug={toolkit.slug} withBackground />
-                      <div>
-                        <div className="text-sm font-bold text-slate-800">{toolkit.name}</div>
-                        <div className={`mt-1 text-xs ${toolkit.connected ? "text-emerald-600" : "text-amber-600"}`}>{toolkit.status}</div>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              <div className="mt-4 grid gap-3 md:grid-cols-[1fr_1fr_auto]">
-                <input value={githubOwner} onChange={(e) => setGithubOwner(e.target.value)} placeholder="GitHub owner" className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-blue-300 focus:bg-white" />
-                <input value={githubRepo} onChange={(e) => setGithubRepo(e.target.value)} placeholder="Repo" className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-blue-300 focus:bg-white" />
-                <button onClick={syncGithub} disabled={busyAction !== null} className="rounded-2xl bg-indigo-600 px-4 py-3 text-xs font-semibold uppercase tracking-[0.18em] text-white disabled:opacity-50">Sync README</button>
-              </div>
-              <div className="mt-3">
-                <button onClick={syncGmail} disabled={busyAction !== null} className="w-full rounded-2xl bg-red-600 px-4 py-3 text-xs font-semibold uppercase tracking-[0.18em] text-white disabled:opacity-50">Sync Gmail Inbox</button>
               </div>
             </section>
 

@@ -1,6 +1,4 @@
 import { useState, memo } from "react";
-import { ComposioToolkitIcon, toolkitColorClasses } from "./ComposioToolkitIcon";
-import { resolveComposioToolMeta } from "../lib/composioToolMeta";
 import type { ToolCallStatus } from "../types";
 
 interface ConfirmRequest {
@@ -47,21 +45,7 @@ const COLOR_CLASSES: Record<string, { bg: string; text: string }> = {
 function resolveToolMeta(toolName: string) {
   const builtin = TOOL_META[toolName];
   if (builtin) {
-    return { ...builtin, toolkitSlug: undefined as string | undefined };
-  }
-
-  const composio = resolveComposioToolMeta(toolName);
-  if (composio) {
-    const palette = composio.toolkitSlug
-      ? toolkitColorClasses(composio.toolkitSlug)
-      : COLOR_CLASSES[composio.color] ?? COLOR_CLASSES.slate;
-    return {
-      icon: composio.iconPath,
-      label: composio.label,
-      color: composio.color,
-      toolkitSlug: composio.toolkitSlug,
-      palette,
-    };
+    return { ...builtin, toolkitSlug: undefined as string | undefined, palette: COLOR_CLASSES[builtin.color] ?? COLOR_CLASSES.slate };
   }
 
   return {
@@ -139,8 +123,6 @@ export const ToolCallBubble = memo(function ToolCallBubble({
           <div className={`w-7 h-7 rounded-lg ${palette.bg} flex items-center justify-center flex-shrink-0`}>
             {call.status === "running" ? (
               <span className="w-3.5 h-3.5 border-2 border-blue-400 border-t-transparent rounded-full animate-spin" />
-            ) : meta.toolkitSlug ? (
-              <ComposioToolkitIcon slug={meta.toolkitSlug} className="w-3.5 h-3.5" />
             ) : (
               <svg className={`w-3.5 h-3.5 ${palette.text}`} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
                 <path d={meta.icon} />

@@ -1,6 +1,6 @@
 import { useState, useRef, useCallback, useMemo } from "react";
 import { listen, UnlistenFn } from "@tauri-apps/api/event";
-import { sendChat, confirmToolCall } from "../api/tauri";
+import { sendChat } from "../api/tauri";
 import type { ChatTimelineItem, ToolCallStatus } from "../types";
 
 interface Message {
@@ -151,21 +151,8 @@ export function useChat() {
   }, []);
 
   const handleConfirm = useCallback(
-    async (requestId: string, approved: boolean) => {
-      await confirmToolCall(requestId, approved);
-      setTimeline((prev) =>
-        prev.map((item) => {
-          if (item.kind !== "tool" || item.id !== requestId) return item;
-          return {
-            ...item,
-            call: {
-              ...item.call,
-              status: approved ? ("running" as const) : ("failed" as const),
-              result: approved ? undefined : "User denied this action.",
-            },
-          };
-        }),
-      );
+    async (_requestId: string, _approved: boolean) => {
+      // Tool approval is handled by the CLI agent (ACP), not Meuxe.
     },
     [],
   );

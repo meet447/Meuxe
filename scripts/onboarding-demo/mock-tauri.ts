@@ -21,42 +21,6 @@ export async function invoke<T>(cmd: string, args?: Record<string, unknown>): Pr
       return [] as T;
     case "characters_create":
       return "demo-character-id" as T;
-    case "composio_status":
-      return [
-        {
-          slug: "github",
-          name: "GitHub",
-          connected: false,
-          status: "not_connected",
-        },
-        {
-          slug: "gmail",
-          name: "Gmail",
-          connected: true,
-          status: "active",
-        },
-        {
-          slug: "slack",
-          name: "Slack",
-          connected: false,
-          status: "not_connected",
-        },
-      ] as T;
-    case "composio_save_config":
-      return undefined as T;
-    case "composio_authorize_toolkit":
-      return {
-        toolkit: (args?.toolkit as string) ?? "github",
-        auth_config_id: "ac_demo",
-        connected_account_id: "ca_demo",
-        redirect_url: "https://example.com/oauth-demo",
-        status: "initiated",
-      } as T;
-    case "composio_refresh_toolkit":
-      return {
-        toolkit: (args?.toolkit as string) ?? "github",
-        status: "active",
-      } as T;
     case "agent_setup_status":
       return {
         prerequisites: {

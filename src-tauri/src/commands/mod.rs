@@ -4,6 +4,5 @@ pub mod chat;
 pub mod config;
 pub mod expressions;
 pub mod memory;
-pub mod tools;
 pub mod tts;
 pub mod voice;

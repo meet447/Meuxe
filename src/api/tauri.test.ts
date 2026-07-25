@@ -147,11 +147,6 @@ describe('tauri api utilities', () => {
       expect(invoke).toHaveBeenCalledWith('chat_clear', { characterId: 'char-1' });
     });
 
-    it('confirmToolCall calls tool_confirm', async () => {
-      await tauriApi.confirmToolCall('req-1', true);
-      expect(invoke).toHaveBeenCalledWith('tool_confirm', { requestId: 'req-1', approved: true });
-    });
-
     it('transcribeVoice calls voice_transcribe', async () => {
       await tauriApi.transcribeVoice('base64audio', 'audio/webm');
       expect(invoke).toHaveBeenCalledWith('voice_transcribe', { audioBase64: 'base64audio', mimeType: 'audio/webm' });
@@ -212,38 +207,6 @@ describe('tauri api utilities', () => {
     it('getMemorySources calls memory_sources', async () => {
       await tauriApi.getMemorySources('char-1');
       expect(invoke).toHaveBeenCalledWith('memory_sources', { characterId: 'char-1' });
-    });
-
-    it('getComposioStatus calls composio_status', async () => {
-      await tauriApi.getComposioStatus();
-      expect(invoke).toHaveBeenCalledWith('composio_status');
-    });
-
-    it('authorizeComposioToolkit calls composio_authorize_toolkit', async () => {
-      await tauriApi.authorizeComposioToolkit('github');
-      expect(invoke).toHaveBeenCalledWith('composio_authorize_toolkit', { toolkit: 'github' });
-    });
-
-    it('refreshComposioToolkit calls composio_refresh_toolkit', async () => {
-      await tauriApi.refreshComposioToolkit('github');
-      expect(invoke).toHaveBeenCalledWith('composio_refresh_toolkit', { toolkit: 'github' });
-    });
-
-    it('syncComposioGithubReadme calls composio_sync_github_readme', async () => {
-      await tauriApi.syncComposioGithubReadme('char-1', 'owner', 'repo');
-      expect(invoke).toHaveBeenCalledWith('composio_sync_github_readme', { characterId: 'char-1', owner: 'owner', repo: 'repo' });
-    });
-
-    it('syncComposioGmail calls composio_sync_gmail', async () => {
-      await tauriApi.syncComposioGmail('char-1', 20);
-      expect(invoke).toHaveBeenCalledWith('composio_sync_gmail', { characterId: 'char-1', maxResults: 20 });
-    });
-  });
-
-  describe('Tool functions', () => {
-    it('listTools calls tools_list', async () => {
-      await tauriApi.listTools();
-      expect(invoke).toHaveBeenCalledWith('tools_list');
     });
   });
 

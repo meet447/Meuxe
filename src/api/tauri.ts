@@ -145,10 +145,6 @@ export async function clearChat(characterId: string) {
   return invoke("chat_clear", { characterId });
 }
 
-export async function confirmToolCall(requestId: string, approved: boolean) {
-  return invoke("tool_confirm", { requestId, approved });
-}
-
 export async function transcribeVoice(audioBase64: string, mimeType: string) {
   return invoke<string>("voice_transcribe", { audioBase64, mimeType });
 }
@@ -228,41 +224,6 @@ export async function exportMemoryZipDialog(characterId: string) {
 
 export async function importMemoryZipDialog(characterId: string) {
   return invoke<number | null>("memory_import_zip_dialog", { characterId });
-}
-
-export async function getComposioStatus() {
-  return invoke("composio_status");
-}
-
-export async function saveComposioConfig(
-  apiKey: string | null,
-  enabledToolkits?: string[],
-) {
-  return invoke("composio_save_config", {
-    apiKey,
-    enabledToolkits: enabledToolkits ?? [],
-  });
-}
-
-export async function authorizeComposioToolkit(toolkit: string) {
-  return invoke("composio_authorize_toolkit", { toolkit });
-}
-
-export async function refreshComposioToolkit(toolkit: string) {
-  return invoke("composio_refresh_toolkit", { toolkit });
-}
-
-export async function syncComposioGithubReadme(characterId: string, owner: string, repo: string) {
-  return invoke<number>("composio_sync_github_readme", { characterId, owner, repo });
-}
-
-export async function syncComposioGmail(characterId: string, maxResults?: number) {
-  return invoke<number>("composio_sync_gmail", { characterId, maxResults });
-}
-
-// Tools
-export async function listTools() {
-  return invoke<{ name: string; description: string; permission: string; enabled: boolean }[]>("tools_list");
 }
 
 // Expressions

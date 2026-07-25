@@ -10,7 +10,6 @@ use meuxe_core::llm::OpenAiCompatClient;
 use meuxe_core::memory::store::MemoryStore;
 use meuxe_core::memory_vault::MemoryVault;
 use meuxe_core::session::SessionStore;
-use meuxe_core::tools::ToolRegistry;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use tauri::Manager;
@@ -26,7 +25,6 @@ pub struct AppState {
     pub expressions: ExpressionManager,
     pub llm: OpenAiCompatClient,
     pub whisper_ctx: Option<Arc<WhisperContext>>,
-    pub tool_registry: ToolRegistry,
     pub chat_cancel: std::sync::Mutex<Option<tokio_util::sync::CancellationToken>>,
 }
 
@@ -115,7 +113,6 @@ pub fn run() {
                 expressions: ExpressionManager::new(&data_dir),
                 llm: OpenAiCompatClient::new(),
                 whisper_ctx,
-                tool_registry: ToolRegistry::with_defaults(data_dir.clone()),
                 chat_cancel: std::sync::Mutex::new(None),
             };
 
@@ -144,7 +141,6 @@ pub fn run() {
             commands::chat::chat_clear,
             commands::agent_setup::agent_setup_status,
             commands::agent_setup::agent_setup_install,
-            commands::tools::tools_list,
             commands::memory::memory_get,
             commands::memory::memory_search,
             commands::memory::memory_clear,
@@ -163,12 +159,6 @@ pub fn run() {
             commands::memory::memory_ingest_folder_dialog,
             commands::memory::memory_export_zip_dialog,
             commands::memory::memory_import_zip_dialog,
-            commands::memory::composio_status,
-            commands::memory::composio_save_config,
-            commands::memory::composio_authorize_toolkit,
-            commands::memory::composio_refresh_toolkit,
-            commands::memory::composio_sync_github_readme,
-            commands::memory::composio_sync_gmail,
             commands::expressions::expressions_supported,
             commands::expressions::expressions_model_list,
             commands::expressions::expressions_get,

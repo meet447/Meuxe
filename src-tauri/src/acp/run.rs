@@ -43,10 +43,6 @@ Follow all expression-tag rules in the persona for avatar reactions.\n\n\
     Ok(())
 }
 
-fn build_acp_prompt_for_send(agent_prompt: &str) -> String {
-    agent_prompt.to_string()
-}
-
 pub fn resolve_acp_agent(config: &AgentConfig, data_dir: &Path) -> Result<AcpAgent, String> {
     match config.preset.as_str() {
         "opencode" => {

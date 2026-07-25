@@ -1,5 +1,4 @@
 import type { ToolCallStatus } from "./ToolCallBubble";
-import { resolveComposioToolMeta } from "../lib/composioToolMeta";
 
 const TOOL_LABELS: Record<string, string> = {
   read_file: "Reading",
@@ -15,18 +14,11 @@ const TOOL_LABELS: Record<string, string> = {
   organize_desktop: "Organizing",
   clipboard_read: "Clipboard",
   clipboard_write: "Clipboard",
-  web_search: "Searching",
-  composio_sync_github_readme: "GitHub sync",
-  composio_sync_gmail: "Gmail sync",
 };
 
 function resolveToolLabel(toolName: string): string {
   if (TOOL_LABELS[toolName]) {
     return TOOL_LABELS[toolName];
-  }
-  const composio = resolveComposioToolMeta(toolName);
-  if (composio) {
-    return composio.label;
   }
   return toolName.replace(/_/g, " ");
 }
