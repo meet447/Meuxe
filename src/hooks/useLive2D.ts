@@ -113,16 +113,24 @@ export function useLive2D(canvasRef: React.RefObject<HTMLCanvasElement | null>) 
 
     const { zoom, framing, offsetX, offsetY } = viewportRef.current;
     const baseScale = baseScaleRef.current * zoom;
+    const screenW = app.screen.width;
+    const screenH = app.screen.height;
+
     let targetScale = baseScale;
-    let targetY = app.screen.height / 2 + offsetY;
+    let targetY = screenH / 2 + offsetY;
 
     if (framing === "half") {
-      targetScale = baseScale * 1.85;
-      targetY = app.screen.height * 0.58 + offsetY;
+      const halfZoom = 1.65;
+      const widthCap = (screenW * 0.96) / intrinsicW;
+      targetScale = Math.min(baseScale * halfZoom, widthCap);
+      const scaledH = intrinsicH * targetScale;
+      const topMargin = screenH * 0.08;
+      // Center anchor: align sprite top near top margin so head stays in frame
+      targetY = topMargin + scaledH / 2 + offsetY;
     }
 
     model.scale.set(targetScale);
-    model.x = app.screen.width / 2 + offsetX;
+    model.x = screenW / 2 + offsetX;
     model.y = targetY;
   }, [canvasRef]);
 
