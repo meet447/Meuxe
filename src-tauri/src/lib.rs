@@ -3,7 +3,6 @@ mod commands;
 mod tray;
 mod window;
 
-use dashmap::DashMap;
 use meuxe_core::character::CharacterLoader;
 use meuxe_core::config::ConfigManager;
 use meuxe_core::expressions::ExpressionManager;
@@ -28,7 +27,6 @@ pub struct AppState {
     pub llm: OpenAiCompatClient,
     pub whisper_ctx: Option<Arc<WhisperContext>>,
     pub tool_registry: ToolRegistry,
-    pub pending_confirmations: DashMap<String, tokio::sync::oneshot::Sender<bool>>,
     pub chat_cancel: std::sync::Mutex<Option<tokio_util::sync::CancellationToken>>,
 }
 
@@ -118,7 +116,6 @@ pub fn run() {
                 llm: OpenAiCompatClient::new(),
                 whisper_ctx,
                 tool_registry: ToolRegistry::with_defaults(data_dir.clone()),
-                pending_confirmations: DashMap::new(),
                 chat_cancel: std::sync::Mutex::new(None),
             };
 
@@ -144,7 +141,6 @@ pub fn run() {
             commands::chat::chat_send,
             commands::chat::chat_history,
             commands::chat::chat_clear,
-            commands::chat::tool_confirm,
             commands::tools::tools_list,
             commands::memory::memory_get,
             commands::memory::memory_search,

@@ -6,14 +6,10 @@ import {
   getConfig,
   saveConfig,
   resetAllAppData,
-  testLlm,
   getVoices,
-  listTools,
 } from "../api/tauri";
 import { ComposioIntegrationsPanel } from "./ComposioIntegrationsPanel";
-import { LLM_PRESETS, llmPresetEntries } from "../lib/llmPresets";
-import { ACP_AGENT_PRESETS } from "../lib/agentPresets";
-import { LlmModelField } from "./LlmModelField";
+import { ACP_AGENT_PRESET_IDS, ACP_AGENT_PRESETS } from "../lib/agentPresets";
 interface Voice {
   id: string;
   name: string;
@@ -24,9 +20,7 @@ interface TTSPreset {
   needs_key: boolean;
 }
 
-type SettingsPage = null | "profile" | "llm" | "tts" | "search" | "integrations" | "privacy" | "tools" | "expressions" | "memory";
-
-const LLM_PRESET_LIST = llmPresetEntries();
+type SettingsPage = null | "profile" | "llm" | "tts" | "search" | "integrations" | "privacy" | "expressions" | "memory";
 
 const TTS_PRESETS: Record<string, TTSPreset> = {
   tiktok: { name: "TikTok TTS", needs_key: false },
@@ -48,9 +42,6 @@ const MaskIcon = () => (
 const SearchIcon = () => (
   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
 );
-const ToolsIcon = () => (
-  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
-);
 const ArchiveIcon = () => (
   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M5 8h14M5 12h10M5 16h8M4 4h16v16H4z" /></svg>
 );
@@ -66,149 +57,15 @@ const MENU_ITEMS: { id: SettingsPage & string; label: string; description: strin
   { id: "privacy", label: "Privacy", description: "What stays on your device", icon: ShieldIcon },
   { id: "memory", label: "Memory", description: "What your companion remembers", icon: ArchiveIcon },
   { id: "tts", label: "Voice", description: "How they sound when they speak", icon: SpeakerIcon },
-  { id: "llm", label: "AI Connection", description: "Model that powers replies", icon: BrainIcon },
+  { id: "llm", label: "CLI Agent", description: "Claude Code, Codex, or custom ACP", icon: BrainIcon },
   { id: "expressions", label: "Expressions", description: "Emotions on their avatar", icon: MaskIcon },
   { id: "search", label: "Web Search (advanced)", description: "Optional search API keys", icon: SearchIcon },
   { id: "integrations", label: "Integrations (advanced)", description: "Optional Gmail, GitHub, and other apps", icon: PlugIcon },
-  { id: "tools", label: "Agent Tools (advanced)", description: "Built-in chat tools (file, search, shell)", icon: ToolsIcon },
 ];
-
-const PERMISSION_STYLES: Record<string, { label: string; color: string }> = {
-  Safe: { label: "Safe", color: "text-emerald-600 bg-emerald-50 border-emerald-200" },
-  Cautious: { label: "Cautious", color: "text-amber-600 bg-amber-50 border-amber-200" },
-  Dangerous: { label: "Dangerous", color: "text-red-600 bg-red-50 border-red-200" },
-};
-
-function ToolsPage({ onBack }: { onBack: () => void }) {
-  const [tools, setTools] = useState<{ name: string; description: string; permission: string; enabled: boolean }[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
-  const [toggles, setToggles] = useState<Record<string, boolean>>({});
-
-  useEffect(() => {
-    listTools()
-      .then((data) => {
-        setTools(data);
-        const initial: Record<string, boolean> = {};
-        for (const t of data) {
-          initial[t.name] = t.enabled;
-        }
-        setToggles(initial);
-      })
-      .catch((err) => console.error("Failed to load tools:", err))
-      .finally(() => setLoading(false));
-  }, []);
-
-  const handleToggle = (name: string) => {
-    setToggles((prev) => ({ ...prev, [name]: !prev[name] }));
-    setSaved(false);
-  };
-
-  const handleSave = async () => {
-    setSaving(true);
-    const disabledTools = Object.entries(toggles)
-      .filter(([, enabled]) => !enabled)
-      .map(([name]) => name);
-
-    try {
-      await saveConfig({ disabled_tools: disabledTools } as any);
-      setSaved(true);
-      setTimeout(() => setSaved(false), 2000);
-    } catch (err) {
-      console.error("Failed to save tool config:", err);
-    }
-    setSaving(false);
-  };
-
-  const enabledCount = Object.values(toggles).filter(Boolean).length;
-
-  return (
-    <div className="flex-1 overflow-y-auto p-6 scrollbar-thin scrollbar-thumb-slate-200 scrollbar-track-transparent">
-      <div className="flex items-center gap-4 mb-6">
-        <button
-          onClick={onBack}
-          className="w-10 h-10 rounded-full bg-white border border-slate-100 shadow-sm shadow-blue-900/5 hover:shadow-md hover:-translate-y-0.5 flex items-center justify-center text-slate-500 hover:text-blue-500 transition-all"
-        >
-          <svg width="18" height="18" viewBox="0 0 16 16" fill="none"><path d="M10 12L6 8L10 4" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
-        </button>
-        <div>
-          <h2 className="text-xl font-bold text-slate-800 tracking-tight">Agent Tools</h2>
-          <p className="text-sm text-slate-400 mt-0.5">{enabledCount} of {tools.length} enabled</p>
-        </div>
-      </div>
-
-      {loading ? (
-        <div className="flex justify-center py-12">
-          <div className="flex gap-2">
-            <span className="w-2.5 h-2.5 rounded-full bg-blue-400 animate-bounce [animation-delay:-0.3s]" />
-            <span className="w-2.5 h-2.5 rounded-full bg-blue-400 animate-bounce [animation-delay:-0.15s]" />
-            <span className="w-2.5 h-2.5 rounded-full bg-blue-400 animate-bounce" />
-          </div>
-        </div>
-      ) : (
-        <>
-          <div className="space-y-2 mb-6">
-            {tools.map((tool) => {
-              const enabled = toggles[tool.name] ?? true;
-              const perm = PERMISSION_STYLES[tool.permission] || PERMISSION_STYLES.Safe;
-              return (
-                <div
-                  key={tool.name}
-                  className={`flex items-center gap-3 px-4 py-3 rounded-2xl border transition-all ${
-                    enabled
-                      ? "bg-white border-slate-100 shadow-sm"
-                      : "bg-slate-50/50 border-slate-100/50 opacity-60"
-                  }`}
-                >
-                  {/* Toggle */}
-                  <button
-                    onClick={() => handleToggle(tool.name)}
-                    className={`relative w-10 h-6 rounded-full transition-colors flex-shrink-0 ${
-                      enabled ? "bg-blue-500" : "bg-slate-300"
-                    }`}
-                  >
-                    <span
-                      className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow-sm transition-transform ${
-                        enabled ? "left-[18px]" : "left-0.5"
-                      }`}
-                    />
-                  </button>
-
-                  {/* Info */}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span className="text-[13px] font-semibold text-slate-700">
-                        {tool.name.replace(/_/g, " ")}
-                      </span>
-                      <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full border ${perm.color}`}>
-                        {perm.label}
-                      </span>
-                    </div>
-                    <p className="text-[12px] text-slate-400 mt-0.5 truncate">{tool.description}</p>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-
-          <button
-            onClick={handleSave}
-            disabled={saving}
-            className="w-full py-3.5 rounded-2xl bg-blue-500 text-white text-[15px] font-semibold hover:bg-blue-600 shadow-md shadow-blue-500/20 disabled:opacity-50 hover:-translate-y-0.5 transition-all active:translate-y-0"
-          >
-            {saving ? "Saving..." : saved ? "Saved!" : "Save Configuration"}
-          </button>
-        </>
-      )}
-    </div>
-  );
-}
 
 const inputClass = "w-full px-5 py-3.5 rounded-2xl bg-slate-50 hover:bg-slate-100/50 text-slate-700 text-[15px] outline-none transition-all placeholder-slate-400 border border-slate-100 focus:bg-white focus:ring-2 focus:ring-blue-100 focus:border-blue-300 mb-5";
 const labelClass = "block text-sm font-semibold text-slate-700 tracking-wide mb-2 pl-1";
 const buttonClass = "w-full py-3.5 rounded-2xl bg-blue-500 text-white text-[15px] font-semibold hover:bg-blue-600 shadow-md shadow-blue-500/20 disabled:opacity-50 hover:-translate-y-0.5 transition-all active:translate-y-0";
-const secondaryBtnClass = "w-full py-3.5 rounded-2xl bg-white border border-slate-200 text-slate-600 text-[15px] font-medium hover:bg-slate-50 hover:border-slate-300 shadow-sm disabled:opacity-50 transition-all mb-3";
 
 function LocalFirstNotice({ variant = "blue" }: { variant?: "blue" | "emerald" | "amber" }) {
   const colors = {
@@ -260,28 +117,19 @@ export function Settings({ onClose, characterId, characterName, modelId, onPrevi
   const [voices, setVoices] = useState<Voice[]>([]);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
-  const [testResult, setTestResult] = useState<{ success: boolean; error?: string } | null>(null);
-  const [testing, setTesting] = useState(false);
 
   const isMac = navigator.platform.toUpperCase().includes("MAC");
 
-  // Derive configured status from the config object itself
-  const [configuredLlm, setConfiguredLlm] = useState<Record<string, { configured: boolean; model: string }>>({});
   const [configuredTts, setConfiguredTts] = useState<Record<string, { configured: boolean; voice: string }>>({});
 
   const [userName, setUserName] = useState("");
   const [userAbout, setUserAbout] = useState("");
-  const [llmProvider, setLlmProvider] = useState("");
-  const [llmApiKey, setLlmApiKey] = useState("");
-  const [llmModel, setLlmModel] = useState("");
-  const [llmBaseUrl, setLlmBaseUrl] = useState("");
   const [ttsProvider, setTtsProvider] = useState("tiktok");
   const [ttsApiKey, setTtsApiKey] = useState("");
   const [ttsVoice, setTtsVoice] = useState("jp_001");
   const [searchProvider, setSearchProvider] = useState("duckduckgo");
   const [serpApiKey, setSerpApiKey] = useState("");
   const [exaApiKey, setExaApiKey] = useState("");
-  const [agentBackend, setAgentBackend] = useState<"legacy" | "acp">("legacy");
   const [agentPreset, setAgentPreset] = useState("claude");
   const [agentProgram, setAgentProgram] = useState("");
   const [agentArgs, setAgentArgs] = useState("");
@@ -290,22 +138,7 @@ export function Settings({ onClose, characterId, characterName, modelId, onPrevi
   const [resetError, setResetError] = useState<string | null>(null);
 
   const deriveConfigured = (cfg: any) => {
-    // Derive which providers are configured from stored config
-    const llmConfigured: Record<string, { configured: boolean; model: string }> = {};
     const ttsConfigured: Record<string, { configured: boolean; voice: string }> = {};
-
-    if (cfg?.llm_providers) {
-      for (const [id, prov] of Object.entries(cfg.llm_providers as Record<string, any>)) {
-        llmConfigured[id] = { configured: true, model: prov.model || "" };
-      }
-    }
-    // Current active LLM is always configured
-    if (cfg?.llm?.provider) {
-      llmConfigured[cfg.llm.provider] = {
-        configured: true,
-        model: cfg.llm.model || "",
-      };
-    }
 
     if (cfg?.tts_providers) {
       for (const [id, prov] of Object.entries(cfg.tts_providers as Record<string, any>)) {
@@ -319,7 +152,6 @@ export function Settings({ onClose, characterId, characterName, modelId, onPrevi
       };
     }
 
-    setConfiguredLlm(llmConfigured);
     setConfiguredTts(ttsConfigured);
   };
 
@@ -331,17 +163,12 @@ export function Settings({ onClose, characterId, characterName, modelId, onPrevi
 
         setUserName(cfg.user?.name || "");
         setUserAbout(cfg.user?.about || "");
-        setLlmProvider(cfg.llm?.provider || "");
-        setLlmApiKey("");
-        setLlmModel(cfg.llm?.model || "");
-        setLlmBaseUrl(cfg.llm?.base_url || "");
         setTtsProvider(cfg.tts?.provider || "tiktok");
         setTtsApiKey("");
         setTtsVoice(cfg.tts?.voice || "jp_001");
         setSearchProvider(cfg.search?.provider || "duckduckgo");
         setSerpApiKey("");
         setExaApiKey("");
-        setAgentBackend(cfg.agent?.backend === "acp" ? "acp" : "legacy");
         setAgentPreset(cfg.agent?.preset || "claude");
         setAgentProgram(cfg.agent?.program || "");
         setAgentArgs((cfg.agent?.args || []).join(" "));
@@ -355,56 +182,18 @@ export function Settings({ onClose, characterId, characterName, modelId, onPrevi
       .catch(console.error);
   }, [ttsProvider]);
 
-  const selectPreset = (id: string) => {
-    const preset = LLM_PRESETS[id];
-    if (!preset) return;
-    setLlmProvider(id);
-    setTestResult(null);
-    setLlmApiKey("");
-
-    // If this provider was previously configured, restore its saved config
-    const saved = config?.llm_providers?.[id];
-    if (saved) {
-      setLlmBaseUrl(saved.base_url || preset.base_url);
-      setLlmModel(saved.model || preset.default_model);
-    } else {
-      setLlmBaseUrl(preset.base_url);
-      setLlmModel(preset.default_model);
-    }
-  };
-
-  const testConnection = async () => {
-    setTesting(true);
-    setTestResult(null);
-    try {
-      await testLlm({
-        base_url: llmBaseUrl,
-        api_key: llmApiKey || "",
-        model: llmModel,
-        provider: llmProvider,
-      });
-      setTestResult({ success: true });
-    } catch (err: any) {
-      setTestResult({ success: false, error: err?.toString() || "Connection failed" });
-    }
-    setTesting(false);
-  };
-
   const handleSave = async () => {
     setSaving(true);
     const update: any = {
       user: { name: userName, about: userAbout },
-      llm: { provider: llmProvider, base_url: llmBaseUrl, model: llmModel },
       tts: { provider: ttsProvider, voice: ttsVoice },
       search: { provider: searchProvider },
       agent: {
-        backend: agentBackend,
         preset: agentPreset,
         program: agentProgram,
         args: agentArgs.trim() ? agentArgs.trim().split(/\s+/) : [],
       },
     };
-    if (llmApiKey) update.llm.api_key = llmApiKey;
     if (ttsApiKey) update.tts.api_key = ttsApiKey;
     if (serpApiKey) update.search.serp_api_key = serpApiKey;
     if (exaApiKey) update.search.exa_api_key = exaApiKey;
@@ -461,8 +250,12 @@ export function Settings({ onClose, characterId, characterName, modelId, onPrevi
           </p>
           <div className="mt-4 grid grid-cols-2 gap-3">
             <div className="rounded-2xl bg-white/80 px-4 py-3">
-              <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-400">LLM</div>
-              <div className="mt-1 text-sm font-bold text-slate-700">{config.llm?.provider || "not set"}</div>
+              <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-400">Agent</div>
+              <div className="mt-1 text-sm font-bold text-slate-700">
+                {ACP_AGENT_PRESETS[(config.agent?.preset as keyof typeof ACP_AGENT_PRESETS) || "claude"]?.title ||
+                  config.agent?.preset ||
+                  "not set"}
+              </div>
             </div>
             <div className="rounded-2xl bg-white/80 px-4 py-3">
               <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-400">TTS</div>
@@ -573,187 +366,58 @@ export function Settings({ onClose, characterId, characterName, modelId, onPrevi
   if (page === "llm") {
     return (
       <div className="flex-1 overflow-y-auto p-6 scrollbar-thin scrollbar-thumb-slate-200 scrollbar-track-transparent">
-        <SubHeader title="AI Connection" />
+        <SubHeader title="CLI Agent" />
+        <p className="text-slate-500 text-[15px] mb-8 leading-relaxed max-w-xl">
+          Chat always runs through your local ACP agent. Meuxe supplies persona, memory, voice, and avatar; the agent supplies reasoning and tools.
+        </p>
 
-        <div className="mb-8 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-          <label className={labelClass}>How replies are generated</label>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
-            <button
-              type="button"
-              onClick={() => setAgentBackend("legacy")}
-              className={`px-4 py-3 rounded-2xl text-left border transition-all ${
-                agentBackend === "legacy"
-                  ? "border-blue-400 bg-blue-50 text-blue-800"
-                  : "border-slate-200 bg-slate-50 text-slate-600 hover:border-slate-300"
-              }`}
-            >
-              <span className="block text-sm font-semibold">Built-in (API)</span>
-              <span className="block text-xs mt-1 text-slate-500">Uses the model provider below with Meuxe memory and tools.</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setAgentBackend("acp")}
-              className={`px-4 py-3 rounded-2xl text-left border transition-all ${
-                agentBackend === "acp"
-                  ? "border-violet-400 bg-violet-50 text-violet-900"
-                  : "border-slate-200 bg-slate-50 text-slate-600 hover:border-slate-300"
-              }`}
-            >
-              <span className="block text-sm font-semibold">CLI agent (ACP)</span>
-              <span className="block text-xs mt-1 text-slate-500">Claude Code, Codex, or a custom agent on your machine.</span>
-            </button>
-          </div>
-
-          {agentBackend === "acp" && (
-            <div className="space-y-4 animate-in fade-in duration-200">
-              <label className={labelClass}>Agent preset</label>
-              <div className="flex flex-wrap gap-2 mb-2">
-                {(["claude", "codex", "custom"] as const).map((id) => (
-                  <button
-                    key={id}
-                    type="button"
-                    onClick={() => setAgentPreset(id)}
-                    className={`px-4 py-2 rounded-xl text-sm font-semibold border ${
-                      agentPreset === id
-                        ? "border-violet-400 bg-violet-50 text-violet-800"
-                        : "border-slate-200 text-slate-600"
-                    }`}
-                  >
-                    {ACP_AGENT_PRESETS[id].title}
-                  </button>
-                ))}
-              </div>
-              {agentPreset === "custom" && (
-                <>
-                  <label className={labelClass}>Command</label>
-                  <input
-                    type="text"
-                    value={agentProgram}
-                    onChange={(e) => setAgentProgram(e.target.value)}
-                    placeholder="e.g. python my_agent.py"
-                    className={inputClass}
-                  />
-                  <label className={labelClass}>Arguments (optional)</label>
-                  <input
-                    type="text"
-                    value={agentArgs}
-                    onChange={(e) => setAgentArgs(e.target.value)}
-                    placeholder="space-separated flags"
-                    className={inputClass}
-                  />
-                </>
-              )}
-              <p className="text-xs text-slate-500 leading-relaxed">
-                Persona and memory context are written to companion-home before each turn. Install the CLI agent and sign in on your machine first.
-              </p>
-            </div>
-          )}
-        </div>
-
-        <h3 className="text-sm font-bold text-slate-700 mb-3">Model provider (built-in mode)</h3>
-        <LocalFirstNotice variant={LLM_PRESETS[llmProvider]?.needs_key === false ? "emerald" : "blue"} />
-
-        <label className={labelClass}>Provider</label>
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mb-6 max-h-[280px] overflow-y-auto pr-1 scrollbar-thin scrollbar-thumb-slate-200">
-          {LLM_PRESET_LIST.map(([id, preset]) => (
+        <label className={labelClass}>Agent preset</label>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
+          {ACP_AGENT_PRESET_IDS.map((id) => (
             <button
               key={id}
-              onClick={() => selectPreset(id)}
-              className={`relative px-4 py-3 rounded-2xl text-[13px] font-semibold border transition-all ${
-                llmProvider === id
-                  ? "border-blue-400 bg-blue-50 text-blue-700 shadow-sm shadow-blue-500/10 hover:-translate-y-0.5"
-                  : configuredLlm[id]?.configured
-                    ? "border-green-200 bg-green-50/30 text-slate-600 hover:border-green-300 hover:shadow-sm"
-                    : "border-slate-200 bg-white text-slate-500 hover:border-slate-300 hover:shadow-sm"
+              type="button"
+              onClick={() => setAgentPreset(id)}
+              className={`rounded-[1.4rem] border px-4 py-4 text-left transition-all ${
+                agentPreset === id
+                  ? "border-violet-400 bg-violet-50 text-violet-800 shadow-sm"
+                  : "border-slate-200 bg-white text-slate-600 hover:border-slate-300"
               }`}
             >
-              <span className="flex items-center justify-center gap-1.5">
-                {preset.name}
-                {preset.needs_key === false && <span className="text-[10px] text-emerald-600 font-bold">Local</span>}
-                {configuredLlm[id]?.configured && llmProvider !== id && (
-                  <svg className="w-3.5 h-3.5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" /></svg>
-                )}
-              </span>
-              {configuredLlm[id]?.configured && llmProvider !== id && (
-                <span className="block text-[10px] text-green-600/70 font-medium mt-0.5">Configured</span>
-              )}
+              <div className="text-sm font-semibold">{ACP_AGENT_PRESETS[id].title}</div>
+              <div className="mt-1 text-xs leading-relaxed text-slate-500">{ACP_AGENT_PRESETS[id].blurb}</div>
             </button>
           ))}
         </div>
 
-        {llmProvider && (
-          <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
-            {LLM_PRESETS[llmProvider]?.needs_key !== false && (
-              <>
-                <label className={labelClass}>API Key</label>
-                <input
-                  type="password"
-                  value={llmApiKey}
-                  onChange={(e) => { setLlmApiKey(e.target.value); setTestResult(null); }}
-                  placeholder="Paste your API key (blank to keep current)"
-                  className={inputClass}
-                />
-              </>
-            )}
-            {LLM_PRESETS[llmProvider]?.needs_key === false && (
-              <div className="mb-5 rounded-2xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
-                This provider runs through a local OpenAI-compatible endpoint. No API key is stored or sent.
-              </div>
-            )}
-
-            <LlmModelField
-              value={llmModel}
-              onChange={(model) => {
-                setLlmModel(model);
-                setTestResult(null);
-              }}
-              baseUrl={llmBaseUrl}
-              apiKey={llmApiKey}
-              providerId={llmProvider}
-              needsKey={LLM_PRESETS[llmProvider]?.needs_key !== false}
-              onInvalidateTest={() => setTestResult(null)}
+        {agentPreset === "custom" && (
+          <>
+            <label className={labelClass}>Command</label>
+            <input
+              type="text"
+              value={agentProgram}
+              onChange={(e) => setAgentProgram(e.target.value)}
+              placeholder="e.g. python my_agent.py"
+              className={inputClass}
             />
-
-            {llmProvider === "custom" && (
-              <>
-                <label className={labelClass}>Base URL</label>
-                <input
-                  type="text"
-                  value={llmBaseUrl}
-                  onChange={(e) => { setLlmBaseUrl(e.target.value); setTestResult(null); }}
-                  placeholder="https://api.example.com/v1"
-                  className={inputClass}
-                />
-              </>
-            )}
-
-            <button
-              onClick={testConnection}
-              disabled={testing}
-              className={secondaryBtnClass}
-            >
-              {testing ? "Testing Connection..." : "Test Connection"}
-            </button>
-
-            {testResult && (
-              <div className={`mb-6 px-5 py-4 rounded-2xl text-sm font-medium ${
-                testResult.success
-                  ? "bg-green-50 text-green-700 border border-green-200/50 shadow-sm"
-                  : "bg-red-50 text-red-700 border border-red-200/50 shadow-sm"
-              }`}>
-                {testResult.success ? "Connected successfully!" : testResult.error || "Connection failed"}
-              </div>
-            )}
-
-            <button
-              onClick={handleSave}
-              disabled={saving}
-              className={buttonClass}
-            >
-              {saving ? "Saving..." : saved ? "Saved!" : "Save Configuration"}
-            </button>
-          </div>
+            <label className={labelClass}>Arguments (optional)</label>
+            <input
+              type="text"
+              value={agentArgs}
+              onChange={(e) => setAgentArgs(e.target.value)}
+              placeholder="space-separated flags"
+              className={inputClass}
+            />
+          </>
         )}
+
+        <p className="text-xs text-slate-500 leading-relaxed mb-6">
+          Persona and memory context are written to companion-home before each turn. Install the CLI and sign in on your machine first.
+        </p>
+
+        <button onClick={handleSave} disabled={saving} className={buttonClass}>
+          {saving ? "Saving..." : saved ? "Saved!" : "Save agent"}
+        </button>
       </div>
     );
   }
@@ -1002,11 +666,6 @@ export function Settings({ onClose, characterId, characterName, modelId, onPrevi
         </div>
       </div>
     );
-  }
-
-  // ========== TOOLS PAGE ==========
-  if (page === "tools") {
-    return <ToolsPage onBack={() => setPage(null)} />;
   }
 
   // ========== EXPRESSIONS PAGE ==========

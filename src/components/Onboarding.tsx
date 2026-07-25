@@ -3,16 +3,12 @@ import {
   saveConfig,
   createCharacter,
   getVoices,
-  testLlm,
   previewVoice,
   listModels,
 } from "../api/tauri";
-import { LlmModelField } from "./LlmModelField";
-import { LLM_PRESETS, llmPresetEntries } from "../lib/llmPresets";
 import {
   ACP_AGENT_PRESET_IDS,
   ACP_AGENT_PRESETS,
-  type AgentBackend,
   type AcpAgentPresetId,
 } from "../lib/agentPresets";
 
@@ -36,12 +32,10 @@ interface Model {
 interface FormData {
   user: { name: string; about: string };
   agent: {
-    backend: AgentBackend;
     preset: AcpAgentPresetId;
     program: string;
     args: string;
   };
-  llm: { provider: string; base_url: string; api_key: string; model: string };
   tts: { provider: string; api_key: string; voice: string };
   companion: {
     name: string;
@@ -187,21 +181,16 @@ export function Onboarding({ onComplete }: { onComplete: () => void }) {
   const [step, setStep] = useState(0);
   const [voices, setVoices] = useState<Voice[]>([]);
   const [models, setModels] = useState<Model[]>([]);
-  const [testResult, setTestResult] = useState<{ success: boolean; message?: string; error?: string } | null>(null);
-  const [testing, setTesting] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [personalityTouched, setPersonalityTouched] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
-  const llmPresets = LLM_PRESETS;
-  const llmPresetList = llmPresetEntries();
   const ttsPresets = TTS_PRESETS;
 
   const [form, setForm] = useState<FormData>({
     user: { name: "", about: "" },
-    agent: { backend: "acp", preset: "claude", program: "", args: "" },
-    llm: { provider: "", base_url: "", api_key: "", model: "" },
+    agent: { preset: "claude", program: "", args: "" },
     tts: { provider: "tiktok", api_key: "", voice: "jp_001" },
     companion: {
       name: "",
@@ -255,38 +244,6 @@ export function Onboarding({ onComplete }: { onComplete: () => void }) {
     }));
   };
 
-  const selectLLMPreset = (presetId: string) => {
-    const preset = llmPresets[presetId];
-    if (!preset) return;
-    setForm((prev) => ({
-      ...prev,
-      llm: {
-        provider: presetId,
-        base_url: preset.base_url,
-        api_key: prev.llm.api_key,
-        model: preset.default_model,
-      },
-    }));
-    setTestResult(null);
-  };
-
-  const testConnection = async () => {
-    setTesting(true);
-    setTestResult(null);
-    try {
-      await testLlm({
-        base_url: form.llm.base_url,
-        api_key: form.llm.api_key || "",
-        model: form.llm.model,
-        provider: form.llm.provider,
-      });
-      setTestResult({ success: true, message: "Connected successfully!" });
-    } catch (err: any) {
-      setTestResult({ success: false, error: err?.message || String(err) || "Connection failed" });
-    }
-    setTesting(false);
-  };
-
   const [previewError, setPreviewError] = useState("");
   const [previewing, setPreviewing] = useState(false);
 
@@ -335,13 +292,10 @@ export function Onboarding({ onComplete }: { onComplete: () => void }) {
       case 3:
         return form.tts.voice !== "";
       case 4:
-        if (form.agent.backend === "acp") {
-          if (form.agent.preset === "custom") {
-            return form.agent.program.trim() !== "";
-          }
-          return form.agent.preset !== "";
+        if (form.agent.preset === "custom") {
+          return form.agent.program.trim() !== "";
         }
-        return form.llm.provider !== "" && form.llm.model !== "";
+        return true;
       default:
         return false;
     }
@@ -371,21 +325,10 @@ export function Onboarding({ onComplete }: { onComplete: () => void }) {
       await saveConfig({
         user: form.user,
         agent: {
-          backend: form.agent.backend,
           preset: form.agent.preset,
           program: form.agent.program,
           args: form.agent.args.trim() ? form.agent.args.trim().split(/\s+/) : [],
         },
-        ...(form.agent.backend === "legacy"
-          ? {
-              llm: {
-                provider: form.llm.provider,
-                base_url: form.llm.base_url,
-                api_key: form.llm.api_key || null,
-                model: form.llm.model,
-              },
-            }
-          : {}),
         tts: {
           provider: form.tts.provider,
           api_key: form.tts.api_key || null,
@@ -491,203 +434,73 @@ export function Onboarding({ onComplete }: { onComplete: () => void }) {
               <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
                 <h2 className={headingClass}>Connect their mind</h2>
                 <p className={descriptionClass}>
-                  Meuxe is the face, memory, and voice. Pick the CLI agent on your machine that does the thinking—Claude Code, Codex, or your own ACP agent. You can switch to a cloud API model later in Settings.
+                  Meuxe is the face, memory, and voice. Choose the CLI agent on your machine that does the thinking—Claude Code, Codex, or your own ACP agent.
                 </p>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6">
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setForm((prev) => ({
-                        ...prev,
-                        agent: { ...prev.agent, backend: "acp" },
-                      }))
-                    }
-                    className={`px-4 py-3.5 rounded-2xl text-left border transition-all ${
-                      form.agent.backend === "acp"
-                        ? "border-violet-400 bg-violet-50 text-violet-900 shadow-sm"
-                        : "border-slate-200 bg-white text-slate-600 hover:border-slate-300"
-                    }`}
-                  >
-                    <span className="block text-sm font-semibold">CLI agent (recommended)</span>
-                    <span className="block text-xs mt-1 text-slate-500">Uses agents you already run locally via ACP.</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setForm((prev) => ({
-                        ...prev,
-                        agent: { ...prev.agent, backend: "legacy" },
-                      }))
-                    }
-                    className={`px-4 py-3.5 rounded-2xl text-left border transition-all ${
-                      form.agent.backend === "legacy"
-                        ? "border-blue-400 bg-blue-50 text-blue-800 shadow-sm"
-                        : "border-slate-200 bg-white text-slate-600 hover:border-slate-300"
-                    }`}
-                  >
-                    <span className="block text-sm font-semibold">Built-in cloud API</span>
-                    <span className="block text-xs mt-1 text-slate-500">OpenAI-compatible model inside Meuxe.</span>
-                  </button>
+                <label className={labelClass}>Agent</label>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
+                  {ACP_AGENT_PRESET_IDS.map((id) => (
+                    <button
+                      key={id}
+                      type="button"
+                      onClick={() =>
+                        setForm((prev) => ({
+                          ...prev,
+                          agent: { ...prev.agent, preset: id },
+                        }))
+                      }
+                      className={`rounded-[1.4rem] border px-4 py-4 text-left transition-all ${
+                        form.agent.preset === id
+                          ? "border-violet-400 bg-violet-50 text-violet-800 shadow-sm"
+                          : "border-slate-200 bg-white text-slate-600 hover:border-slate-300"
+                      }`}
+                    >
+                      <div className="text-[14px] font-semibold">{ACP_AGENT_PRESETS[id].title}</div>
+                      <div
+                        className={`mt-1 text-[12px] leading-relaxed ${
+                          form.agent.preset === id ? "text-violet-700/80" : "text-slate-400"
+                        }`}
+                      >
+                        {ACP_AGENT_PRESETS[id].blurb}
+                      </div>
+                    </button>
+                  ))}
                 </div>
 
-                {form.agent.backend === "acp" && (
-                  <div className="animate-in fade-in duration-300">
-                    <label className={labelClass}>Agent</label>
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
-                      {ACP_AGENT_PRESET_IDS.map((id) => (
-                        <button
-                          key={id}
-                          type="button"
-                          onClick={() =>
-                            setForm((prev) => ({
-                              ...prev,
-                              agent: { ...prev.agent, preset: id },
-                            }))
-                          }
-                          className={`rounded-[1.4rem] border px-4 py-4 text-left transition-all ${
-                            form.agent.preset === id
-                              ? "border-violet-400 bg-violet-50 text-violet-800 shadow-sm"
-                              : "border-slate-200 bg-white text-slate-600 hover:border-slate-300"
-                          }`}
-                        >
-                          <div className="text-[14px] font-semibold">{ACP_AGENT_PRESETS[id].title}</div>
-                          <div
-                            className={`mt-1 text-[12px] leading-relaxed ${
-                              form.agent.preset === id ? "text-violet-700/80" : "text-slate-400"
-                            }`}
-                          >
-                            {ACP_AGENT_PRESETS[id].blurb}
-                          </div>
-                        </button>
-                      ))}
-                    </div>
-
-                    {form.agent.preset === "custom" && (
-                      <>
-                        <label className={labelClass}>Command</label>
-                        <input
-                          type="text"
-                          value={form.agent.program}
-                          onChange={(e) =>
-                            setForm((prev) => ({
-                              ...prev,
-                              agent: { ...prev.agent, program: e.target.value },
-                            }))
-                          }
-                          placeholder="e.g. python my_agent.py"
-                          className={inputClass}
-                        />
-                        <label className={labelClass}>Arguments (optional)</label>
-                        <input
-                          type="text"
-                          value={form.agent.args}
-                          onChange={(e) =>
-                            setForm((prev) => ({
-                              ...prev,
-                              agent: { ...prev.agent, args: e.target.value },
-                            }))
-                          }
-                          placeholder="space-separated flags"
-                          className={inputClass}
-                        />
-                      </>
-                    )}
-
-                    <div className="rounded-2xl border border-violet-100 bg-violet-50/80 px-5 py-4 text-sm leading-relaxed text-violet-900/90">
-                      Install and sign in to your agent in the terminal first. Meuxe will inject persona and memory into{" "}
-                      <code className="text-xs bg-white/80 px-1.5 py-0.5 rounded">companion-home</code> before each reply.
-                    </div>
-                  </div>
+                {form.agent.preset === "custom" && (
+                  <>
+                    <label className={labelClass}>Command</label>
+                    <input
+                      type="text"
+                      value={form.agent.program}
+                      onChange={(e) =>
+                        setForm((prev) => ({
+                          ...prev,
+                          agent: { ...prev.agent, program: e.target.value },
+                        }))
+                      }
+                      placeholder="e.g. python my_agent.py"
+                      className={inputClass}
+                    />
+                    <label className={labelClass}>Arguments (optional)</label>
+                    <input
+                      type="text"
+                      value={form.agent.args}
+                      onChange={(e) =>
+                        setForm((prev) => ({
+                          ...prev,
+                          agent: { ...prev.agent, args: e.target.value },
+                        }))
+                      }
+                      placeholder="space-separated flags"
+                      className={inputClass}
+                    />
+                  </>
                 )}
 
-                {form.agent.backend === "legacy" && (
-                  <div className="animate-in fade-in duration-300">
-                    <label className={labelClass}>Model provider</label>
-                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mb-6 max-h-[280px] overflow-y-auto pr-1 scrollbar-thin scrollbar-thumb-slate-200">
-                      {llmPresetList.map(([id, preset]) => (
-                        <button
-                          key={id}
-                          onClick={() => selectLLMPreset(id)}
-                          className={`px-4 py-3.5 rounded-2xl text-[14px] font-semibold border transition-all ${
-                            form.llm.provider === id
-                              ? "border-blue-400 bg-blue-50 text-blue-700 shadow-sm shadow-blue-500/10 hover:-translate-y-0.5"
-                              : "border-slate-200 bg-white text-slate-500 hover:border-slate-300 hover:shadow-sm"
-                          }`}
-                        >
-                          {preset.name}
-                          {!preset.needs_key && <span className="ml-2 text-[10px] text-emerald-600">Local/no key</span>}
-                        </button>
-                      ))}
-                    </div>
-
-                    {form.llm.provider && (
-                      <div className="animate-in fade-in duration-300">
-                        {llmPresets[form.llm.provider]?.needs_key !== false && (
-                          <>
-                            <label className={labelClass}>API Key</label>
-                            <input
-                              type="password"
-                              value={form.llm.api_key}
-                              onChange={(e) => {
-                                updateForm("llm", "api_key", e.target.value);
-                                setTestResult(null);
-                              }}
-                              placeholder="Paste your API key"
-                              className={inputClass}
-                            />
-                          </>
-                        )}
-
-                        <LlmModelField
-                          value={form.llm.model}
-                          onChange={(model) => updateForm("llm", "model", model)}
-                          baseUrl={form.llm.base_url}
-                          apiKey={form.llm.api_key}
-                          providerId={form.llm.provider}
-                          needsKey={llmPresets[form.llm.provider]?.needs_key !== false}
-                          onInvalidateTest={() => setTestResult(null)}
-                        />
-
-                        {form.llm.provider === "custom" && (
-                          <>
-                            <label className={labelClass}>Base URL</label>
-                            <input
-                              type="text"
-                              value={form.llm.base_url}
-                              onChange={(e) => {
-                                updateForm("llm", "base_url", e.target.value);
-                                setTestResult(null);
-                              }}
-                              placeholder="https://api.example.com/v1"
-                              className={inputClass}
-                            />
-                          </>
-                        )}
-
-                        <button
-                          onClick={testConnection}
-                          disabled={testing}
-                          className="w-full py-3.5 rounded-2xl bg-white border border-slate-200 text-slate-600 text-[15px] font-medium hover:bg-slate-50 hover:border-slate-300 shadow-sm disabled:opacity-50 transition-all mb-4"
-                        >
-                          {testing ? "Testing..." : "Test Connection"}
-                        </button>
-
-                        {testResult && (
-                          <div
-                            className={`px-5 py-4 rounded-2xl text-[15px] font-medium animate-in fade-in ${
-                              testResult.success
-                                ? "bg-green-50 text-green-700 border border-green-200/50 shadow-sm"
-                                : "bg-red-50 text-red-700 border border-red-200/50 shadow-sm"
-                            }`}
-                          >
-                            {testResult.success ? "Connected successfully!" : testResult.error || "Connection failed"}
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                )}
+                <div className="rounded-2xl border border-violet-100 bg-violet-50/80 px-5 py-4 text-sm leading-relaxed text-violet-900/90">
+                  Install and sign in to your agent in the terminal first. Meuxe injects persona and memory into companion-home before each reply.
+                </div>
               </div>
             )}
 

@@ -1,7 +1,5 @@
 /** ACP CLI agent presets (shared by Onboarding + Settings). */
 
-export type AgentBackend = "legacy" | "acp";
-
 export type AcpAgentPresetId = "claude" | "codex" | "custom";
 
 export const ACP_AGENT_PRESETS: Record<
