@@ -1,4 +1,9 @@
-import type { PreviewModel } from "./CompanionAvatarPreview";
+export interface PreviewModel {
+  id: string;
+  type: string;
+  path: string;
+  animations?: { name: string; path: string }[];
+}
 
 export function ModelPicker({
   models,
