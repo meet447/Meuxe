@@ -1,9 +1,12 @@
 import { useRef, useCallback, useEffect } from "react";
 import * as THREE from "three";
+import { ACESFilmicToneMapping, SRGBColorSpace } from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { FBXLoader } from "three/examples/jsm/loaders/FBXLoader.js";
 import { VRMLoaderPlugin, VRM, VRMExpressionPresetName } from "@pixiv/three-vrm";
+import { VRMAnimationLoaderPlugin, createVRMAnimationClip } from "@pixiv/three-vrm-animation";
 import { mixamoVRMRigMap } from "../utils/mixamoRigMap";
+import { resolveAssetUrl } from "../api/tauri";
 import type { AudioLevels } from "./useAudioAnalyser";
 import type { AnimationInfo } from "../types";
 
@@ -11,11 +14,16 @@ function lerp(a: number, b: number, t: number): number {
   return a + (b - a) * t;
 }
 
+const ORBIT_ROTATE_SPEED = 0.005;
+
 export function useVRM(canvasRef: React.RefObject<HTMLCanvasElement | null>) {
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
   const sceneRef = useRef<THREE.Scene | null>(null);
   const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
   const vrmRef = useRef<VRM | null>(null);
+  const pivotRef = useRef<THREE.Group | null>(null);
+  const orbitYawRef = useRef(0);
+  const dragRef = useRef({ active: false, pointerId: -1, lastX: 0, lastY: 0 });
   const clockRef = useRef<THREE.Clock | null>(null);
   const animFrameRef = useRef<number>(0);
   const animatingRef = useRef(false);
@@ -95,6 +103,17 @@ export function useVRM(canvasRef: React.RefObject<HTMLCanvasElement | null>) {
 
   applyViewportRef.current = syncStageLayout;
 
+  const applyOrbitRotation = useCallback(() => {
+    const pivot = pivotRef.current;
+    if (!pivot) return;
+    pivot.rotation.y = orbitYawRef.current;
+  }, []);
+
+  const resetOrbitRotation = useCallback(() => {
+    orbitYawRef.current = 0;
+    applyOrbitRotation();
+  }, [applyOrbitRotation]);
+
   useEffect(() => {
     const parent = canvasRef.current?.parentElement;
     if (!parent) return;
@@ -109,6 +128,17 @@ export function useVRM(canvasRef: React.RefObject<HTMLCanvasElement | null>) {
   }, [canvasRef]);
 
   // Retarget Mixamo FBX animation to VRM skeleton
+  const loadVrmaClip = useCallback(async (url: string, vrm: VRM): Promise<THREE.AnimationClip | null> => {
+    const gltfLoader = new GLTFLoader();
+    gltfLoader.register((parser) => new VRMAnimationLoaderPlugin(parser));
+    const gltf = await gltfLoader.loadAsync(url);
+    const vrmAnimations = gltf.userData.vrmAnimations as unknown[] | undefined;
+    if (!vrmAnimations?.length) {
+      return null;
+    }
+    return createVRMAnimationClip(vrmAnimations[0] as Parameters<typeof createVRMAnimationClip>[0], vrm);
+  }, []);
+
   const retargetAnimation = useCallback(
     (fbxScene: THREE.Group, vrm: VRM, clipName: string): THREE.AnimationClip | null => {
       const clip = fbxScene.animations[0];
@@ -378,19 +408,37 @@ export function useVRM(canvasRef: React.RefObject<HTMLCanvasElement | null>) {
         });
         renderer.setSize(canvasRef.current.clientWidth, canvasRef.current.clientHeight);
         renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        renderer.outputColorSpace = SRGBColorSpace;
+        renderer.toneMapping = ACESFilmicToneMapping;
+        renderer.toneMappingExposure = 1.15;
         rendererRef.current = renderer;
       }
 
       // Create scene once
       if (!sceneRef.current) {
         const scene = new THREE.Scene();
-        scene.add(new THREE.AmbientLight(0xffffff, 0.7));
-        const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
-        dirLight.position.set(1, 1, 1).normalize();
-        scene.add(dirLight);
-        const fillLight = new THREE.DirectionalLight(0xffffff, 0.3);
-        fillLight.position.set(-1, 0.5, -1).normalize();
+
+        // Hemisphere + key/fill (brighter than flat ambient for MToon / VRM on light UI backgrounds)
+        const hemi = new THREE.HemisphereLight(0xffffff, 0xfff0e8, 1.5);
+        hemi.position.set(0, 1, 0);
+        scene.add(hemi);
+
+        const keyLight = new THREE.DirectionalLight(0xffffff, 1.75);
+        keyLight.position.set(-0.6, 1.4, 1.4);
+        scene.add(keyLight);
+
+        const fillLight = new THREE.DirectionalLight(0xeaf2ff, 0.65);
+        fillLight.position.set(1.2, 0.5, 1.0);
         scene.add(fillLight);
+
+        const rimLight = new THREE.DirectionalLight(0xffffff, 0.4);
+        rimLight.position.set(0.2, 0.8, -1.2);
+        scene.add(rimLight);
+
+        const pivot = new THREE.Group();
+        scene.add(pivot);
+        pivotRef.current = pivot;
+
         sceneRef.current = scene;
       }
 
@@ -417,23 +465,34 @@ export function useVRM(canvasRef: React.RefObject<HTMLCanvasElement | null>) {
           return;
         }
 
-        vrm.scene.rotation.y = Math.PI;
-        sceneRef.current.add(vrm.scene);
+        const version = vrm.meta?.metaVersion === "1" ? "1" : "0";
+        vrm.scene.rotation.y = version === "1" ? 0 : Math.PI;
+        pivotRef.current?.add(vrm.scene);
+        resetOrbitRotation();
         vrmRef.current = vrm;
 
         // Create animation mixer
         const mixer = new THREE.AnimationMixer(vrm.scene);
         mixerRef.current = mixer;
 
-        // Load FBX animations
+        // Load animations (VRMA or Mixamo FBX)
         if (animations && animations.length > 0) {
           const fbxLoader = new FBXLoader();
-          // Load all animations in parallel
           await Promise.allSettled(
             animations.map(async (anim) => {
               try {
-                const fbx = await fbxLoader.loadAsync(anim.path);
-                const clip = retargetAnimation(fbx, vrm, anim.name);
+                const assetUrl = await resolveAssetUrl(anim.path);
+                const cacheBustUrl = `${assetUrl}${assetUrl.includes("?") ? "&" : "?"}t=${Date.now()}`;
+                const lower = anim.path.toLowerCase();
+                let clip: THREE.AnimationClip | null = null;
+
+                if (lower.endsWith(".vrma")) {
+                  clip = await loadVrmaClip(cacheBustUrl, vrm);
+                } else if (lower.endsWith(".fbx")) {
+                  const fbx = await fbxLoader.loadAsync(cacheBustUrl);
+                  clip = retargetAnimation(fbx, vrm, anim.name);
+                }
+
                 if (clip) {
                   clipsRef.current.set(anim.name, clip);
                   console.log(`[VRM] Loaded animation: "${anim.name}" (${clip.duration.toFixed(1)}s)`);
@@ -444,7 +503,6 @@ export function useVRM(canvasRef: React.RefObject<HTMLCanvasElement | null>) {
             })
           );
 
-          // Play idle animation if available
           const idleNames = ["idle", "breathingidle", "breathing_idle", "standing", "default"];
           let matchFound = false;
           for (const name of idleNames) {
@@ -457,7 +515,6 @@ export function useVRM(canvasRef: React.RefObject<HTMLCanvasElement | null>) {
             }
             if (matchFound) break;
           }
-          // If no idle found, play the first animation
           if (!currentActionRef.current && clipsRef.current.size > 0) {
             playAnimation(clipsRef.current.keys().next().value!);
           }
@@ -479,8 +536,44 @@ export function useVRM(canvasRef: React.RefObject<HTMLCanvasElement | null>) {
         console.error("[VRM] Failed to load model:", err);
       }
     },
-    [canvasRef, startAnimationLoop, retargetAnimation, playAnimation]
+    [canvasRef, startAnimationLoop, retargetAnimation, playAnimation, resetOrbitRotation, loadVrmaClip]
   );
+
+  const handlePointerDown = useCallback((event: React.PointerEvent<HTMLCanvasElement>) => {
+    if (!vrmRef.current) return;
+    dragRef.current = {
+      active: true,
+      pointerId: event.pointerId,
+      lastX: event.clientX,
+      lastY: event.clientY,
+    };
+    event.currentTarget.setPointerCapture(event.pointerId);
+  }, []);
+
+  const handlePointerMove = useCallback(
+    (event: React.PointerEvent<HTMLCanvasElement>) => {
+      const drag = dragRef.current;
+      if (!drag.active || event.pointerId !== drag.pointerId) return;
+
+      const dx = event.clientX - drag.lastX;
+      drag.lastX = event.clientX;
+      drag.lastY = event.clientY;
+
+      orbitYawRef.current += dx * ORBIT_ROTATE_SPEED;
+      applyOrbitRotation();
+    },
+    [applyOrbitRotation]
+  );
+
+  const endPointerDrag = useCallback((event: React.PointerEvent<HTMLCanvasElement>) => {
+    const drag = dragRef.current;
+    if (!drag.active || event.pointerId !== drag.pointerId) return;
+    dragRef.current.active = false;
+    dragRef.current.pointerId = -1;
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+  }, []);
 
   const setExpression = useCallback((expressionName: string) => {
     const vrm = vrmRef.current;
@@ -590,5 +683,9 @@ export function useVRM(canvasRef: React.RefObject<HTMLCanvasElement | null>) {
     setViewport,
     setTypingReaction,
     getDebug,
+    handlePointerDown,
+    handlePointerMove,
+    handlePointerUp: endPointerDrag,
+    handlePointerCancel: endPointerDrag,
   };
 }

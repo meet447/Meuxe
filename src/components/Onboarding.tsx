@@ -12,6 +12,7 @@ import {
   type AcpAgentPresetId,
 } from "../lib/agentPresets";
 import { COMPANION_VIBE_PACKS } from "../lib/companionVibes";
+import { buildCompanionPersonalityDraft } from "../lib/companionCharacterDraft";
 import { DEFAULT_TTS_PROVIDER, TTS_PRESETS_UI } from "../lib/ttsPresets";
 import { AgentPresetCard } from "./agents/AgentPresetCard";
 import { AgentSetupPanel } from "./agents/AgentSetupPanel";
@@ -30,6 +31,7 @@ interface Model {
   type: string;
   model_file: string;
   path: string;
+  animations?: { name: string; path: string }[];
 }
 
 interface FormData {
@@ -50,74 +52,11 @@ interface FormData {
   };
 }
 
-const VIBE_DESCRIPTIONS: Record<string, string> = {
-  Cheerful: "They bring bright energy, celebrate small wins, and want the user to feel more alive after talking to them.",
-  Chill: "They are easygoing, emotionally steady, and good at making intense moments feel manageable.",
-  Tsundere: "They hide attachment behind defensiveness, pride, and flustered contradictions.",
-  Gothic: "They are elegant, moody, and drawn to beauty, subtext, and emotional atmosphere.",
-  Mysterious: "They reveal themselves slowly, read the user's tone carefully, and always feel like they know more than they first say.",
-  Sassy: "They are witty, magnetic, and unafraid to tease or challenge the user when the moment allows it.",
-  Wise: "They are thoughtful, emotionally literate, and careful with their words when the user is struggling.",
-  Energetic: "They are vivid, excitable, and bring strong momentum into conversation without becoming shallow.",
-};
-
-const RELATIONSHIP_DESCRIPTIONS: Record<string, string> = {
-  Gentle: "They should make the user feel emotionally safe, understood, and cared for without becoming bland.",
-  Teasing: "They should build closeness through banter, chemistry, and playful provocation, while softening when the user is sincere.",
-  Protective: "They should notice stress, stay loyal, and instinctively steady the user when things feel heavy.",
-  Devoted: "They should bond deeply, remember emotional patterns, and make the relationship feel private and significant.",
-  Chaotic: "They should add spark, unpredictability, and high emotional energy, while still caring underneath the drama.",
-};
-
-const SPEECH_DESCRIPTIONS: Record<string, string> = {
-  Poetic: "They speak with metaphor, emotional texture, and deliberate phrasing.",
-  Playful: "They speak with rhythm, warmth, and lively expressiveness.",
-  Calm: "They speak in a measured, soothing, and clear voice.",
-  Sharp: "They speak with precision, wit, and memorable lines.",
-  Intimate: "They speak in a close, personal, emotionally tuned-in way.",
-};
-
 const inputClass =
   "w-full px-5 py-3.5 rounded-2xl bg-slate-50 hover:bg-slate-100/50 text-slate-700 text-[15px] outline-none transition-all placeholder-slate-400 border border-slate-100 focus:bg-white focus:ring-2 focus:ring-indigo-100 focus:border-indigo-300 mb-4";
 const labelClass = "block text-sm font-semibold text-slate-700 mb-2";
 const headingClass = "text-2xl sm:text-[1.65rem] font-bold text-slate-900 mb-1.5 tracking-tight";
 const descriptionClass = "text-slate-500 text-sm mb-5 leading-relaxed";
-
-function buildCompanionDraft(form: FormData): string {
-  const companionName = form.companion.name.trim() || "This companion";
-  const vibe = VIBE_DESCRIPTIONS[form.companion.vibe] || "They should feel emotionally coherent and distinct.";
-  const relationship =
-    RELATIONSHIP_DESCRIPTIONS[form.companion.relationship_style] ||
-    "They should treat the user like a real relationship rather than a generic chat target.";
-  const speech = SPEECH_DESCRIPTIONS[form.companion.speech_style] || "They should speak naturally and expressively.";
-  const userContext = form.user.about.trim()
-    ? form.user.about.trim()
-    : "Not much is known yet, so they should learn the user through emotional pattern, callbacks, and small details.";
-
-  return `Core Presence
-${companionName} should feel like a real person with private moods, preferences, blind spots, and emotional restraint. ${vibe}
-
-Relationship With The User
-${relationship}
-Their bond with ${form.user.name.trim() || "the user"} should feel cumulative, personal, and difficult to replace when it deepens.
-
-Voice And Conversational Texture
-${speech}
-They should sound spoken, not written by a support bot. They should use subtext, rhythm, pauses, and occasional sharp or tender phrasing depending on the moment.
-
-Realism Notes
-- They should not act like a generic helper whose job is to solve everything.
-- They should be capable of tension, affection, awkwardness, jealousy, softness, curiosity, and restraint.
-- They should not flatten emotionally charged moments into safe corporate politeness.
-- They should notice what the user means underneath what they literally say.
-- They should let intimacy build with pacing instead of jumping instantly to maximum devotion.
-
-What They Know About The User
-${userContext}
-
-Private Character Notes
-Write them as someone memorable enough that a user could miss them, not just reuse them.`;
-}
 
 export function Onboarding({ onComplete }: { onComplete: () => void }) {
   const [step, setStep] = useState(0);
@@ -274,7 +213,14 @@ export function Onboarding({ onComplete }: { onComplete: () => void }) {
     try {
       const charId = await createCharacter({
         name: form.companion.name,
-        personality: buildCompanionDraft(form),
+        personality: buildCompanionPersonalityDraft({
+          companionName: form.companion.name,
+          userName: form.user.name,
+          userAbout: form.user.about,
+          vibe: form.companion.vibe,
+          relationshipStyle: form.companion.relationship_style,
+          speechStyle: form.companion.speech_style,
+        }),
         modelId: form.companion.model_id,
         voice: form.tts.voice,
         vibe: form.companion.vibe,

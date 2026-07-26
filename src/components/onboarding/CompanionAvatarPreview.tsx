@@ -7,11 +7,9 @@ const Live2DCanvas = lazy(() =>
 );
 const VRMCanvas = lazy(() => import("../VRMCanvas").then((m) => ({ default: m.VRMCanvas })));
 
-export interface PreviewModel {
-  id: string;
-  type: string;
-  path: string;
-}
+import type { PreviewModel } from "./ModelPicker";
+
+export type { PreviewModel };
 
 const noop = () => undefined;
 const previewBg = BG_PRESETS[2].value;
@@ -77,6 +75,7 @@ export function CompanionAvatarPreview({
             {model.type === "vrm" ? (
               <VRMCanvas
                 modelPath={url}
+                animations={model.animations}
                 expression="neutral"
                 speaking={false}
                 userTyping={false}

@@ -58,15 +58,18 @@ impl ExpressionManager {
             }
         }
 
-        // Load from file
+        // Load from user override, else bundled defaults shipped with the app.
         let path = self.mappings_dir.join(format!("{model_id}.json"));
         let mapping = if path.exists() {
             std::fs::read_to_string(&path)
                 .ok()
                 .and_then(|contents| serde_json::from_str(&contents).ok())
-                .unwrap_or_default()
+                .filter(|m: &HashMap<String, String>| !m.is_empty())
+                .unwrap_or_else(|| {
+                    load_bundled_expression_mapping(model_id).unwrap_or_default()
+                })
         } else {
-            HashMap::new()
+            load_bundled_expression_mapping(model_id).unwrap_or_default()
         };
 
         // Cache and return
@@ -124,10 +127,45 @@ impl ExpressionManager {
     }
 }
 
+fn load_bundled_expression_mapping(model_id: &str) -> Option<HashMap<String, String>> {
+    let file_name = format!("{model_id}.json");
+    for root in [PathBuf::from("models"), PathBuf::from("../models")] {
+        let path = root.join("expression_mappings").join(&file_name);
+        if !path.is_file() {
+            continue;
+        }
+        let contents = std::fs::read_to_string(&path).ok()?;
+        return serde_json::from_str(&contents).ok();
+    }
+    None
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use tempfile::TempDir;
+
+    #[test]
+    fn test_bundled_default_mapping_haru() {
+        if !PathBuf::from("models/expression_mappings/haru.json").exists() {
+            return;
+        }
+        let tmp = TempDir::new().unwrap();
+        let mgr = ExpressionManager::new(tmp.path());
+        assert_eq!(mgr.resolve("haru", "happy"), "F05");
+        assert_eq!(mgr.resolve("haru", "angry"), "F02");
+    }
+
+    #[test]
+    fn test_bundled_default_mapping_utsuwa() {
+        if !PathBuf::from("models/expression_mappings/utsuwa.json").exists() {
+            return;
+        }
+        let tmp = TempDir::new().unwrap();
+        let mgr = ExpressionManager::new(tmp.path());
+        assert_eq!(mgr.resolve("utsuwa", "happy"), "happy");
+        assert_eq!(mgr.resolve("utsuwa", "neutral"), "relaxed");
+    }
 
     #[test]
     fn test_empty_mapping() {

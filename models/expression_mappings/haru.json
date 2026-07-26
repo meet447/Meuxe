@@ -1,0 +1,14 @@
+{
+  "neutral": "F01",
+  "happy": "F05",
+  "sad": "F03",
+  "angry": "F02",
+  "surprised": "F06",
+  "excited": "F05",
+  "embarrassed": "F07",
+  "thinking": "F08",
+  "blush": "F07",
+  "smirk": "F04",
+  "scared": "F06",
+  "disgusted": "F02"
+}

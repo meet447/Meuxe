@@ -1,0 +1,14 @@
+{
+  "neutral": "relaxed",
+  "happy": "happy",
+  "sad": "sad",
+  "angry": "angry",
+  "surprised": "surprised",
+  "excited": "happy",
+  "embarrassed": "relaxed",
+  "thinking": "relaxed",
+  "blush": "happy",
+  "smirk": "happy",
+  "scared": "surprised",
+  "disgusted": "angry"
+}

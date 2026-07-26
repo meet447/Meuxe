@@ -7,8 +7,19 @@ export async function invoke<T>(cmd: string, args?: Record<string, unknown>): Pr
       return undefined as T;
     case "models_list":
       return [
-        { id: "haru", type: "live2d", model_file: "haru.model3.json", path: "live2d/haru" },
-        { id: "demo-vrm", type: "vrm", model_file: "model.vrm", path: "vrm/demo" },
+        {
+          id: "haru",
+          type: "live2d",
+          model_file: "Haru.model3.json",
+          path: "models/live2d/haru/Haru.model3.json",
+        },
+        {
+          id: "utsuwa",
+          type: "vrm",
+          model_file: "utsuwa.vrm",
+          path: "models/vrm/utsuwa/utsuwa.vrm",
+          animations: [{ name: "idle", path: "models/vrm/utsuwa/animations/idle.vrma" }],
+        },
       ] as T;
     case "tts_voices":
       return [
