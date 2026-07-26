@@ -10,7 +10,13 @@ For each preset, Meuxe picks the first match:
 2. **Meuxe local fallback** — legacy `{app_data}/agents/npm/bin/` if present from older Meuxe versions
 3. **npx** — Claude and Codex only, when Node/npx is available and no binary was found
 
-When nothing is found (`None`), Meuxe runs **`npm install -g`** for the preset package before chat (and the in-app **Install globally (npm)** button does the same). Restart the app if the new CLI is not detected immediately after install.
+When nothing is found (`None`), Meuxe runs **`npm install -g`** for the preset package:
+
+- **Onboarding** — **Finish** (or **Install globally (npm)** on the agent step)
+- **Chat** — automatically before the first message
+- **Settings** — **Install globally (npm)** on the agent panel
+
+Restart the app if the new CLI is not detected immediately after install.
 
 | Preset | System binary name | Global install example |
 |--------|-------------------|-------------------------|

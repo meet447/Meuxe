@@ -98,7 +98,7 @@ export function AgentSetupPanel({
 
           {friendly && !agent.ready && (
             <p className="text-sm text-slate-500 leading-snug">
-              Install the CLI globally with npm, or send a message and Meuxe will try to install it for you.
+              Install the CLI globally now, or tap Finish and Meuxe will run the same global npm install for you.
             </p>
           )}
 

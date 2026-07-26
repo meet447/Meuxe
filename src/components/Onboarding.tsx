@@ -5,6 +5,7 @@ import {
   getVoices,
   previewVoice,
   listModels,
+  installAgentSetup,
   type AgentSetupStatusResponse,
 } from "../api/tauri";
 import {
@@ -194,7 +195,8 @@ export function Onboarding({ onComplete }: { onComplete: () => void }) {
           return form.agent.program.trim() !== "";
         }
         if (agentSetupLoading) return false;
-        return agentSetup?.agent.ready === true;
+        if (agentSetup?.agent.ready) return true;
+        return agentSetup?.prerequisites.node_available === true;
       default:
         return false;
     }
@@ -202,7 +204,17 @@ export function Onboarding({ onComplete }: { onComplete: () => void }) {
 
   const stepHint = (): string | null => {
     if (step === 4 && form.agent.preset !== "custom" && !canProceed() && !agentSetupLoading) {
-      return "Install your pick above to finish setup.";
+      return "Install Node.js above to finish setup.";
+    }
+    if (
+      step === 4 &&
+      form.agent.preset !== "custom" &&
+      !agentSetupLoading &&
+      agentSetup &&
+      !agentSetup.agent.ready &&
+      agentSetup.prerequisites.node_available
+    ) {
+      return "Finish will install the agent globally if it is not on your system yet.";
     }
     return null;
   };
@@ -211,6 +223,16 @@ export function Onboarding({ onComplete }: { onComplete: () => void }) {
     setSubmitting(true);
     setError("");
     try {
+      if (form.agent.preset !== "custom" && agentSetup && !agentSetup.agent.ready) {
+        const installed = await installAgentSetup(form.agent.preset);
+        setAgentSetup(installed);
+        if (!installed.agent.ready) {
+          setError(installed.agent.detail || "Could not install the agent CLI. Try Install above, then finish again.");
+          setSubmitting(false);
+          return;
+        }
+      }
+
       const charId = await createCharacter({
         name: form.companion.name,
         personality: buildCompanionPersonalityDraft({
