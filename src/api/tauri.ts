@@ -58,6 +58,8 @@ export interface AgentSetupStatusResponse {
     system_path: boolean;
     needs_node: boolean;
     detail: string;
+    install_source: "system" | "managed" | "npx" | "none";
+    system_command: string | null;
   };
 }
 

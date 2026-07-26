@@ -63,34 +63,22 @@ Follow all expression-tag rules in the persona for avatar reactions.\n\n\
     Ok(())
 }
 
-pub fn resolve_acp_agent(config: &AgentConfig, data_dir: &Path) -> Result<AcpAgent, String> {
+pub async fn resolve_acp_agent(config: &AgentConfig, data_dir: &Path) -> Result<AcpAgent, String> {
     match config.preset.as_str() {
         "opencode" => {
-            if let Some(managed) =
-                crate::commands::agent_setup::resolve_managed_bin(data_dir, "opencode")
-            {
-                let path = managed.to_string_lossy().into_owned();
-                AcpAgent::from_args([path, "acp".to_string()]).map_err(|e| e.to_string())
-            } else {
-                AcpAgent::from_args(["opencode", "acp"]).map_err(|e| e.to_string())
-            }
+            let args = crate::commands::agent_setup::resolve_opencode_argv(data_dir).await;
+            AcpAgent::from_args(args).map_err(|e| e.to_string())
         }
         "claude" => {
-            if let Some(managed) =
-                crate::commands::agent_setup::resolve_managed_bin(data_dir, "claude-agent-acp")
-            {
-                let path = managed.to_string_lossy().into_owned();
-                AcpAgent::from_args([path]).map_err(|e| e.to_string())
+            if let Some(args) = crate::commands::agent_setup::resolve_claude_argv(data_dir).await {
+                AcpAgent::from_args(args).map_err(|e| e.to_string())
             } else {
                 Ok(AcpAgent::claude_agent())
             }
         }
         "codex" => {
-            if let Some(managed) =
-                crate::commands::agent_setup::resolve_managed_bin(data_dir, "codex-acp")
-            {
-                let path = managed.to_string_lossy().into_owned();
-                AcpAgent::from_args([path]).map_err(|e| e.to_string())
+            if let Some(args) = crate::commands::agent_setup::resolve_codex_argv(data_dir).await {
+                AcpAgent::from_args(args).map_err(|e| e.to_string())
             } else {
                 Ok(AcpAgent::codex())
             }
@@ -124,7 +112,16 @@ pub async fn run_acp_chat_stream(params: RunAcpChatStreamParams) -> Result<(), S
     ensure_companion_home(&state.data_dir).map_err(|e| e.to_string())?;
     write_companion_home_context(&companion_home, &persona_context).map_err(|e| e.to_string())?;
 
-    let agent = resolve_acp_agent(&agent_config, &state.data_dir)?;
+    if agent_config.preset != "custom" {
+        crate::commands::agent_setup::ensure_agent_installed_globally(
+            &state.data_dir,
+            &agent_config.preset,
+        )
+        .await
+        .map_err(|e| format!("Could not set up agent CLI: {e}"))?;
+    }
+
+    let agent = resolve_acp_agent(&agent_config, &state.data_dir).await?;
     let user_id = derive_user_id_from_state(&state)?;
 
     let app_emit = app.clone();

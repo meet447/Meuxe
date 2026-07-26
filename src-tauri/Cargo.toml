@@ -29,3 +29,6 @@ bytes = "1.11.1"
 chrono = { version = "0.4", features = ["serde"] }
 agent-client-protocol = "2"
 shell-words = "1.1.1"
+
+[dev-dependencies]
+tempfile = "3"
