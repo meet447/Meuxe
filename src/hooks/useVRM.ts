@@ -1,5 +1,6 @@
 import { useRef, useCallback, useEffect } from "react";
 import * as THREE from "three";
+import { ACESFilmicToneMapping, SRGBColorSpace } from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { FBXLoader } from "three/examples/jsm/loaders/FBXLoader.js";
 import { VRMLoaderPlugin, VRM, VRMExpressionPresetName } from "@pixiv/three-vrm";
@@ -407,19 +408,32 @@ export function useVRM(canvasRef: React.RefObject<HTMLCanvasElement | null>) {
         });
         renderer.setSize(canvasRef.current.clientWidth, canvasRef.current.clientHeight);
         renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        renderer.outputColorSpace = SRGBColorSpace;
+        renderer.toneMapping = ACESFilmicToneMapping;
+        renderer.toneMappingExposure = 1.15;
         rendererRef.current = renderer;
       }
 
       // Create scene once
       if (!sceneRef.current) {
         const scene = new THREE.Scene();
-        scene.add(new THREE.AmbientLight(0xffffff, 0.7));
-        const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
-        dirLight.position.set(1, 1, 1).normalize();
-        scene.add(dirLight);
-        const fillLight = new THREE.DirectionalLight(0xffffff, 0.3);
-        fillLight.position.set(-1, 0.5, -1).normalize();
+
+        // Hemisphere + key/fill (brighter than flat ambient for MToon / VRM on light UI backgrounds)
+        const hemi = new THREE.HemisphereLight(0xffffff, 0xfff0e8, 1.5);
+        hemi.position.set(0, 1, 0);
+        scene.add(hemi);
+
+        const keyLight = new THREE.DirectionalLight(0xffffff, 1.75);
+        keyLight.position.set(-0.6, 1.4, 1.4);
+        scene.add(keyLight);
+
+        const fillLight = new THREE.DirectionalLight(0xeaf2ff, 0.65);
+        fillLight.position.set(1.2, 0.5, 1.0);
         scene.add(fillLight);
+
+        const rimLight = new THREE.DirectionalLight(0xffffff, 0.4);
+        rimLight.position.set(0.2, 0.8, -1.2);
+        scene.add(rimLight);
 
         const pivot = new THREE.Group();
         scene.add(pivot);
