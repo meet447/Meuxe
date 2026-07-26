@@ -98,7 +98,7 @@ export function AgentSetupPanel({
 
           {friendly && !agent.ready && (
             <p className="text-sm text-slate-500 leading-snug">
-              Install the CLI globally (npm), or use the local fallback below.
+              Install the CLI globally with npm, or send a message and Meuxe will try to install it for you.
             </p>
           )}
 
@@ -119,7 +119,7 @@ export function AgentSetupPanel({
                 disabled={installing}
                 className="rounded-xl bg-violet-600 px-3.5 py-2 text-sm font-semibold text-white hover:bg-violet-700 disabled:opacity-50"
               >
-                {installing ? "Installing…" : "Install local fallback"}
+                {installing ? "Installing…" : "Install globally (npm)"}
               </button>
             )}
             {status.prerequisites.node_available && agent.ready && usingSystem && (
@@ -132,7 +132,7 @@ export function AgentSetupPanel({
                 disabled={installing}
                 className="rounded-xl border border-violet-200 bg-white px-3.5 py-2 text-sm font-semibold text-violet-800 hover:bg-violet-50 disabled:opacity-50"
               >
-                {installing ? "Installing…" : "Install local fallback"}
+                {installing ? "Installing…" : "Install globally (npm)"}
               </button>
             )}
           </div>

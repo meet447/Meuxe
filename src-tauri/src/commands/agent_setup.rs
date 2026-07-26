@@ -282,10 +282,10 @@ fn status_from_resolution(preset: &str, resolution: AgentResolution) -> AgentPre
                     system_command.clone().unwrap_or_else(|| "opencode".into())
                 ),
                 AgentInstallSource::Managed => {
-                    "Using OpenCode from Meuxe app folder (local fallback).".into()
+                    "Using agent from Meuxe app folder (legacy local install).".into()
                 }
                 AgentInstallSource::None => {
-                    "Install OpenCode globally (e.g. npm i -g opencode-ai) or use the local fallback installer.".into()
+                    "Install OpenCode globally (e.g. npm i -g opencode-ai) or use Install in settings.".into()
                 }
                 AgentInstallSource::Npx => unreachable!(),
             };
@@ -299,13 +299,13 @@ fn status_from_resolution(preset: &str, resolution: AgentResolution) -> AgentPre
                     system_command.clone().unwrap_or_default()
                 ),
                 AgentInstallSource::Managed => {
-                    "Using Claude ACP adapter from Meuxe app folder (local fallback).".into()
+                    "Using Claude ACP adapter from Meuxe app folder (legacy local install).".into()
                 }
                 AgentInstallSource::Npx => {
                     "No global adapter found — will run via npx on chat (install globally for a fixed version).".into()
                 }
                 AgentInstallSource::None => {
-                    "Install Node.js, then npm i -g @agentclientprotocol/claude-agent-acp or use the local fallback.".into()
+                    "Install Node.js, then npm i -g @agentclientprotocol/claude-agent-acp (or use Install in settings).".into()
                 }
             };
             (needs_node, detail)
@@ -318,13 +318,13 @@ fn status_from_resolution(preset: &str, resolution: AgentResolution) -> AgentPre
                     system_command.clone().unwrap_or_default()
                 ),
                 AgentInstallSource::Managed => {
-                    "Using Codex ACP adapter from Meuxe app folder (local fallback).".into()
+                    "Using Codex ACP adapter from Meuxe app folder (legacy local install).".into()
                 }
                 AgentInstallSource::Npx => {
                     "No global adapter found — will run via npx on chat (install globally for a fixed version).".into()
                 }
                 AgentInstallSource::None => {
-                    "Install Node.js, then npm i -g @agentclientprotocol/codex-acp or use the local fallback.".into()
+                    "Install Node.js, then npm i -g @agentclientprotocol/codex-acp (or use Install in settings).".into()
                 }
             };
             (needs_node, detail)
@@ -373,18 +373,9 @@ pub async fn check_preset(data_dir: &Path, preset: &str) -> AgentPresetSetupStat
     }
 }
 
-async fn run_npm_install(prefix: &Path, package: &str) -> Result<(), String> {
-    let prefix_str = prefix.to_string_lossy().to_string();
+async fn run_npm_global_install(package: &str) -> Result<(), String> {
     let child = AsyncCommand::new("npm")
-        .args([
-            "install",
-            "--global",
-            "--no-audit",
-            "--no-fund",
-            "--prefix",
-            &prefix_str,
-            package,
-        ])
+        .args(["install", "-g", "--no-audit", "--no-fund", package])
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()
@@ -402,7 +393,7 @@ async fn run_npm_install(prefix: &Path, package: &str) -> Result<(), String> {
         let stderr = String::from_utf8_lossy(&output.stderr);
         let stdout = String::from_utf8_lossy(&output.stdout);
         Err(format!(
-            "npm install failed: {}",
+            "npm install -g failed: {}",
             if !stderr.trim().is_empty() {
                 stderr.trim().to_string()
             } else {
@@ -412,34 +403,58 @@ async fn run_npm_install(prefix: &Path, package: &str) -> Result<(), String> {
     }
 }
 
+fn preset_npm_package(preset: &str) -> Result<&'static str, String> {
+    match preset {
+        "opencode" => Ok("opencode-ai"),
+        "claude" => Ok("@agentclientprotocol/claude-agent-acp"),
+        "codex" => Ok("@agentclientprotocol/codex-acp"),
+        "custom" => Err("Nothing to install for a custom agent.".into()),
+        other => Err(format!("Unknown preset: {other}")),
+    }
+}
+
+/// Install the preset's npm package with `npm install -g` (user-global, same as terminal).
+pub async fn install_global_package(preset: &str) -> Result<(), String> {
+    let prerequisites = check_prerequisites().await;
+    if !prerequisites.node_available {
+        return Err(
+            "Node.js is required. Install it from https://nodejs.org (LTS), then try again.".into(),
+        );
+    }
+    let package = preset_npm_package(preset)?;
+    run_npm_global_install(package).await
+}
+
+/// If no system/managed/npx agent is available, run a global npm install once.
+pub async fn ensure_agent_installed_globally(data_dir: &Path, preset: &str) -> Result<(), String> {
+    if preset == "custom" {
+        return Ok(());
+    }
+    let resolution = resolve_agent(data_dir, preset).await;
+    if resolution.source != AgentInstallSource::None {
+        return Ok(());
+    }
+    install_global_package(preset).await?;
+    let after = resolve_agent(data_dir, preset).await;
+    if after.source == AgentInstallSource::None {
+        return Err(
+            "Global install finished but the agent CLI is still not on PATH. Restart the app or open a new terminal, then try again.".into(),
+        );
+    }
+    Ok(())
+}
+
 pub async fn install_preset(
     data_dir: &Path,
     preset: &str,
 ) -> Result<AgentSetupStatusResponse, String> {
+    install_global_package(preset).await?;
+
     let prerequisites = check_prerequisites().await;
-    if !prerequisites.node_available {
-        return Err(
-            "Node.js is required for the local fallback install. Install it from https://nodejs.org (LTS), or install the agent globally via npm.".into(),
-        );
-    }
-
-    let prefix = managed_npm_prefix(data_dir);
-    std::fs::create_dir_all(&prefix).map_err(|e| e.to_string())?;
-
-    let package = match preset {
-        "opencode" => "opencode-ai",
-        "claude" => "@agentclientprotocol/claude-agent-acp",
-        "codex" => "@agentclientprotocol/codex-acp",
-        "custom" => return Err("Nothing to install for a custom agent.".into()),
-        other => return Err(format!("Unknown preset: {other}")),
-    };
-
-    run_npm_install(&prefix, package).await?;
-
     let agent = check_preset(data_dir, preset).await;
     if !agent.ready {
         return Err(format!(
-            "Install finished but the agent is still not ready: {}",
+            "Global install finished but the agent is still not ready: {}",
             agent.detail
         ));
     }

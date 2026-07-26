@@ -112,6 +112,15 @@ pub async fn run_acp_chat_stream(params: RunAcpChatStreamParams) -> Result<(), S
     ensure_companion_home(&state.data_dir).map_err(|e| e.to_string())?;
     write_companion_home_context(&companion_home, &persona_context).map_err(|e| e.to_string())?;
 
+    if agent_config.preset != "custom" {
+        crate::commands::agent_setup::ensure_agent_installed_globally(
+            &state.data_dir,
+            &agent_config.preset,
+        )
+        .await
+        .map_err(|e| format!("Could not set up agent CLI: {e}"))?;
+    }
+
     let agent = resolve_acp_agent(&agent_config, &state.data_dir).await?;
     let user_id = derive_user_id_from_state(&state)?;
 
