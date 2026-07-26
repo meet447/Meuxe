@@ -545,7 +545,7 @@ export function useVRM(canvasRef: React.RefObject<HTMLCanvasElement | null>) {
       drag.lastX = event.clientX;
       drag.lastY = event.clientY;
 
-      orbitYawRef.current -= dx * ORBIT_ROTATE_SPEED;
+      orbitYawRef.current += dx * ORBIT_ROTATE_SPEED;
       applyOrbitRotation();
     },
     [applyOrbitRotation]
