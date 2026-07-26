@@ -11,11 +11,22 @@ function lerp(a: number, b: number, t: number): number {
   return a + (b - a) * t;
 }
 
+const ORBIT_ROTATE_SPEED = 0.005;
+const ORBIT_PITCH_MIN = -Math.PI / 6;
+const ORBIT_PITCH_MAX = Math.PI / 6;
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, value));
+}
+
 export function useVRM(canvasRef: React.RefObject<HTMLCanvasElement | null>) {
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
   const sceneRef = useRef<THREE.Scene | null>(null);
   const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
   const vrmRef = useRef<VRM | null>(null);
+  const pivotRef = useRef<THREE.Group | null>(null);
+  const orbitRef = useRef({ yaw: 0, pitch: 0 });
+  const dragRef = useRef({ active: false, pointerId: -1, lastX: 0, lastY: 0 });
   const clockRef = useRef<THREE.Clock | null>(null);
   const animFrameRef = useRef<number>(0);
   const animatingRef = useRef(false);
@@ -94,6 +105,20 @@ export function useVRM(canvasRef: React.RefObject<HTMLCanvasElement | null>) {
   }, [layoutRendererSize, applyViewport]);
 
   applyViewportRef.current = syncStageLayout;
+
+  const applyOrbitRotation = useCallback(() => {
+    const pivot = pivotRef.current;
+    if (!pivot) return;
+    const { yaw, pitch } = orbitRef.current;
+    pivot.rotation.order = "YXZ";
+    pivot.rotation.y = yaw;
+    pivot.rotation.x = pitch;
+  }, []);
+
+  const resetOrbitRotation = useCallback(() => {
+    orbitRef.current = { yaw: 0, pitch: 0 };
+    applyOrbitRotation();
+  }, [applyOrbitRotation]);
 
   useEffect(() => {
     const parent = canvasRef.current?.parentElement;
@@ -391,6 +416,11 @@ export function useVRM(canvasRef: React.RefObject<HTMLCanvasElement | null>) {
         const fillLight = new THREE.DirectionalLight(0xffffff, 0.3);
         fillLight.position.set(-1, 0.5, -1).normalize();
         scene.add(fillLight);
+
+        const pivot = new THREE.Group();
+        scene.add(pivot);
+        pivotRef.current = pivot;
+
         sceneRef.current = scene;
       }
 
@@ -418,7 +448,8 @@ export function useVRM(canvasRef: React.RefObject<HTMLCanvasElement | null>) {
         }
 
         vrm.scene.rotation.y = Math.PI;
-        sceneRef.current.add(vrm.scene);
+        pivotRef.current?.add(vrm.scene);
+        resetOrbitRotation();
         vrmRef.current = vrm;
 
         // Create animation mixer
@@ -479,8 +510,50 @@ export function useVRM(canvasRef: React.RefObject<HTMLCanvasElement | null>) {
         console.error("[VRM] Failed to load model:", err);
       }
     },
-    [canvasRef, startAnimationLoop, retargetAnimation, playAnimation]
+    [canvasRef, startAnimationLoop, retargetAnimation, playAnimation, resetOrbitRotation]
   );
+
+  const handlePointerDown = useCallback((event: React.PointerEvent<HTMLCanvasElement>) => {
+    if (!vrmRef.current) return;
+    dragRef.current = {
+      active: true,
+      pointerId: event.pointerId,
+      lastX: event.clientX,
+      lastY: event.clientY,
+    };
+    event.currentTarget.setPointerCapture(event.pointerId);
+  }, []);
+
+  const handlePointerMove = useCallback(
+    (event: React.PointerEvent<HTMLCanvasElement>) => {
+      const drag = dragRef.current;
+      if (!drag.active || event.pointerId !== drag.pointerId) return;
+
+      const dx = event.clientX - drag.lastX;
+      const dy = event.clientY - drag.lastY;
+      drag.lastX = event.clientX;
+      drag.lastY = event.clientY;
+
+      orbitRef.current.yaw -= dx * ORBIT_ROTATE_SPEED;
+      orbitRef.current.pitch = clamp(
+        orbitRef.current.pitch - dy * ORBIT_ROTATE_SPEED,
+        ORBIT_PITCH_MIN,
+        ORBIT_PITCH_MAX
+      );
+      applyOrbitRotation();
+    },
+    [applyOrbitRotation]
+  );
+
+  const endPointerDrag = useCallback((event: React.PointerEvent<HTMLCanvasElement>) => {
+    const drag = dragRef.current;
+    if (!drag.active || event.pointerId !== drag.pointerId) return;
+    dragRef.current.active = false;
+    dragRef.current.pointerId = -1;
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+  }, []);
 
   const setExpression = useCallback((expressionName: string) => {
     const vrm = vrmRef.current;
@@ -590,5 +663,9 @@ export function useVRM(canvasRef: React.RefObject<HTMLCanvasElement | null>) {
     setViewport,
     setTypingReaction,
     getDebug,
+    handlePointerDown,
+    handlePointerMove,
+    handlePointerUp: endPointerDrag,
+    handlePointerCancel: endPointerDrag,
   };
 }

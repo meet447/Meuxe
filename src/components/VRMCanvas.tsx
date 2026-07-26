@@ -32,19 +32,28 @@ export const VRMCanvas = memo(function VRMCanvas({
   getAudioLevels,
 }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const { loadModel, setExpression, startLipSync, stopLipSync, setViewport, setTypingReaction } =
-    useVRM(canvasRef);
+  const {
+    loadModel,
+    setExpression,
+    startLipSync,
+    stopLipSync,
+    setViewport,
+    setTypingReaction,
+    handlePointerDown,
+    handlePointerMove,
+    handlePointerUp,
+    handlePointerCancel,
+  } = useVRM(canvasRef);
   const prevModelPath = useRef<string | null>(null);
   const prevExpression = useRef<string>("");
   const [modelLoading, setModelLoading] = useState(false);
-  const dragOffset = { x: 0, y: 0 };
 
   useEffect(() => {
     if (modelPath && modelPath !== prevModelPath.current) {
       prevModelPath.current = modelPath;
       setModelLoading(true);
       loadModel(modelPath, animations).then(() => {
-        setViewport(zoom, framing, dragOffset.x, dragOffset.y);
+        setViewport(zoom, framing);
       }).finally(() => setModelLoading(false));
     }
     // Intentionally disabling lint rule - loading state is necessary for model loading UX
@@ -67,7 +76,7 @@ export const VRMCanvas = memo(function VRMCanvas({
   }, [speaking, startLipSync, stopLipSync, getAudioLevels]);
 
   useEffect(() => {
-    setViewport(zoom, framing, dragOffset.x, dragOffset.y);
+    setViewport(zoom, framing);
   }, [zoom, framing, setViewport]);
 
   useEffect(() => {
@@ -102,8 +111,12 @@ export const VRMCanvas = memo(function VRMCanvas({
       )}
       <canvas
         ref={canvasRef}
-        className="w-full h-full cursor-default"
+        className="w-full h-full cursor-grab active:cursor-grabbing"
         style={{ display: modelPath ? "block" : "none", touchAction: "none" }}
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerUp}
+        onPointerCancel={handlePointerCancel}
       />
     </div>
   );
