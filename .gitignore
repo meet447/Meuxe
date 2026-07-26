@@ -65,6 +65,8 @@ models/whisper/*.ggml
 
 # Expression mappings — user-configured per model (manual via UI)
 models/expression_mappings/*.json
+!models/expression_mappings/haru.json
+!models/expression_mappings/utsuwa.json
 
 # Environment — secrets
 .env
