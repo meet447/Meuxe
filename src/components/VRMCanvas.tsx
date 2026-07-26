@@ -17,8 +17,6 @@ interface Props {
   onFramingChange?: (framing: "full" | "half") => void;
   onBackgroundChange?: (bg: string) => void;
   getAudioLevels?: () => { volume: number; mouthOpen: number; mouthForm: number };
-  /** Restrict drag rotation to horizontal (yaw) only. */
-  orbitYawOnly?: boolean;
 }
 
 export const VRMCanvas = memo(function VRMCanvas({
@@ -32,7 +30,6 @@ export const VRMCanvas = memo(function VRMCanvas({
   zoom,
   framing,
   getAudioLevels,
-  orbitYawOnly = false,
 }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const {
@@ -46,7 +43,7 @@ export const VRMCanvas = memo(function VRMCanvas({
     handlePointerMove,
     handlePointerUp,
     handlePointerCancel,
-  } = useVRM(canvasRef, { orbitYawOnly });
+  } = useVRM(canvasRef);
   const prevModelPath = useRef<string | null>(null);
   const prevExpression = useRef<string>("");
   const [modelLoading, setModelLoading] = useState(false);

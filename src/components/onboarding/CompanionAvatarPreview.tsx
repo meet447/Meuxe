@@ -79,7 +79,6 @@ export function CompanionAvatarPreview({
               <VRMCanvas
                 modelPath={url}
                 animations={model.animations}
-                orbitYawOnly
                 expression="neutral"
                 speaking={false}
                 userTyping={false}

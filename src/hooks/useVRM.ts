@@ -14,30 +14,15 @@ function lerp(a: number, b: number, t: number): number {
 }
 
 const ORBIT_ROTATE_SPEED = 0.005;
-const ORBIT_PITCH_MIN = -Math.PI / 6;
-const ORBIT_PITCH_MAX = Math.PI / 6;
 
-function clamp(value: number, min: number, max: number): number {
-  return Math.min(max, Math.max(min, value));
-}
-
-export type UseVRMOptions = {
-  /** When true, drag only rotates left/right (no vertical tilt). */
-  orbitYawOnly?: boolean;
-};
-
-export function useVRM(
-  canvasRef: React.RefObject<HTMLCanvasElement | null>,
-  options: UseVRMOptions = {}
-) {
+export function useVRM(canvasRef: React.RefObject<HTMLCanvasElement | null>) {
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
   const sceneRef = useRef<THREE.Scene | null>(null);
   const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
   const vrmRef = useRef<VRM | null>(null);
   const pivotRef = useRef<THREE.Group | null>(null);
-  const orbitRef = useRef({ yaw: 0, pitch: 0 });
+  const orbitYawRef = useRef(0);
   const dragRef = useRef({ active: false, pointerId: -1, lastX: 0, lastY: 0 });
-  const orbitYawOnlyRef = useRef(options.orbitYawOnly ?? false);
   const clockRef = useRef<THREE.Clock | null>(null);
   const animFrameRef = useRef<number>(0);
   const animatingRef = useRef(false);
@@ -72,10 +57,6 @@ export function useVRM(
   const nextBlinkDelayRef = useRef(2000 + Math.random() * 4000);
   const blinkValueRef = useRef(0);
   const blinkClosingRef = useRef(false);
-
-  useEffect(() => {
-    orbitYawOnlyRef.current = options.orbitYawOnly ?? false;
-  }, [options.orbitYawOnly]);
 
   useEffect(() => {
     return () => {
@@ -124,14 +105,11 @@ export function useVRM(
   const applyOrbitRotation = useCallback(() => {
     const pivot = pivotRef.current;
     if (!pivot) return;
-    const { yaw, pitch } = orbitRef.current;
-    pivot.rotation.order = "YXZ";
-    pivot.rotation.y = yaw;
-    pivot.rotation.x = pitch;
+    pivot.rotation.y = orbitYawRef.current;
   }, []);
 
   const resetOrbitRotation = useCallback(() => {
-    orbitRef.current = { yaw: 0, pitch: 0 };
+    orbitYawRef.current = 0;
     applyOrbitRotation();
   }, [applyOrbitRotation]);
 
@@ -564,18 +542,10 @@ export function useVRM(
       if (!drag.active || event.pointerId !== drag.pointerId) return;
 
       const dx = event.clientX - drag.lastX;
-      const dy = event.clientY - drag.lastY;
       drag.lastX = event.clientX;
       drag.lastY = event.clientY;
 
-      orbitRef.current.yaw -= dx * ORBIT_ROTATE_SPEED;
-      if (!orbitYawOnlyRef.current) {
-        orbitRef.current.pitch = clamp(
-          orbitRef.current.pitch - dy * ORBIT_ROTATE_SPEED,
-          ORBIT_PITCH_MIN,
-          ORBIT_PITCH_MAX
-        );
-      }
+      orbitYawRef.current -= dx * ORBIT_ROTATE_SPEED;
       applyOrbitRotation();
     },
     [applyOrbitRotation]
