@@ -67,33 +67,38 @@ export function AgentSetupPanel({
   if (preset === "custom") return null;
 
   const title = ACP_AGENT_PRESETS[preset].title;
+  const agent = status?.agent;
+  const usingSystem = agent?.install_source === "system";
+  const usingManaged = agent?.install_source === "managed";
+  const usingNpx = agent?.install_source === "npx";
 
   return (
     <div className="rounded-2xl border border-slate-200/90 bg-slate-50/80 p-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <span className="text-xs font-semibold text-slate-600">
-          {friendly ? "Quick setup" : "Setup"}
+          {friendly ? "Agent on your system" : "Agent CLI"}
         </span>
         {loading && <span className="text-xs text-slate-400">Checking…</span>}
       </div>
 
-      {status && !loading && (
+      {status && !loading && agent && (
         <div className="mt-3 space-y-3">
           <div className="flex flex-wrap gap-2">
-            <StatusPill ok={status.agent.ready} label={status.agent.ready ? `${title} ready` : `${title} needed`} />
+            <StatusPill ok={agent.ready} label={agent.ready ? `${title} ready` : `${title} needed`} />
+            {usingSystem && <StatusPill ok label="System PATH" />}
+            {usingManaged && <StatusPill ok label="Meuxe fallback" />}
+            {usingNpx && <StatusPill ok label="via npx" />}
             <StatusPill ok={status.prerequisites.node_available} label="Node.js" />
             {status.prerequisites.node_version && (
               <span className="text-[11px] text-slate-400">{status.prerequisites.node_version}</span>
             )}
-            <StatusPill ok={status.prerequisites.npx_available} label="npx" muted={!status.prerequisites.npx_available} />
           </div>
 
-          {!status.agent.ready && !friendly && (
-            <p className="text-sm text-slate-600 leading-snug">{status.agent.detail}</p>
-          )}
-          {!status.agent.ready && friendly && (
-            <p className="text-sm text-slate-600 leading-snug">
-              Tap install once — we&apos;ll set this up in your Meuxe folder.
+          <p className="text-sm text-slate-600 leading-snug">{agent.detail}</p>
+
+          {friendly && !agent.ready && (
+            <p className="text-sm text-slate-500 leading-snug">
+              Install the CLI globally (npm), or use the local fallback below.
             </p>
           )}
 
@@ -107,28 +112,28 @@ export function AgentSetupPanel({
                 Install Node.js
               </button>
             )}
-            {status.prerequisites.node_available && !status.agent.ready && (
+            {status.prerequisites.node_available && !agent.ready && (
               <button
                 type="button"
                 onClick={runInstall}
                 disabled={installing}
                 className="rounded-xl bg-violet-600 px-3.5 py-2 text-sm font-semibold text-white hover:bg-violet-700 disabled:opacity-50"
               >
-                {installing ? "Installing…" : `Install ${title}`}
+                {installing ? "Installing…" : "Install local fallback"}
               </button>
             )}
-            {status.prerequisites.node_available && status.agent.ready && !status.agent.managed_install && (
+            {status.prerequisites.node_available && agent.ready && usingSystem && (
+              <span className="text-xs font-semibold text-emerald-700">Using your global install</span>
+            )}
+            {status.prerequisites.node_available && agent.ready && !usingSystem && (
               <button
                 type="button"
                 onClick={runInstall}
                 disabled={installing}
                 className="rounded-xl border border-violet-200 bg-white px-3.5 py-2 text-sm font-semibold text-violet-800 hover:bg-violet-50 disabled:opacity-50"
               >
-                {installing ? "Installing…" : "Install into Meuxe folder"}
+                {installing ? "Installing…" : "Install local fallback"}
               </button>
-            )}
-            {status.agent.ready && status.agent.managed_install && (
-              <span className="text-xs font-semibold text-emerald-700">Ready in Meuxe folder</span>
             )}
           </div>
         </div>

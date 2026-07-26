@@ -44,7 +44,9 @@ export async function invoke<T>(cmd: string, args?: Record<string, unknown>): Pr
           managed_install: false,
           system_path: true,
           needs_node: false,
-          detail: "Demo: agent ready.",
+          detail: "Demo: using system agent.",
+          install_source: "system",
+          system_command: "/usr/local/bin/opencode",
         },
       } as T;
     case "agent_setup_install":
