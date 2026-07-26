@@ -30,6 +30,7 @@ interface Model {
   type: string;
   model_file: string;
   path: string;
+  animations?: { name: string; path: string }[];
 }
 
 interface FormData {

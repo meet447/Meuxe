@@ -11,7 +11,8 @@
     "record:onboarding": "node scripts/record-onboarding-demo.mjs"
   },
   "dependencies": {
-    "@pixiv/three-vrm": "^3.5.1",
+    "@pixiv/three-vrm": "^3.5.5",
+    "@pixiv/three-vrm-animation": "^3.5.5",
     "@tauri-apps/api": "^2.0.0",
     "@tauri-apps/plugin-autostart": "^2.0.0",
     "@tauri-apps/plugin-global-shortcut": "^2.0.0",

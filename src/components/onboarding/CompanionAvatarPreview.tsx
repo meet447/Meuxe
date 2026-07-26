@@ -11,6 +11,7 @@ export interface PreviewModel {
   id: string;
   type: string;
   path: string;
+  animations?: { name: string; path: string }[];
 }
 
 const noop = () => undefined;
@@ -77,6 +78,7 @@ export function CompanionAvatarPreview({
             {model.type === "vrm" ? (
               <VRMCanvas
                 modelPath={url}
+                animations={model.animations}
                 expression="neutral"
                 speaking={false}
                 userTyping={false}

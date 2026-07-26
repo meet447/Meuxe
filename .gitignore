@@ -53,8 +53,10 @@ models/live2d/ariu/
 characters/*
 !characters/.gitkeep
 
-# VRM models — user-provided
+# VRM models — user-provided, except bundled default
 models/vrm/*
+!models/vrm/utsuwa/
+!models/vrm/utsuwa/**
 
 # Whisper / local AI model weights — user-provided
 models/whisper/*.bin

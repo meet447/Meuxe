@@ -68,10 +68,18 @@ pub const DEFAULT_EXPRESSIONS: &[&str] = &[
 pub const VRM_EXPRESSIONS: &[&str] = &["happy", "angry", "sad", "relaxed", "surprised"];
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AnimationInfo {
+    pub name: String,
+    pub path: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ModelInfo {
     pub id: String,
     #[serde(rename = "type")]
     pub model_type: String,
     pub model_file: String,
     pub path: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub animations: Option<Vec<AnimationInfo>>,
 }

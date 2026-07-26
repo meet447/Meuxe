@@ -3,7 +3,9 @@ import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { FBXLoader } from "three/examples/jsm/loaders/FBXLoader.js";
 import { VRMLoaderPlugin, VRM, VRMExpressionPresetName } from "@pixiv/three-vrm";
+import { VRMAnimationLoaderPlugin, createVRMAnimationClip } from "@pixiv/three-vrm-animation";
 import { mixamoVRMRigMap } from "../utils/mixamoRigMap";
+import { resolveAssetUrl } from "../api/tauri";
 import type { AudioLevels } from "./useAudioAnalyser";
 import type { AnimationInfo } from "../types";
 
@@ -134,6 +136,17 @@ export function useVRM(canvasRef: React.RefObject<HTMLCanvasElement | null>) {
   }, [canvasRef]);
 
   // Retarget Mixamo FBX animation to VRM skeleton
+  const loadVrmaClip = useCallback(async (url: string, vrm: VRM): Promise<THREE.AnimationClip | null> => {
+    const gltfLoader = new GLTFLoader();
+    gltfLoader.register((parser) => new VRMAnimationLoaderPlugin(parser));
+    const gltf = await gltfLoader.loadAsync(url);
+    const vrmAnimations = gltf.userData.vrmAnimations as unknown[] | undefined;
+    if (!vrmAnimations?.length) {
+      return null;
+    }
+    return createVRMAnimationClip(vrmAnimations[0] as Parameters<typeof createVRMAnimationClip>[0], vrm);
+  }, []);
+
   const retargetAnimation = useCallback(
     (fbxScene: THREE.Group, vrm: VRM, clipName: string): THREE.AnimationClip | null => {
       const clip = fbxScene.animations[0];
@@ -447,7 +460,8 @@ export function useVRM(canvasRef: React.RefObject<HTMLCanvasElement | null>) {
           return;
         }
 
-        vrm.scene.rotation.y = Math.PI;
+        const version = vrm.meta?.metaVersion === "1" ? "1" : "0";
+        vrm.scene.rotation.y = version === "1" ? 0 : Math.PI;
         pivotRef.current?.add(vrm.scene);
         resetOrbitRotation();
         vrmRef.current = vrm;
@@ -456,15 +470,24 @@ export function useVRM(canvasRef: React.RefObject<HTMLCanvasElement | null>) {
         const mixer = new THREE.AnimationMixer(vrm.scene);
         mixerRef.current = mixer;
 
-        // Load FBX animations
+        // Load animations (VRMA or Mixamo FBX)
         if (animations && animations.length > 0) {
           const fbxLoader = new FBXLoader();
-          // Load all animations in parallel
           await Promise.allSettled(
             animations.map(async (anim) => {
               try {
-                const fbx = await fbxLoader.loadAsync(anim.path);
-                const clip = retargetAnimation(fbx, vrm, anim.name);
+                const assetUrl = await resolveAssetUrl(anim.path);
+                const cacheBustUrl = `${assetUrl}${assetUrl.includes("?") ? "&" : "?"}t=${Date.now()}`;
+                const lower = anim.path.toLowerCase();
+                let clip: THREE.AnimationClip | null = null;
+
+                if (lower.endsWith(".vrma")) {
+                  clip = await loadVrmaClip(cacheBustUrl, vrm);
+                } else if (lower.endsWith(".fbx")) {
+                  const fbx = await fbxLoader.loadAsync(cacheBustUrl);
+                  clip = retargetAnimation(fbx, vrm, anim.name);
+                }
+
                 if (clip) {
                   clipsRef.current.set(anim.name, clip);
                   console.log(`[VRM] Loaded animation: "${anim.name}" (${clip.duration.toFixed(1)}s)`);
@@ -475,7 +498,6 @@ export function useVRM(canvasRef: React.RefObject<HTMLCanvasElement | null>) {
             })
           );
 
-          // Play idle animation if available
           const idleNames = ["idle", "breathingidle", "breathing_idle", "standing", "default"];
           let matchFound = false;
           for (const name of idleNames) {
@@ -488,7 +510,6 @@ export function useVRM(canvasRef: React.RefObject<HTMLCanvasElement | null>) {
             }
             if (matchFound) break;
           }
-          // If no idle found, play the first animation
           if (!currentActionRef.current && clipsRef.current.size > 0) {
             playAnimation(clipsRef.current.keys().next().value!);
           }
@@ -510,7 +531,7 @@ export function useVRM(canvasRef: React.RefObject<HTMLCanvasElement | null>) {
         console.error("[VRM] Failed to load model:", err);
       }
     },
-    [canvasRef, startAnimationLoop, retargetAnimation, playAnimation, resetOrbitRotation]
+    [canvasRef, startAnimationLoop, retargetAnimation, playAnimation, resetOrbitRotation, loadVrmaClip]
   );
 
   const handlePointerDown = useCallback((event: React.PointerEvent<HTMLCanvasElement>) => {

@@ -40,6 +40,7 @@ function appDataStaticPlugin() {
       ".glb": "application/octet-stream",
       ".gltf": "application/json",
       ".fbx": "application/octet-stream",
+      ".vrma": "application/octet-stream",
     };
     res.setHeader("Content-Type", mimeTypes[ext] || "application/octet-stream");
     res.setHeader("Content-Length", stat.size);
@@ -88,7 +89,11 @@ export default defineConfig({
     rollupOptions: {
       output: {
         manualChunks(id) {
-          if (id.includes("node_modules/three") || id.includes("@pixiv/three-vrm")) {
+          if (
+            id.includes("node_modules/three") ||
+            id.includes("@pixiv/three-vrm") ||
+            id.includes("@pixiv/three-vrm-animation")
+          ) {
             return "three-vrm";
           }
           if (id.includes("node_modules/pixi.js") || id.includes("pixi-live2d-display")) {
