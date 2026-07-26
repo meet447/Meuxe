@@ -21,7 +21,15 @@ function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
 }
 
-export function useVRM(canvasRef: React.RefObject<HTMLCanvasElement | null>) {
+export type UseVRMOptions = {
+  /** When true, drag only rotates left/right (no vertical tilt). */
+  orbitYawOnly?: boolean;
+};
+
+export function useVRM(
+  canvasRef: React.RefObject<HTMLCanvasElement | null>,
+  options: UseVRMOptions = {}
+) {
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
   const sceneRef = useRef<THREE.Scene | null>(null);
   const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
@@ -29,6 +37,7 @@ export function useVRM(canvasRef: React.RefObject<HTMLCanvasElement | null>) {
   const pivotRef = useRef<THREE.Group | null>(null);
   const orbitRef = useRef({ yaw: 0, pitch: 0 });
   const dragRef = useRef({ active: false, pointerId: -1, lastX: 0, lastY: 0 });
+  const orbitYawOnlyRef = useRef(options.orbitYawOnly ?? false);
   const clockRef = useRef<THREE.Clock | null>(null);
   const animFrameRef = useRef<number>(0);
   const animatingRef = useRef(false);
@@ -63,6 +72,10 @@ export function useVRM(canvasRef: React.RefObject<HTMLCanvasElement | null>) {
   const nextBlinkDelayRef = useRef(2000 + Math.random() * 4000);
   const blinkValueRef = useRef(0);
   const blinkClosingRef = useRef(false);
+
+  useEffect(() => {
+    orbitYawOnlyRef.current = options.orbitYawOnly ?? false;
+  }, [options.orbitYawOnly]);
 
   useEffect(() => {
     return () => {
@@ -556,11 +569,13 @@ export function useVRM(canvasRef: React.RefObject<HTMLCanvasElement | null>) {
       drag.lastY = event.clientY;
 
       orbitRef.current.yaw -= dx * ORBIT_ROTATE_SPEED;
-      orbitRef.current.pitch = clamp(
-        orbitRef.current.pitch - dy * ORBIT_ROTATE_SPEED,
-        ORBIT_PITCH_MIN,
-        ORBIT_PITCH_MAX
-      );
+      if (!orbitYawOnlyRef.current) {
+        orbitRef.current.pitch = clamp(
+          orbitRef.current.pitch - dy * ORBIT_ROTATE_SPEED,
+          ORBIT_PITCH_MIN,
+          ORBIT_PITCH_MAX
+        );
+      }
       applyOrbitRotation();
     },
     [applyOrbitRotation]
