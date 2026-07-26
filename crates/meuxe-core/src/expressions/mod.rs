@@ -64,7 +64,10 @@ impl ExpressionManager {
             std::fs::read_to_string(&path)
                 .ok()
                 .and_then(|contents| serde_json::from_str(&contents).ok())
-                .unwrap_or_default()
+                .filter(|m: &HashMap<String, String>| !m.is_empty())
+                .unwrap_or_else(|| {
+                    load_bundled_expression_mapping(model_id).unwrap_or_default()
+                })
         } else {
             load_bundled_expression_mapping(model_id).unwrap_or_default()
         };
