@@ -67,3 +67,13 @@ The default Tailwind palette is disabled (`--color-*: initial`). If a class like
 ## Motion
 
 Short and soft: `animate-fade-in`, `animate-rise-in`, `animate-pop-in` (≤350ms, `--ease-soft`). Ambient: `animate-breathe`, `animate-blink` on the mascot, `animate-dot` for thinking. Respect `motion-safe:`.
+
+## App icon
+
+The master artwork is `src-tauri/icons/source/icon.svg`: a 1024px **full-bleed** amber tile with the cream mascot blob. It deliberately has no corner radius, margin or shadow — platforms mask it differently:
+
+- **macOS** — `icon.icns` is built on Apple's grid (824px squircle, 100px margin, no baked shadow). macOS 26+ applies its own squircle and lighting, so the artwork must work when masked.
+- **Windows / Linux** — full-bleed tile with 22.4% rounded corners (`icon.ico`, `Square*Logo.png`, `32x32.png`…).
+- **Tray** — `icons/tray/trayTemplate*.png` is a monochrome template image (black silhouette, transparent eye/mouth holes) for the macOS menu bar; `tray*.png` is the coloured tile for Windows/Linux.
+
+Edit the SVG, then run `npm run icons` (`scripts/generate-icons.mjs`) to regenerate every file. Never edit the PNGs by hand.

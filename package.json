@@ -8,6 +8,7 @@
     "build": "tsc -b && vite build",
     "tauri": "tauri",
     "test": "vitest run",
+    "icons": "node scripts/generate-icons.mjs",
     "record:onboarding": "node scripts/record-onboarding-demo.mjs"
   },
   "dependencies": {

@@ -15,7 +15,14 @@ pub fn setup_tray(app: &AppHandle) -> Result<(), String> {
 
     let menu = Menu::with_items(app, &[&open, &toggle_mini, &quit]).map_err(|e| e.to_string())?;
 
-    TrayIconBuilder::new()
+    #[cfg(target_os = "macos")]
+    let builder = TrayIconBuilder::new()
+        .icon(tauri::include_image!("./icons/tray/trayTemplate@2x.png"))
+        .icon_as_template(true);
+    #[cfg(not(target_os = "macos"))]
+    let builder = TrayIconBuilder::new().icon(tauri::include_image!("./icons/tray/tray@2x.png"));
+
+    builder
         .menu(&menu)
         .tooltip("Meuxe")
         .on_menu_event(|app, event| match event.id.as_ref() {
