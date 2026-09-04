@@ -1,18 +1,27 @@
-export function MeuxeMark({ className = "h-12 w-12" }: { className?: string }) {
+import { cn } from "./cn";
+import { Mascot } from "./Mascot";
+
+/**
+ * App mark: pastel amber squircle holding the mascot. Sizes via `className`
+ * (default h-12 w-12). Use `plain` for a flat, non-elevated version.
+ */
+export function MeuxeMark({
+  className = "h-12 w-12",
+  plain = false,
+}: {
+  className?: string;
+  plain?: boolean;
+}) {
   return (
     <div
-      className={`flex items-center justify-center rounded-[1.25rem] bg-blue-600 text-white shadow-sm ${className}`}
+      className={cn(
+        "squircle flex shrink-0 items-center justify-center rounded-[30%] bg-accent-100",
+        !plain && "shadow-soft",
+        className,
+      )}
       aria-hidden
     >
-      <svg className="h-[55%] w-[55%]" viewBox="0 0 32 32" fill="none">
-        <path
-          d="M8 22V10l4 6 4-6 4 6 4-6v12"
-          stroke="currentColor"
-          strokeWidth="2.5"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-      </svg>
+      <Mascot tone="warm" animated={false} className="h-[74%] w-[74%] translate-y-[3%]" />
     </div>
   );
 }

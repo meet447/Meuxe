@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <!--
+    Meuxe app icon — master artwork, full bleed (no corner radius,
+    margin or drop shadow). Platform masks are applied downstream:
+    macOS 26+ masks to its squircle itself; scripts/generate-icons.mjs
+    emits a rounded-corner variant for Windows/Linux and a legacy-macOS
+    variant on Apple's 824px grid. Edit this file, then `npm run icons`.
+  -->
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#f7dc9d"/>
+      <stop offset="1" stop-color="#eebd55"/>
+    </linearGradient>
+    <linearGradient id="body" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#fffaf0"/>
+      <stop offset="1" stop-color="#fdf0d2"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.5" cy="0.28" r="0.6">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.32"/>
+      <stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <rect width="1024" height="1024" fill="url(#bg)"/>
+  <rect width="1024" height="1024" fill="url(#glow)"/>
+
+  <!-- Blob body: same silhouette as <Mascot/> (64-unit grid), centred and scaled -->
+  <g transform="translate(512 528) scale(13.6) translate(-32 -31.5)">
+    <path d="M32 7C44 6 56 14 56 27c0 13-6 26-22 29C18 59 7 47 8 33 9 19 20 8 32 7Z" fill="url(#body)"/>
+    <ellipse cx="22" cy="16" rx="7" ry="3.6" fill="#ffffff" opacity="0.55"/>
+
+    <circle cx="16.5" cy="39.5" r="3.4" fill="#e4889d" opacity="0.55"/>
+    <circle cx="47.5" cy="39.5" r="3.4" fill="#e4889d" opacity="0.55"/>
+
+    <ellipse cx="23" cy="31.5" rx="3.6" ry="4.6" fill="#1b1b1e"/>
+    <ellipse cx="41" cy="31.5" rx="3.6" ry="4.6" fill="#1b1b1e"/>
+    <circle cx="24.4" cy="29.6" r="1.25" fill="#ffffff"/>
+    <circle cx="42.4" cy="29.6" r="1.25" fill="#ffffff"/>
+
+    <path d="M27.5 42.5Q32 46.2 36.5 42.5" stroke="#1b1b1e" stroke-width="2.2" stroke-linecap="round" fill="none" opacity="0.85"/>
+  </g>
+</svg>

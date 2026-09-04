@@ -1,6 +1,6 @@
 import { invoke, convertFileSrc } from "@tauri-apps/api/core";
 
-// Asset paths — in the Tauri app, resolve to convertFileSrc URLs via the backend.
+// Asset paths: in the Tauri app, resolve to convertFileSrc URLs via the backend.
 // In browser-only dev (npm run dev), fall back to Vite /static/ middleware.
 export function toAssetUrl(relativePath: string): string {
   const clean = relativePath.replace(/^\/+/, "");

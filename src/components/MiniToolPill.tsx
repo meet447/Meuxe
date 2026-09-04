@@ -1,4 +1,5 @@
 import type { ToolCallStatus } from "./ToolCallBubble";
+import { CheckIcon, Pill } from "./ui";
 
 const TOOL_LABELS: Record<string, string> = {
   read_file: "Reading",
@@ -23,12 +24,20 @@ function resolveToolLabel(toolName: string): string {
   return toolName.replace(/_/g, " ");
 }
 
-const STATUS_DOTS: Record<string, string> = {
-  running: "bg-blue-400 animate-pulse",
-  completed: "bg-emerald-400",
-  failed: "bg-red-400",
-  awaiting_confirmation: "bg-amber-400 animate-pulse",
-};
+function statusTone(status: ToolCallStatus["status"]) {
+  switch (status) {
+    case "running":
+      return { tone: "honey" as const, pulse: true, dot: true };
+    case "completed":
+      return { tone: "sage" as const, pulse: false, dot: false };
+    case "failed":
+      return { tone: "clay" as const, pulse: false, dot: false };
+    case "awaiting_confirmation":
+      return { tone: "honey" as const, pulse: true, dot: true };
+    default:
+      return { tone: "neutral" as const, pulse: false, dot: false };
+  }
+}
 
 interface Props {
   toolCalls: ToolCallStatus[];
@@ -42,35 +51,34 @@ export function MiniToolPills({ toolCalls, pendingConfirmation }: Props) {
     <div className="absolute bottom-14 left-2 right-2 z-15 flex flex-wrap gap-1 pointer-events-none">
       {toolCalls.map((tc) => {
         const label = resolveToolLabel(tc.toolName);
-        const dotClass = STATUS_DOTS[tc.status] || "bg-slate-400";
+        const { tone, pulse, dot } = statusTone(tc.status);
         const isConfirm = tc.status === "awaiting_confirmation";
 
         return (
-          <div
+          <Pill
             key={tc.requestId}
-            className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-semibold backdrop-blur-xl shadow-sm pointer-events-auto ${
-              isConfirm
-                ? "bg-amber-500/80 text-white border border-amber-400/50"
-                : "bg-white/75 text-slate-600 border border-white/40"
+            tone={tone}
+            dot={dot}
+            pulse={pulse}
+            size="xs"
+            className={`pointer-events-auto shadow-soft backdrop-blur ${
+              isConfirm ? "bg-honey-50/95" : "bg-surface-2/95"
             }`}
           >
-            <span className={`w-1.5 h-1.5 rounded-full ${dotClass}`} />
-            <span>{label}</span>
+            {label}
             {tc.status === "completed" && (
-              <svg className="w-2.5 h-2.5 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-              </svg>
+              <CheckIcon className="ml-0.5 h-2.5 w-2.5 text-sage-500" strokeWidth={2.4} />
             )}
-          </div>
+          </Pill>
         );
       })}
 
       {/* Voice confirmation hint */}
       {pendingConfirmation && (
-        <div className="w-full mt-1 text-center">
-          <span className="inline-block rounded-full bg-amber-500/80 text-white text-[10px] font-semibold px-3 py-1 backdrop-blur-xl shadow-sm animate-pulse">
-            Say "yes" to allow or "no" to deny
-          </span>
+        <div className="mt-1 w-full text-center">
+          <Pill tone="honey" dot pulse size="xs" className="bg-honey-50/95 shadow-soft backdrop-blur">
+            Say &quot;yes&quot; to allow or &quot;no&quot; to deny
+          </Pill>
         </div>
       )}
     </div>

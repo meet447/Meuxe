@@ -1,63 +1,62 @@
-# Meuxe
+<p align="center">
+  <img src="assets/icon.png" alt="Meuxe icon" width="112" />
+</p>
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
+<h1 align="center">Meuxe</h1>
 
-A **desktop companion**—a character on your screen who remembers you, speaks, and grows with you over time. Built with [**Tauri 2**](https://v2.tauri.app/) (Rust + React). Chat runs through your **ACP CLI agent** (Claude Code, Codex, OpenCode, or custom); memories, persona, and relationship state stay on your machine. Optional cloud **TTS** only if you enable it.
+<p align="center">
+  A companion that lives on your desktop. Remembers you, talks back, and stays on your machine.
+</p>
 
-Product direction: [`docs/DIRECTION.md`](docs/DIRECTION.md) · Roadmap: [`docs/ROADMAP.md`](docs/ROADMAP.md) · ACP presets: [`docs/acp-agents.md`](docs/acp-agents.md)
+<p align="center">
+  <a href="LICENSE"><img alt="MIT license" src="https://img.shields.io/badge/license-MIT-yellow.svg"></a>
+  <a href="CONTRIBUTING.md"><img alt="PRs welcome" src="https://img.shields.io/badge/PRs-welcome-brightgreen.svg"></a>
+  <a href="https://v2.tauri.app/"><img alt="Built with Tauri 2" src="https://img.shields.io/badge/built%20with-Tauri%202-24C8DB.svg"></a>
+</p>
 
-![Meuxe demo](assets/demo.png)
+<p align="center">
+  <a href="docs/DIRECTION.md">Direction</a> · <a href="docs/ROADMAP.md">Roadmap</a> · <a href="docs/DESIGN.md">Design</a> · <a href="docs/acp-agents.md">Agents</a> · <a href="CONTRIBUTING.md">Contributing</a>
+</p>
 
-## Table of contents
+<p align="center">
+  <img src="assets/screenshot-app.png" alt="Meuxe main window: companion on stage with the conversation panel open" width="880" />
+</p>
 
-- [Features](#features)
-- [Quick start](#quick-start)
-- [ACP agents (chat)](#acp-agents-chat)
-- [Providers (optional)](#providers-optional)
-- [Development](#development)
-- [Releases](#releases)
-- [Contributing](#contributing)
-- [Security](#security)
-- [License](#license)
+## What is Meuxe
 
-## Features
+Meuxe is a character on your screen who remembers past conversations, speaks with a voice, and reacts with expressions. Everything about the relationship (memory, persona, mood) is stored locally on your machine. Chat is powered by a coding agent you already have installed (Claude Code, Codex, OpenCode, or any [ACP](https://agentclientprotocol.com) agent). Optional cloud voices only if you turn them on.
 
-### Companion core
+## Highlights
 
-- **ACP-backed chat** — Meuxe is the [Agent Client Protocol](https://agentclientprotocol.com) client; reasoning runs in the CLI agent you install and select
-- **Layered characters** — written as `.yaml` and `.md` files (`soul.md`, `style.md`, `rules.md`, etc.)
-- **Session history** — local persistence of chats
-- **Local long-term memory** — semantic, episodic, and reflection-style memories (local storage)
-- **Relationship state** — trust, affection, mood, and energy evolve over time
-- **Expression-aware streaming** — parses agent replies for emotion tags in real time (`<<expression>>`)
+- **Remembers you.** Long-term memory (episodic, semantic, reflections) plus a relationship state that evolves: trust, affection, mood, energy.
+- **Your agent, your choice.** Chat runs through the CLI agent you install and select; Meuxe is the Agent Client Protocol client, not a locked-in model API.
+- **Expressive avatars.** Live2D and VRM characters with lip sync, expression tags parsed from agent replies, and framing controls on stage.
+- **Voice in and out.** Your companion speaks aloud with live captions, and listens through your microphone with optional on-device Whisper transcription.
+- **Mini mode.** A transparent desktop widget with hover-to-reveal chat, size presets, and expand to the full app.
+- **Keyboard shortcuts.** Toggle mini mode, focus chat, and control the mic without reaching for the mouse.
+- **Local-first privacy.** Memories, persona, sessions, and relationship state stay on your machine.
+- **Characters as files.** Layered companion profiles as editable `.yaml` and `.md` files (`soul.md`, `style.md`, `rules.md`, and more).
 
-### Interaction
+## Screenshots
 
-- **Streaming chat** — real-time text over ACP agent sessions
-- **Speech subtitles** — per-sentence captions on the main stage and in mini mode while TTS plays
-- **Parallel TTS** — synthesizes speech segments in parallel for lower latency
-- **Voice input** — microphone capture, VAD, and optional Whisper-based transcription
-- **Light companion stage** — flat, readable UI with history drawer and floating chat input
-- **Global shortcuts** — toggle mini mode, focus chat, and mic from the keyboard
+<p align="center">
+  <img src="assets/screenshot-onboarding.png" alt="Meuxe onboarding: the first step of the guided setup" width="880" />
+</p>
 
-### Avatars
+<p align="center"><em>First launch: a short guided setup for you, your companion, their voice, and the agent behind them.</em></p>
 
-- **Live2D** — Cubism models with lip sync and expression mapping
-- **VRM** — 3D avatars with custom animations
-- **Mini mode** — transparent desktop widget with hover-to-reveal chat, size presets, and expand to full app
-- **Avatar framing** — zoom and background in Settings (full / half-body on stage toolbar)
+## Get started
 
-## Quick start
+Pre-built installers come from GitHub Releases when maintainers publish a tag. You can also build and run from source:
 
 ### Prerequisites
 
-- **Node.js** 22 recommended (see [`.nvmrc`](.nvmrc))
+- **Node.js** 22 (see [`.nvmrc`](.nvmrc))
 - **Rust** 1.88.0 with **Cargo** (pinned in [`rust-toolchain.toml`](rust-toolchain.toml); see [Tauri prerequisites](https://v2.tauri.app/start/prerequisites/) for OS-specific packages)
 - **Linux:** WebKitGTK and related dev packages (the same set [used in CI](.github/workflows/release.yml) is a good reference)
-- **An ACP agent** for chat — pick one during onboarding or in Settings → Agent (see [ACP agents (chat)](#acp-agents-chat))
+- **An ACP agent** for chat (see [Pick an agent](#pick-an-agent) below)
 
-### Install and run (development)
+### Install and run
 
 ```bash
 git clone https://github.com/meet447/Meuxe.git
@@ -72,41 +71,22 @@ npm run tauri dev
 npm run tauri build
 ```
 
-## ACP agents (chat)
+### Pick an agent
 
-Meuxe does **not** embed an OpenAI-compatible LLM client for chat. Every message goes to a subprocess speaking **ACP**:
+First launch walks you through choosing an agent, and you can change it later in Settings → Agent. Meuxe does not ship its own model: every message goes to the agent you pick, over ACP.
 
 | Preset | Typical install |
 |--------|-------------------|
 | **OpenCode** | `opencode` CLI (`npm i -g opencode-ai`), launched as `opencode acp` |
 | **Claude Code** | `npx -y @agentclientprotocol/claude-agent-acp@latest` |
 | **Codex** | `npx -y @agentclientprotocol/codex-acp@latest` |
-| **Custom** | Any ACP agent — command and args in Settings |
+| **Custom** | Any ACP agent: set command and args in Settings |
 
-Before each turn, Meuxe writes persona, memory, and relationship context under `companion-home/` in your app data directory and uses that tree as the agent working directory. Details: [`docs/companion-home.md`](docs/companion-home.md) and [`docs/acp-agents.md`](docs/acp-agents.md).
+## How it works
 
-## Providers (optional)
+Meuxe is an [Agent Client Protocol](https://agentclientprotocol.com) client. Before each turn it writes persona, memory, and relationship context into `companion-home/` in the app data directory and uses that tree as the agent's working directory. See [`docs/companion-home.md`](docs/companion-home.md) and [`docs/acp-agents.md`](docs/acp-agents.md) for details.
 
-You choose which optional services to use:
-
-- **Chat** — always via your **ACP CLI agent** (see above). No separate “LLM API” setting in Meuxe.
-- **TTS** — built-in Meuxe TTS (no key), plus ElevenLabs and OpenAI TTS when configured in Settings → Voice.
-
-## Project structure
-
-```text
-Meuxe/
-├── src/                 # React (Vite) frontend
-├── src-tauri/           # Tauri shell, ACP client, Rust commands
-├── crates/meuxe-core/   # Shared Rust logic (persona, memory, sessions, TTS, …)
-├── characters/          # Local companion profiles
-├── models/              # Live2D and VRM assets
-└── data/                # Local session and memory data (created at runtime)
-```
-
-### Upgrading from MeuxCompanion
-
-The desktop app identifier is now `com.meuxe.app` (product name **Meuxe**). Local data no longer lives under `com.meuxcompanion.app`. To keep existing sessions, memory, and config, copy your old app data directory into the new path (for example macOS `~/Library/Application Support/com.meuxe.app`).
+For voice, Meuxe ships built-in TTS with no API key required. You can optionally add ElevenLabs and OpenAI voices in Settings → Voice.
 
 ## Development
 
@@ -114,12 +94,13 @@ The desktop app identifier is now `com.meuxe.app` (product name **Meuxe**). Loca
 npm run tauri dev    # desktop app + hot reload
 npm run dev          # Vite frontend only (without Tauri shell)
 npm test             # Vitest unit tests
-npm run build        # Typecheck + production frontend build
+npm run build        # typecheck + production frontend build
+npm run icons        # regenerate app icons from src-tauri/icons/source/icon.svg
 ```
 
 ### Rust (Linux / CI parity)
 
-`whisper-rs-sys` needs CMake and g++. On Linux CI images, link against GCC’s `libstdc++`:
+`whisper-rs-sys` needs CMake and g++. On Linux CI images, link against GCC's `libstdc++`:
 
 ```bash
 export CC=gcc CXX=g++
@@ -130,7 +111,25 @@ cargo clippy --workspace --all-targets -- -D warnings
 cargo test --workspace
 ```
 
+### Project structure
+
+```text
+Meuxe/
+├── src/                 # React (Vite) frontend
+├── src-tauri/           # Tauri shell, ACP client, Rust commands
+├── crates/meuxe-core/   # Shared Rust logic (persona, memory, sessions, TTS)
+├── characters/          # Local companion profiles
+├── models/              # Live2D and VRM assets
+├── data/                # Local session and memory data (created at runtime)
+├── scripts/             # Build and asset helpers
+└── docs/                # Product docs and architecture notes
+```
+
 See [CONTRIBUTING.md](CONTRIBUTING.md) for how we handle issues, pull requests, and code review.
+
+## Migrating from MeuxCompanion
+
+The desktop app identifier is now `com.meuxe.app` (product name **Meuxe**). Local data no longer lives under `com.meuxcompanion.app`. To keep existing sessions, memory, and config, copy your old app data directory into the new path (for example macOS `~/Library/Application Support/com.meuxe.app`).
 
 ## Releases
 

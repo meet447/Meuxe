@@ -5,6 +5,7 @@ import {
   type AgentSetupStatusResponse,
 } from "../../api/tauri";
 import { ACP_AGENT_PRESETS, type AcpAgentPresetId } from "../../lib/agentPresets";
+import { Button, ExternalIcon, Pill, Surface } from "../ui";
 
 export function AgentSetupPanel({
   preset,
@@ -73,12 +74,12 @@ export function AgentSetupPanel({
   const usingNpx = agent?.install_source === "npx";
 
   return (
-    <div className="rounded-2xl border border-slate-200/90 bg-slate-50/80 p-4">
+    <Surface tone="surface" elevation="soft" className="p-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <span className="text-xs font-semibold text-slate-600">
-          {friendly ? "Agent on your system" : "Agent CLI"}
+        <span className="text-xs font-semibold text-ink-2">
+          {friendly ? "Assistant on your system" : "Assistant setup"}
         </span>
-        {loading && <span className="text-xs text-slate-400">Checking…</span>}
+        {loading && <span className="text-xs text-ink-3">Checking…</span>}
       </div>
 
       {status && !loading && agent && (
@@ -87,60 +88,51 @@ export function AgentSetupPanel({
             <StatusPill ok={agent.ready} label={agent.ready ? `${title} ready` : `${title} needed`} />
             {usingSystem && <StatusPill ok label="System PATH" />}
             {usingManaged && <StatusPill ok label="Meuxe fallback" />}
-            {usingNpx && <StatusPill ok label="via npx" />}
+            {usingNpx && <StatusPill ok label="On demand" />}
             <StatusPill ok={status.prerequisites.node_available} label="Node.js" />
             {status.prerequisites.node_version && (
-              <span className="text-[11px] text-slate-400">{status.prerequisites.node_version}</span>
+              <span className="text-[11px] text-ink-3">{status.prerequisites.node_version}</span>
             )}
           </div>
 
-          <p className="text-sm text-slate-600 leading-snug">{agent.detail}</p>
+          <p className="text-sm leading-snug text-ink-2">{agent.detail}</p>
 
           {friendly && !agent.ready && (
-            <p className="text-sm text-slate-500 leading-snug">
+            <p className="text-sm leading-snug text-ink-3">
               Install the CLI globally now, or tap Finish and Meuxe will run the same global npm install for you.
             </p>
           )}
 
           <div className="flex flex-wrap gap-2">
             {!status.prerequisites.node_available && (
-              <button
-                type="button"
+              <Button
+                size="sm"
+                variant="secondary"
+                trailing={<ExternalIcon className="h-3.5 w-3.5" />}
                 onClick={() => window.open("https://nodejs.org/en/download", "_blank")}
-                className="rounded-xl border border-amber-200 bg-white px-3.5 py-2 text-sm font-semibold text-amber-900 hover:bg-amber-50"
               >
                 Install Node.js
-              </button>
+              </Button>
             )}
             {status.prerequisites.node_available && !agent.ready && (
-              <button
-                type="button"
-                onClick={runInstall}
-                disabled={installing}
-                className="rounded-xl bg-violet-600 px-3.5 py-2 text-sm font-semibold text-white hover:bg-violet-700 disabled:opacity-50"
-              >
-                {installing ? "Installing…" : "Install globally (npm)"}
-              </button>
+              <Button size="sm" variant="primary" loading={installing} onClick={runInstall}>
+                Install globally (npm)
+              </Button>
             )}
             {status.prerequisites.node_available && agent.ready && usingSystem && (
-              <span className="text-xs font-semibold text-emerald-700">Using your global install</span>
+              <span className="text-xs font-semibold text-sage-700">Using your global install</span>
             )}
             {status.prerequisites.node_available && agent.ready && !usingSystem && (
-              <button
-                type="button"
-                onClick={runInstall}
-                disabled={installing}
-                className="rounded-xl border border-violet-200 bg-white px-3.5 py-2 text-sm font-semibold text-violet-800 hover:bg-violet-50 disabled:opacity-50"
-              >
-                {installing ? "Installing…" : "Install globally (npm)"}
-              </button>
+              <Button size="sm" variant="soft" loading={installing} onClick={runInstall}>
+                Install globally (npm)
+              </Button>
             )}
           </div>
         </div>
       )}
 
-      {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
-    </div>
+      {error && <p className="mt-2 text-sm text-clay-700">{error}</p>}
+    </Surface>
   );
 }
 
@@ -154,12 +146,8 @@ function StatusPill({
   muted?: boolean;
 }) {
   return (
-    <span
-      className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${
-        ok ? "bg-emerald-100 text-emerald-800" : muted ? "bg-slate-200 text-slate-600" : "bg-amber-100 text-amber-900"
-      }`}
-    >
+    <Pill tone={muted ? "neutral" : ok ? "sage" : "honey"} dot>
       {label}
-    </span>
+    </Pill>
   );
 }

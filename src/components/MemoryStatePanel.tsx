@@ -26,6 +26,24 @@ import type {
   MemoryVaultOverview,
   TopicSummary,
 } from "../types";
+import {
+  Button,
+  Dots,
+  DownloadIcon,
+  Field,
+  IconButton,
+  Input,
+  Mascot,
+  MoonIcon,
+  Notice,
+  Pill,
+  PinIcon,
+  RefreshIcon,
+  SearchIcon,
+  Textarea,
+  TrashIcon,
+  UploadIcon,
+} from "./ui";
 
 interface Props {
   characterId?: string;
@@ -33,10 +51,31 @@ interface Props {
   onConversationCleared?: () => void;
 }
 
-const sectionCardClass =
-  "rounded-[1.75rem] border border-slate-200/70 bg-white px-5 py-5 shadow-[0_10px_30px_rgba(15,23,42,0.05)]";
+const sectionCardClass = "squircle rounded-card bg-surface-2 p-5 shadow-soft";
 
 type MemoryTab = "overview" | "search" | "timeline" | "sources" | "vault";
+
+const TAB_LABELS: Record<MemoryTab, string> = {
+  overview: "Overview",
+  search: "Search",
+  timeline: "Timeline",
+  sources: "Sources",
+  vault: "Vault",
+};
+
+function statusNoticeTone(message: string): "info" | "success" {
+  const lower = message.toLowerCase();
+  if (
+    lower.includes("completed") ||
+    lower.includes("imported") ||
+    lower.includes("exported") ||
+    lower.includes("migrated") ||
+    lower.includes("rebuilt")
+  ) {
+    return "success";
+  }
+  return "info";
+}
 
 export function MemoryStatePanel({ characterId, characterName, onConversationCleared }: Props) {
   const [memories, setMemories] = useState<MemoryRecord[]>([]);
@@ -54,7 +93,9 @@ export function MemoryStatePanel({ characterId, characterName, onConversationCle
   const [activeTab, setActiveTab] = useState<MemoryTab>("overview");
   const [lastDream, setLastDream] = useState<DreamRun | null>(null);
   const [statusMessage, setStatusMessage] = useState("");
-  const [busyAction, setBusyAction] = useState<null | "memories" | "conversation" | "dream" | "rebuild" | "ingest" | "export" >(null);
+  const [busyAction, setBusyAction] = useState<
+    null | "memories" | "conversation" | "dream" | "rebuild" | "ingest" | "export"
+  >(null);
 
   const refresh = useCallback(async () => {
     if (!characterId) return;
@@ -141,7 +182,7 @@ export function MemoryStatePanel({ characterId, characterName, onConversationCle
 
   const reflections = useMemo(
     () => memories.filter((memory) => memory.type === "reflections").slice(0, 8),
-    [memories]
+    [memories],
   );
 
   const recentTimeline = useMemo(
@@ -149,7 +190,7 @@ export function MemoryStatePanel({ characterId, characterName, onConversationCle
       [...memories]
         .sort((a, b) => new Date(b.ts).getTime() - new Date(a.ts).getTime())
         .slice(0, 16),
-    [memories]
+    [memories],
   );
 
   const runDream = useCallback(async () => {
@@ -185,17 +226,23 @@ export function MemoryStatePanel({ characterId, characterName, onConversationCle
     }
   }, [characterId, refresh]);
 
-  const handleMemoryDelete = useCallback(async (memoryId: string) => {
-    if (!characterId) return;
-    await deleteMemory(characterId, memoryId);
-    await refresh();
-  }, [characterId, refresh]);
+  const handleMemoryDelete = useCallback(
+    async (memoryId: string) => {
+      if (!characterId) return;
+      await deleteMemory(characterId, memoryId);
+      await refresh();
+    },
+    [characterId, refresh],
+  );
 
-  const handleMemoryPin = useCallback(async (memoryId: string, pinned: boolean) => {
-    if (!characterId) return;
-    await setMemoryPinned(characterId, memoryId, pinned);
-    await refresh();
-  }, [characterId, refresh]);
+  const handleMemoryPin = useCallback(
+    async (memoryId: string, pinned: boolean) => {
+      if (!characterId) return;
+      await setMemoryPinned(characterId, memoryId, pinned);
+      await refresh();
+    },
+    [characterId, refresh],
+  );
 
   const ingestNote = useCallback(async () => {
     if (!characterId || !noteTitle.trim() || !noteBody.trim()) return;
@@ -215,7 +262,11 @@ export function MemoryStatePanel({ characterId, characterName, onConversationCle
     if (!characterId || !transcriptTitle.trim() || !transcriptBody.trim()) return;
     setBusyAction("ingest");
     try {
-      const count = await ingestMemoryTranscript(characterId, transcriptTitle.trim(), transcriptBody.trim());
+      const count = await ingestMemoryTranscript(
+        characterId,
+        transcriptTitle.trim(),
+        transcriptBody.trim(),
+      );
       setStatusMessage(`Imported transcript with ${count} memory entr${count === 1 ? "y" : "ies"}.`);
       setTranscriptTitle("");
       setTranscriptBody("");
@@ -290,40 +341,29 @@ export function MemoryStatePanel({ characterId, characterName, onConversationCle
     }
   }, [characterId, refresh]);
 
-
   if (!characterId) {
-    return (
-      <div className="p-6 text-sm text-slate-400">
-        Select a character to inspect memory.
-      </div>
-    );
+    return <p className="text-sm text-ink-3">Select a character to inspect memory.</p>;
   }
 
   return (
-    <div className="flex-1 overflow-y-auto p-6 scrollbar-thin scrollbar-thumb-slate-200 scrollbar-track-transparent">
-      <div className="mb-6 rounded-[2rem] border border-slate-200 bg-white px-5 py-5 shadow-sm">
+    <div className="space-y-5">
+      <div className={sectionCardClass}>
         <div className="flex items-start justify-between gap-4">
           <div>
-            <div className="text-[11px] font-semibold uppercase tracking-[0.26em] text-slate-500">Memory Vault</div>
-            <h3 className="mt-2 text-2xl font-bold tracking-tight text-slate-800">{characterName}</h3>
-            <p className="mt-2 max-w-sm text-sm leading-relaxed text-slate-500">
+            <p className="text-xs text-ink-3">Memory vault</p>
+            <h3 className="mt-1 text-sm font-semibold text-ink">{characterName}</h3>
+            <p className="mt-2 max-w-sm text-sm leading-relaxed text-ink-2">
               Inspect the local memory database, Markdown vault, relationship state, and background reflections.
             </p>
           </div>
-          <button
-            onClick={refresh}
-            disabled={loading}
-            className="rounded-full border border-white/90 bg-white/90 px-4 py-2 text-[12px] font-semibold uppercase tracking-[0.22em] text-slate-600 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md"
-          >
-            {loading ? "Refreshing" : "Refresh"}
-          </button>
+          <Button variant="secondary" size="sm" loading={loading} onClick={refresh}>
+            Refresh
+          </Button>
         </div>
         {groupedMemoryLabel && (
-          <div className="mt-5 rounded-2xl border border-white/80 bg-white/80 px-4 py-3 text-xs font-medium text-slate-500 shadow-sm">
-            {groupedMemoryLabel}
-          </div>
+          <p className="mt-4 rounded-card bg-surface px-4 py-3 text-xs text-ink-3">{groupedMemoryLabel}</p>
         )}
-        <div className="mt-5 grid grid-cols-2 gap-3 md:grid-cols-6">
+        <div className="mt-4 grid grid-cols-2 gap-3 md:grid-cols-6">
           <Metric label="Memories" value={overview?.total_memories ?? memories.length} />
           <Metric label="Sources" value={overview?.total_sources ?? 0} />
           <Metric label="Dreams" value={overview?.total_dreams ?? 0} />
@@ -333,25 +373,31 @@ export function MemoryStatePanel({ characterId, characterName, onConversationCle
         </div>
       </div>
 
-      <div className="mb-5 flex flex-wrap gap-2">
+      <div className="inline-flex gap-1 rounded-full bg-well p-1">
         {(["overview", "search", "timeline", "sources", "vault"] as MemoryTab[]).map((tab) => (
           <button
             key={tab}
+            type="button"
             onClick={() => setActiveTab(tab)}
-            className={`rounded-full px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.2em] transition-all ${
+            className={`rounded-full px-3.5 py-1.5 text-[13px] font-medium transition ${
               activeTab === tab
-                ? "bg-slate-900 text-white shadow-md"
-                : "border border-slate-200 bg-white text-slate-500 hover:-translate-y-0.5 hover:shadow-sm"
+                ? "bg-surface-2 text-ink shadow-soft"
+                : "text-ink-2 hover:text-ink"
             }`}
           >
-            {tab}
+            {TAB_LABELS[tab]}
           </button>
         ))}
       </div>
 
       {statusMessage && (
-        <div className="mb-5 rounded-2xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-700">
-          {statusMessage}
+        <Notice tone={statusNoticeTone(statusMessage)}>{statusMessage}</Notice>
+      )}
+
+      {loading && memories.length === 0 && (
+        <div className="flex items-center gap-2 py-4">
+          <Dots />
+          <span className="text-sm text-ink-3">Loading memories…</span>
         </div>
       )}
 
@@ -359,19 +405,17 @@ export function MemoryStatePanel({ characterId, characterName, onConversationCle
         {activeTab === "overview" && (
           <>
             <section className={sectionCardClass}>
-              <div className="mb-4">
-                <div className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500">Relationship State</div>
-                <h4 className="mt-2 text-lg font-bold text-slate-800">Prompt-aware companion context</h4>
-              </div>
+              <h4 className="text-sm font-semibold text-ink">Relationship state</h4>
+              <p className="mt-1 text-xs text-ink-3">Prompt-aware companion context</p>
               {overview?.relationship ? (
-                <div className="grid gap-3 md:grid-cols-4">
+                <div className="mt-4 grid gap-3 md:grid-cols-4">
                   <Metric label="Trust" value={`${Math.round(overview.relationship.trust * 100)}%`} />
                   <Metric label="Affection" value={`${Math.round(overview.relationship.affection * 100)}%`} />
                   <Metric label="Energy" value={`${Math.round(overview.relationship.energy * 100)}%`} />
                   <Metric label="Mood" value={overview.relationship.mood} />
-                  <div className="rounded-2xl border border-slate-100 bg-slate-50 px-4 py-3 md:col-span-4">
-                    <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-400">Summary</div>
-                    <p className="mt-2 text-sm text-slate-600">{overview.relationship.relationship_summary}</p>
+                  <div className="rounded-card bg-surface px-4 py-3 md:col-span-4">
+                    <p className="text-xs text-ink-3">Summary</p>
+                    <p className="mt-2 text-sm text-ink-2">{overview.relationship.relationship_summary}</p>
                   </div>
                 </div>
               ) : (
@@ -380,155 +424,248 @@ export function MemoryStatePanel({ characterId, characterName, onConversationCle
             </section>
 
             <section className={sectionCardClass}>
-              <div className="mb-4 flex items-center justify-between gap-3">
+              <div className="flex items-start justify-between gap-3">
                 <div>
-                  <div className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500">Background Dream</div>
-                  <h4 className="mt-2 text-lg font-bold text-slate-800">Reflect and consolidate</h4>
-                  <p className="mt-2 text-sm leading-relaxed text-slate-500">
+                  <h4 className="text-sm font-semibold text-ink">Background dream</h4>
+                  <p className="mt-1 text-xs text-ink-3">Reflect and consolidate</p>
+                  <p className="mt-2 text-sm leading-relaxed text-ink-2">
                     Dream runs turn recent memories into reflections and update the Markdown vault.
                   </p>
                 </div>
-                <button
+                <Button
+                  variant="soft"
+                  size="sm"
+                  leading={<MoonIcon className="h-4 w-4" />}
+                  loading={busyAction === "dream"}
+                  disabled={busyAction !== null && busyAction !== "dream"}
                   onClick={runDream}
-                  disabled={busyAction !== null}
-                  className="rounded-2xl bg-indigo-600 px-4 py-3 text-[12px] font-semibold uppercase tracking-[0.18em] text-white transition-all hover:-translate-y-0.5 hover:bg-indigo-700 disabled:opacity-50"
                 >
-                  {busyAction === "dream" ? "Dreaming" : "Run Dream"}
-                </button>
+                  Run dream
+                </Button>
               </div>
-              <p className="rounded-2xl border border-indigo-100 bg-indigo-50 px-4 py-3 text-sm leading-relaxed text-indigo-700">
+              <p className="mt-4 rounded-card bg-surface px-4 py-3 text-sm text-ink-2">
                 {lastDream?.summary || "No manual dream run in this panel yet."}
               </p>
             </section>
 
             <section className={sectionCardClass}>
-              <div className="mb-4">
-                <div className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500">Reflections</div>
-                <h4 className="mt-2 text-lg font-bold text-slate-800">Recent long-horizon notes</h4>
+              <h4 className="text-sm font-semibold text-ink">Reflections</h4>
+              <p className="mt-1 text-xs text-ink-3">Recent long-horizon notes</p>
+              <div className="mt-4">
+                <MemoryList
+                  memories={reflections}
+                  emptyText="No reflections yet. Run a dream after a few meaningful conversations."
+                  onDelete={handleMemoryDelete}
+                  onPin={handleMemoryPin}
+                />
               </div>
-              <MemoryList memories={reflections} emptyText="No reflections yet. Run a dream after a few meaningful conversations." onDelete={handleMemoryDelete} onPin={handleMemoryPin} />
             </section>
           </>
         )}
 
         {activeTab === "search" && (
           <section className={sectionCardClass}>
-          <div className="mb-4 flex items-center justify-between">
-            <div>
-              <div className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500">Memory Search</div>
-              <h4 className="mt-2 text-lg font-bold text-slate-800">Probe the local archive</h4>
+            <div className="mb-4 flex items-center justify-between">
+              <div>
+                <h4 className="text-sm font-semibold text-ink">Memory search</h4>
+                <p className="mt-1 text-xs text-ink-3">Probe the local archive</p>
+              </div>
+              <Pill size="xs">{memories.length} entries</Pill>
             </div>
-            <span className="rounded-full bg-slate-100 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-              {memories.length} entries
-            </span>
-          </div>
 
-          <div className="flex gap-2">
-            <input
-              type="text"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search for preferences, facts..."
-              className="flex-1 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-[14px] text-slate-700 outline-none transition-all placeholder:text-slate-400 focus:border-blue-300 focus:bg-white focus:ring-2 focus:ring-blue-100"
-            />
-            <button
-              onClick={handleSearch}
-              disabled={searching}
-              className="rounded-2xl bg-slate-800 px-4 py-3 text-[12px] font-semibold uppercase tracking-[0.2em] text-white transition-all hover:-translate-y-0.5 hover:bg-slate-900"
+            <div className="flex gap-2">
+              <Input
+                type="text"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Search for preferences, facts..."
+                className="flex-1"
+              />
+              <Button
+                variant="soft"
+                leading={<SearchIcon className="h-4 w-4" />}
+                loading={searching}
+                onClick={handleSearch}
+              >
+                Search
+              </Button>
+            </div>
+
+            {results.length > 0 && (
+              <div className="mt-4 space-y-3">
+                {results.map((memory) => (
+                  <MemoryCard
+                    key={memory.id}
+                    memory={memory}
+                    accent
+                    onDelete={handleMemoryDelete}
+                    onPin={handleMemoryPin}
+                  />
+                ))}
+              </div>
+            )}
+
+            <div className="mt-5">
+              <MemoryList
+                memories={memories.slice(0, 12)}
+                emptyText="No long-term memories stored yet. Start chatting and the companion will begin writing memories locally."
+                onDelete={handleMemoryDelete}
+                onPin={handleMemoryPin}
+              />
+            </div>
+
+            <Button
+              variant="danger-soft"
+              fullWidth
+              className="mt-5"
+              loading={busyAction === "memories"}
+              disabled={busyAction !== null && busyAction !== "memories"}
+              onClick={clearMemories}
             >
-              {searching ? "Searching" : "Search"}
-            </button>
-          </div>
-
-          {results.length > 0 && (
-            <div className="mt-4 space-y-3">
-              {results.map((memory) => (
-                <MemoryCard key={memory.id} memory={memory} accent onDelete={handleMemoryDelete} onPin={handleMemoryPin} />
-              ))}
-            </div>
-          )}
-
-          <div className="mt-5">
-            <MemoryList memories={memories.slice(0, 12)} emptyText="No long-term memories stored yet. Start chatting and the companion will begin writing memories locally." onDelete={handleMemoryDelete} onPin={handleMemoryPin} />
-          </div>
-
-          <button
-            onClick={clearMemories}
-            disabled={busyAction !== null}
-            className="mt-5 w-full rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-[13px] font-semibold uppercase tracking-[0.18em] text-rose-700 transition-all hover:bg-rose-100 disabled:opacity-50"
-          >
-            {busyAction === "memories" ? "Clearing Memories..." : "Clear Memories"}
-          </button>
-        </section>
+              Clear memories
+            </Button>
+          </section>
         )}
 
         {activeTab === "timeline" && (
           <section className={sectionCardClass}>
-            <div className="mb-4">
-              <div className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500">Timeline</div>
-              <h4 className="mt-2 text-lg font-bold text-slate-800">Recent memory writes</h4>
+            <h4 className="text-sm font-semibold text-ink">Timeline</h4>
+            <p className="mt-1 text-xs text-ink-3">Recent memory writes</p>
+            <div className="mt-4">
+              <MemoryList
+                memories={recentTimeline}
+                emptyText="No memory timeline yet."
+                onDelete={handleMemoryDelete}
+                onPin={handleMemoryPin}
+              />
             </div>
-            <MemoryList memories={recentTimeline} emptyText="No memory timeline yet." onDelete={handleMemoryDelete} onPin={handleMemoryPin} />
           </section>
         )}
 
         {activeTab === "sources" && (
           <>
             <section className={sectionCardClass}>
-              <div className="mb-4">
-                <div className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500">Local Source Ingestion</div>
-                <h4 className="mt-2 text-lg font-bold text-slate-800">Notes, transcripts, and folders</h4>
-              </div>
-              <div className="grid gap-4 lg:grid-cols-2">
+              <h4 className="text-sm font-semibold text-ink">Local source ingestion</h4>
+              <p className="mt-1 text-xs text-ink-3">Notes, transcripts, and folders</p>
+              <div className="mt-4 grid gap-4 lg:grid-cols-2">
                 <div className="space-y-3">
-                  <input value={noteTitle} onChange={(e) => setNoteTitle(e.target.value)} placeholder="Note title" className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-blue-300 focus:bg-white" />
-                  <textarea value={noteBody} onChange={(e) => setNoteBody(e.target.value)} placeholder="Markdown or text note..." rows={6} className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-blue-300 focus:bg-white" />
-                  <button onClick={ingestNote} disabled={busyAction !== null} className="w-full rounded-2xl bg-slate-900 px-4 py-3 text-[12px] font-semibold uppercase tracking-[0.18em] text-white disabled:opacity-50">Import Note</button>
+                  <Field label="Note title">
+                    <Input
+                      value={noteTitle}
+                      onChange={(e) => setNoteTitle(e.target.value)}
+                      placeholder="Note title"
+                    />
+                  </Field>
+                  <Field label="Note body">
+                    <Textarea
+                      value={noteBody}
+                      onChange={(e) => setNoteBody(e.target.value)}
+                      placeholder="Markdown or text note..."
+                      rows={6}
+                    />
+                  </Field>
+                  <Button
+                    variant="primary"
+                    loading={busyAction === "ingest"}
+                    disabled={busyAction !== null && busyAction !== "ingest"}
+                    onClick={ingestNote}
+                  >
+                    Import note
+                  </Button>
                 </div>
                 <div className="space-y-3">
-                  <input value={transcriptTitle} onChange={(e) => setTranscriptTitle(e.target.value)} placeholder="Meeting title" className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-blue-300 focus:bg-white" />
-                  <textarea value={transcriptBody} onChange={(e) => setTranscriptBody(e.target.value)} placeholder="Meeting transcript..." rows={6} className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:border-blue-300 focus:bg-white" />
-                  <button onClick={ingestTranscript} disabled={busyAction !== null} className="w-full rounded-2xl bg-indigo-600 px-4 py-3 text-[12px] font-semibold uppercase tracking-[0.18em] text-white disabled:opacity-50">Import Transcript</button>
+                  <Field label="Meeting title">
+                    <Input
+                      value={transcriptTitle}
+                      onChange={(e) => setTranscriptTitle(e.target.value)}
+                      placeholder="Meeting title"
+                    />
+                  </Field>
+                  <Field label="Transcript">
+                    <Textarea
+                      value={transcriptBody}
+                      onChange={(e) => setTranscriptBody(e.target.value)}
+                      placeholder="Meeting transcript..."
+                      rows={6}
+                    />
+                  </Field>
+                  <Button
+                    variant="primary"
+                    loading={busyAction === "ingest"}
+                    disabled={busyAction !== null && busyAction !== "ingest"}
+                    onClick={ingestTranscript}
+                  >
+                    Import transcript
+                  </Button>
                 </div>
               </div>
               <div className="mt-4 grid gap-3 md:grid-cols-3">
-                <button onClick={ingestFile} disabled={busyAction !== null} className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-xs font-semibold uppercase tracking-[0.18em] text-slate-600 disabled:opacity-50">Import File</button>
-                <button onClick={ingestFolder} disabled={busyAction !== null} className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-xs font-semibold uppercase tracking-[0.18em] text-slate-600 disabled:opacity-50">Import Folder</button>
-                <button onClick={migrateLegacy} disabled={busyAction !== null} className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-xs font-semibold uppercase tracking-[0.18em] text-slate-600 disabled:opacity-50">Migrate JSONL</button>
+                <Button
+                  variant="secondary"
+                  leading={<UploadIcon className="h-4 w-4" />}
+                  loading={busyAction === "ingest"}
+                  disabled={busyAction !== null && busyAction !== "ingest"}
+                  onClick={ingestFile}
+                >
+                  Import file
+                </Button>
+                <Button
+                  variant="secondary"
+                  leading={<UploadIcon className="h-4 w-4" />}
+                  loading={busyAction === "ingest"}
+                  disabled={busyAction !== null && busyAction !== "ingest"}
+                  onClick={ingestFolder}
+                >
+                  Import folder
+                </Button>
+                <Button
+                  variant="secondary"
+                  loading={busyAction === "ingest"}
+                  disabled={busyAction !== null && busyAction !== "ingest"}
+                  onClick={migrateLegacy}
+                >
+                  Migrate JSONL
+                </Button>
               </div>
             </section>
 
             <section className={sectionCardClass}>
-              <div className="mb-4">
-                <div className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500">Source Provenance</div>
-                <h4 className="mt-2 text-lg font-bold text-slate-800">Recent ingested sources</h4>
-              </div>
-              <div className="space-y-3">
-                {sources.length === 0 ? <EmptyState text="No ingested sources yet." /> : sources.map((source) => (
-                  <div key={source.id} className="rounded-2xl border border-slate-200 bg-white px-4 py-3">
-                    <div className="flex items-center justify-between gap-3">
-                      <span className="text-sm font-bold text-slate-800">{source.title}</span>
-                      <span className="text-[11px] text-slate-400">{new Date(source.ts).toLocaleString()}</span>
+              <h4 className="text-sm font-semibold text-ink">Source provenance</h4>
+              <p className="mt-1 text-xs text-ink-3">Recent ingested sources</p>
+              <div className="mt-4 space-y-3">
+                {sources.length === 0 ? (
+                  <EmptyState text="No ingested sources yet." />
+                ) : (
+                  sources.map((source) => (
+                    <div key={source.id} className="rounded-card bg-surface px-4 py-3">
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="text-sm font-semibold text-ink">{source.title}</span>
+                        <span className="text-xs text-ink-3">{new Date(source.ts).toLocaleString()}</span>
+                      </div>
+                      <Pill size="xs" className="mt-2">
+                        {source.source_kind}
+                      </Pill>
                     </div>
-                    <div className="mt-2 text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">{source.source_kind}</div>
-                  </div>
-                ))}
+                  ))
+                )}
               </div>
             </section>
 
             <section className={sectionCardClass}>
-              <div className="mb-4">
-                <div className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500">Topics</div>
-                <h4 className="mt-2 text-lg font-bold text-slate-800">Derived topic summaries</h4>
-              </div>
-              <div className="grid gap-3 md:grid-cols-2">
-                {topics.length === 0 ? <EmptyState text="No topics yet." /> : topics.map((topic) => (
-                  <div key={topic.topic} className="rounded-2xl border border-slate-100 bg-slate-50 px-4 py-3">
-                    <div className="text-sm font-bold text-slate-800">{topic.topic}</div>
-                    <div className="mt-1 text-xs text-slate-400">{topic.count} memories</div>
-                    <p className="mt-2 text-sm text-slate-600">{topic.summary}</p>
-                  </div>
-                ))}
+              <h4 className="text-sm font-semibold text-ink">Topics</h4>
+              <p className="mt-1 text-xs text-ink-3">Derived topic summaries</p>
+              <div className="mt-4 grid gap-3 md:grid-cols-2">
+                {topics.length === 0 ? (
+                  <EmptyState text="No topics yet." />
+                ) : (
+                  topics.map((topic) => (
+                    <div key={topic.topic} className="rounded-card bg-surface px-4 py-3">
+                      <div className="text-sm font-semibold text-ink">{topic.topic}</div>
+                      <div className="mt-1 text-xs text-ink-3">{topic.count} memories</div>
+                      <p className="mt-2 text-sm text-ink-2">{topic.summary}</p>
+                    </div>
+                  ))
+                )}
               </div>
             </section>
           </>
@@ -537,60 +674,68 @@ export function MemoryStatePanel({ characterId, characterName, onConversationCle
         {activeTab === "vault" && (
           <>
             <section className={sectionCardClass}>
-              <div className="mb-4">
-                <div className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500">Markdown Vault</div>
-                <h4 className="mt-2 text-lg font-bold text-slate-800">Local readable projection</h4>
-                <p className="mt-2 text-sm leading-relaxed text-slate-500">
-                  The SQLite database is canonical. The Markdown vault is rebuilt from it for browsing, backups, and Obsidian-style workflows.
-                </p>
-              </div>
-              <div className="space-y-3 rounded-2xl border border-slate-100 bg-slate-50 px-4 py-4">
+              <h4 className="text-sm font-semibold text-ink">Markdown vault</h4>
+              <p className="mt-1 text-xs text-ink-3">Local readable projection</p>
+              <p className="mt-2 text-sm leading-relaxed text-ink-2">
+                The SQLite database is canonical. The Markdown vault is rebuilt from it for browsing, backups, and
+                Obsidian-style workflows.
+              </p>
+              <div className="mt-4 space-y-3 rounded-card bg-surface px-4 py-4">
                 <PathRow label="Vault folder" value={overview?.vault_path || "Not built yet"} />
                 <PathRow label="Database" value={overview?.database_path || "Not initialized yet"} />
                 <PathRow label="Latest memory" value={overview?.latest_memory_at || "none"} />
                 <PathRow label="Latest dream" value={overview?.latest_dream_at || "none"} />
               </div>
-              <button
+              <Button
+                variant="soft"
+                fullWidth
+                className="mt-5"
+                leading={<RefreshIcon className="h-4 w-4" />}
+                loading={busyAction === "rebuild"}
+                disabled={busyAction !== null && busyAction !== "rebuild"}
                 onClick={rebuildVault}
-                disabled={busyAction !== null}
-                className="mt-5 w-full rounded-2xl bg-slate-900 px-4 py-3 text-[13px] font-semibold uppercase tracking-[0.18em] text-white transition-all hover:-translate-y-0.5 hover:bg-black disabled:opacity-50"
               >
-                {busyAction === "rebuild" ? "Rebuilding Vault..." : "Rebuild Vault"}
-              </button>
+                Rebuild vault
+              </Button>
               <div className="mt-3 grid gap-3 md:grid-cols-2">
-                <button
+                <Button
+                  variant="secondary"
+                  leading={<DownloadIcon className="h-4 w-4" />}
+                  loading={busyAction === "export"}
+                  disabled={busyAction !== null && busyAction !== "export"}
                   onClick={exportZip}
-                  disabled={busyAction !== null}
-                  className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-[12px] font-semibold uppercase tracking-[0.18em] text-slate-600 disabled:opacity-50"
                 >
-                  Export Zip
-                </button>
-                <button
+                  Export zip
+                </Button>
+                <Button
+                  variant="secondary"
+                  leading={<UploadIcon className="h-4 w-4" />}
+                  loading={busyAction === "export"}
+                  disabled={busyAction !== null && busyAction !== "export"}
                   onClick={importZip}
-                  disabled={busyAction !== null}
-                  className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-[12px] font-semibold uppercase tracking-[0.18em] text-slate-600 disabled:opacity-50"
                 >
-                  Import Zip
-                </button>
+                  Import zip
+                </Button>
               </div>
             </section>
 
-        <section className={`${sectionCardClass} bg-slate-50`}>
-          <div className="mb-4">
-            <div className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500">Conversation Archive</div>
-            <h4 className="mt-2 text-lg font-bold text-slate-800">Session control</h4>
-            <p className="mt-2 text-sm leading-relaxed text-slate-500">
-              Clear chat history to restart the conversation without deleting long-term memories.
-            </p>
-          </div>
-          <button
-            onClick={clearConversation}
-            disabled={busyAction !== null}
-            className="w-full rounded-2xl bg-slate-900 px-4 py-3 text-[13px] font-semibold uppercase tracking-[0.18em] text-white transition-all hover:-translate-y-0.5 hover:bg-black disabled:opacity-50"
-          >
-            {busyAction === "conversation" ? "Clearing Conversation..." : "Clear Conversation"}
-          </button>
-        </section>
+            <section className={sectionCardClass}>
+              <h4 className="text-sm font-semibold text-ink">Conversation archive</h4>
+              <p className="mt-1 text-xs text-ink-3">Session control</p>
+              <p className="mt-2 text-sm leading-relaxed text-ink-2">
+                Clear chat history to restart the conversation without deleting long-term memories.
+              </p>
+              <Button
+                variant="danger-soft"
+                fullWidth
+                className="mt-4"
+                loading={busyAction === "conversation"}
+                disabled={busyAction !== null && busyAction !== "conversation"}
+                onClick={clearConversation}
+              >
+                Clear conversation
+              </Button>
+            </section>
           </>
         )}
       </div>
@@ -600,17 +745,18 @@ export function MemoryStatePanel({ characterId, characterName, onConversationCle
 
 function Metric({ label, value }: { label: string; value: string | number }) {
   return (
-    <div className="rounded-2xl border border-white/80 bg-white/85 px-4 py-3 shadow-sm">
-      <div className="text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-400">{label}</div>
-      <div className="mt-1 truncate text-lg font-bold text-slate-800">{value}</div>
+    <div className="rounded-card bg-surface px-4 py-3">
+      <div className="text-xs text-ink-3">{label}</div>
+      <div className="mt-1 truncate text-sm font-semibold text-ink">{value}</div>
     </div>
   );
 }
 
 function EmptyState({ text }: { text: string }) {
   return (
-    <div className="rounded-[1.5rem] border border-dashed border-slate-200 bg-slate-50 px-4 py-5 text-sm text-slate-400">
-      {text}
+    <div className="flex flex-col items-center gap-2 py-6 text-center">
+      <Mascot mood="sleepy" className="h-12 w-12" />
+      <p className="text-sm text-ink-3">{text}</p>
     </div>
   );
 }
@@ -650,55 +796,46 @@ function MemoryCard({
   onPin?: (memoryId: string, pinned: boolean) => void | Promise<void>;
 }) {
   return (
-    <div className={`rounded-[1.45rem] border px-4 py-3 shadow-sm ${
-      accent ? "border-blue-100 bg-blue-50/60" : "border-slate-200/80 bg-white"
-    }`}>
+    <div className={`rounded-card bg-surface px-4 py-3 ${accent ? "ring-1 ring-accent-200/60" : ""}`}>
       <div className="flex items-center justify-between gap-3">
-        <span className={`text-[11px] font-semibold uppercase tracking-[0.22em] ${
-          accent ? "text-blue-600" : "text-slate-500"
-        }`}>
+        <Pill tone={memory.pinned ? "accent" : "neutral"} size="xs">
           {memory.type}
-        </span>
-        <span className="text-[11px] text-slate-400">{new Date(memory.ts).toLocaleString()}</span>
+        </Pill>
+        <span className="text-xs text-ink-3">{new Date(memory.ts).toLocaleString()}</span>
       </div>
-      <p className="mt-2 text-sm leading-relaxed text-slate-700">{memory.summary}</p>
+      <p className="mt-2 text-sm leading-relaxed text-ink">{memory.summary}</p>
       <div className="mt-3 flex flex-wrap items-center gap-2">
-        <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500">
-          importance {Math.round(memory.importance * 100)}%
-        </span>
-        {memory.source_kind && (
-          <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500">
-            {memory.source_kind}
-          </span>
-        )}
-        {memory.topic && (
-          <span className="rounded-full bg-indigo-50 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-indigo-500">
-            topic {memory.topic}
-          </span>
-        )}
+        <Pill size="xs">importance {Math.round(memory.importance * 100)}%</Pill>
+        {memory.source_kind && <Pill size="xs">{memory.source_kind}</Pill>}
+        {memory.topic && <Pill size="xs">topic {memory.topic}</Pill>}
         {memory.tags?.slice(0, 6).map((tag) => (
-          <span key={`${memory.id}-${tag}`} className="rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+          <Pill key={`${memory.id}-${tag}`} size="xs">
             {tag}
-          </span>
+          </Pill>
         ))}
       </div>
       {(onDelete || onPin) && (
-        <div className="mt-3 flex gap-2">
+        <div className="mt-3 flex gap-1">
           {onPin && (
-            <button
+            <IconButton
+              label={memory.pinned ? "Unpin" : "Pin"}
+              size="sm"
+              variant="ghost"
+              active={memory.pinned}
               onClick={() => void onPin(memory.id, !memory.pinned)}
-              className="rounded-full border border-slate-200 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500"
             >
-              {memory.pinned ? "Unpin" : "Pin"}
-            </button>
+              <PinIcon className="h-4 w-4" />
+            </IconButton>
           )}
           {onDelete && (
-            <button
+            <IconButton
+              label="Forget"
+              size="sm"
+              variant="ghost"
               onClick={() => void onDelete(memory.id)}
-              className="rounded-full border border-rose-200 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-rose-600"
             >
-              Forget
-            </button>
+              <TrashIcon className="h-4 w-4" />
+            </IconButton>
           )}
         </div>
       )}
@@ -709,8 +846,8 @@ function MemoryCard({
 function PathRow({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <div className="text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-400">{label}</div>
-      <div className="mt-1 break-all font-mono text-xs text-slate-600">{value}</div>
+      <div className="text-xs text-ink-3">{label}</div>
+      <div className="mt-1 break-all font-mono text-xs text-ink-2">{value}</div>
     </div>
   );
 }

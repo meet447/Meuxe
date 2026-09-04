@@ -1,4 +1,4 @@
-/** Curated vibe packs for onboarding — one pick sets vibe + relationship + speech. */
+/** Curated vibe packs for onboarding: one pick sets vibe + relationship + speech. */
 
 export interface CompanionVibePack {
   id: string;

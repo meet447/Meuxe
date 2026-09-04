@@ -30,7 +30,7 @@ export const mixamoVRMRigMap: Record<string, string> = {
   mixamorigRightFoot: "rightFoot",
   mixamorigRightToeBase: "rightToes",
 
-  // Fingers — left
+  // Fingers - left
   mixamorigLeftHandThumb1: "leftThumbMetacarpal",
   mixamorigLeftHandThumb2: "leftThumbProximal",
   mixamorigLeftHandThumb3: "leftThumbDistal",
@@ -47,7 +47,7 @@ export const mixamoVRMRigMap: Record<string, string> = {
   mixamorigLeftHandPinky2: "leftLittleIntermediate",
   mixamorigLeftHandPinky3: "leftLittleDistal",
 
-  // Fingers — right
+  // Fingers - right
   mixamorigRightHandThumb1: "rightThumbMetacarpal",
   mixamorigRightHandThumb2: "rightThumbProximal",
   mixamorigRightHandThumb3: "rightThumbDistal",

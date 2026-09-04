@@ -1,139 +1,259 @@
 @import "tailwindcss";
 
-/* ─── Global Design Tokens ─── */
-:root {
-  --transition-smooth: cubic-bezier(0.4, 0, 0.2, 1);
-  --shadow-glow-blue: 0 0 20px rgba(59, 130, 246, 0.15);
+/* ──────────────────────────────────────────────────────────────
+   Meuxe design tokens
+   Neutral white/grey surfaces, pastel accents, soft geometry.
+   See docs/DESIGN.md.
+   The default Tailwind palette is disabled on purpose: every
+   colour in the UI must come from the tokens below.
+   ────────────────────────────────────────────────────────────── */
+@theme {
+  --color-*: initial;
+
+  --color-white: #ffffff;
+  --color-black: #000000;
+
+  /* Surfaces (neutral, lightest → deepest) */
+  --color-surface-2: #ffffff; /* raised: inputs on focus, hover, message cards */
+  --color-surface: #fcfcfc;   /* default panel / card */
+  --color-canvas: #f4f4f5;    /* app background behind panels */
+  --color-well: #f0f0f2;      /* sunken insets, sidebars, code wells */
+  --color-well-2: #e6e6e9;    /* deeper inset, pressed states */
+
+  /* Hairlines: a quiet 1px edge is allowed where white meets white */
+  --color-line: #ebebee;
+  --color-line-2: #dcdce0;
+
+  /* Ink (neutral near-black → placeholder) */
+  --color-ink: #1b1b1e;
+  --color-ink-2: #58585e;
+  --color-ink-3: #8b8b92;
+  --color-ink-4: #bbbbc2;
+
+  /* Accent: pastel amber (highlights, selection, links). Not for white text. */
+  --color-accent-50: #fdf8ec;
+  --color-accent-100: #fbefd1;
+  --color-accent-200: #f7dfa4;
+  --color-accent-300: #f3cd78;
+  --color-accent-400: #ecb856;
+  --color-accent-500: #dea03a;
+  --color-accent-600: #b5802a;
+  --color-accent-700: #8a611f;
+
+  /* Peach: pastel rose (user bubbles, soft highlights) */
+  --color-peach-50: #fdf3f5;
+  --color-peach-100: #fbe4e9;
+  --color-peach-200: #f6cad4;
+  --color-peach-300: #eea8b8;
+  --color-peach-400: #e4889d;
+  --color-peach-500: #c9607a;
+
+  /* Honey: pastel lemon (attention / in-progress) */
+  --color-honey-50: #fdfae9;
+  --color-honey-100: #fbf4c7;
+  --color-honey-200: #f6ea98;
+  --color-honey-300: #ecdb62;
+  --color-honey-400: #dcc63a;
+  --color-honey-500: #bfa920;
+  --color-honey-700: #7f7113;
+
+  /* Sage: pastel mint (success / ready) */
+  --color-sage-50: #f0f8f3;
+  --color-sage-100: #dcefe3;
+  --color-sage-200: #bfe2cb;
+  --color-sage-400: #7fc099;
+  --color-sage-500: #5aa477;
+  --color-sage-700: #386f51;
+
+  /* Clay: pastel coral (danger / destructive) */
+  --color-clay-50: #fdf2f0;
+  --color-clay-100: #fbe1dc;
+  --color-clay-200: #f6c4bb;
+  --color-clay-400: #e6806f;
+  --color-clay-500: #d55c49;
+  --color-clay-700: #a03d2f;
+
+  /* Type */
+  --font-sans: "Figtree", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+
+  /* Radii: soft but crisp */
+  --radius-control: 0.75rem; /* 12px: buttons, small chips */
+  --radius-field: 0.75rem;   /* 12px: inputs */
+  --radius-card: 1rem;       /* 16px: cards, tiles */
+  --radius-panel: 1.25rem;   /* 20px: panels, docks */
+  --radius-sheet: 1.5rem;    /* 24px: modals, onboarding sheet */
+
+  /* Elevation: flat. "Shadows" are hairline edges, not drop shadows.
+     soft/float: 1px ring so a white card still reads on a white page.
+     pop: overlays (modals, popovers) get the ring plus one very faint
+     blur so they separate from the scrim beneath. Nothing floats. */
+  --shadow-soft: 0 0 0 1px rgba(20, 20, 25, 0.07);
+  --shadow-float: 0 0 0 1px rgba(20, 20, 25, 0.09);
+  --shadow-pop: 0 0 0 1px rgba(20, 20, 25, 0.08), 0 12px 32px -16px rgba(20, 20, 25, 0.12);
+  --shadow-inset: none;
+
+  /* Motion */
+  --ease-soft: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-spring: cubic-bezier(0.2, 0.9, 0.3, 1.2);
+
+  --animate-fade-in: fade-in 0.3s var(--ease-soft) both;
+  --animate-rise-in: rise-in 0.35s var(--ease-soft) both;
+  --animate-pop-in: pop-in 0.3s var(--ease-spring) both;
+  --animate-breathe: breathe 4s ease-in-out infinite;
+  --animate-blink: blink 5s ease-in-out infinite;
+  --animate-float: float 3.5s ease-in-out infinite;
+  --animate-dot: dot 1.2s ease-in-out infinite;
+  --animate-pulse-soft: pulse-soft 1.8s ease-in-out infinite;
+  --animate-listen-ring: listen-ring 1.6s ease-out infinite;
+
+  @keyframes fade-in {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+  @keyframes rise-in {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes pop-in {
+    from { opacity: 0; transform: scale(0.96); }
+    to { opacity: 1; transform: scale(1); }
+  }
+  @keyframes breathe {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.03); }
+  }
+  @keyframes blink {
+    0%, 92%, 100% { transform: scaleY(1); }
+    95% { transform: scaleY(0.1); }
+  }
+  @keyframes float {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-4px); }
+  }
+  @keyframes dot {
+    0%, 80%, 100% { transform: translateY(0); opacity: 0.45; }
+    40% { transform: translateY(-3px); opacity: 1; }
+  }
+  @keyframes pulse-soft {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.45; }
+  }
+  @keyframes listen-ring {
+    0% { box-shadow: 0 0 0 0 rgba(201, 96, 122, 0.4); }
+    70% { box-shadow: 0 0 0 9px rgba(201, 96, 122, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(201, 96, 122, 0); }
+  }
 }
 
-/* ─── Companion stage (light) ─── */
-.companion-stage-light {
-  background-color: #f8fafc;
+/* ─── Base ───
+   NOTE: <body> stays transparent. The mini desktop widget is a
+   transparent always-on-top window; the app shell paints its own
+   canvas background. */
+html, body, #root {
+  height: 100%;
 }
 
-/* ─── Base & Typography ─── */
 body {
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  margin: 0;
+  font-family: var(--font-sans);
+  color: var(--color-ink);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  letter-spacing: -0.005em;
   overflow: hidden;
 }
 
-/* ─── Scrollbar Styling ─── */
-.scrollbar-thin::-webkit-scrollbar {
-  width: 6px;
+h1, h2, h3, h4 {
+  letter-spacing: -0.02em;
+  line-height: 1.2;
 }
 
+/* Squircle corners where supported; falls back to plain radius. */
+@supports (corner-shape: squircle) {
+  .squircle {
+    corner-shape: squircle;
+  }
+}
+
+/* ─── Scrollbars ─── */
+.scrollbar-thin {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-line-2) transparent;
+}
+.scrollbar-thin::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
 .scrollbar-thin::-webkit-scrollbar-track {
   background: transparent;
 }
-
 .scrollbar-thin::-webkit-scrollbar-thumb {
-  background: #e2e8f0;
+  background: var(--color-line-2);
   border-radius: 999px;
 }
-
 .scrollbar-thin::-webkit-scrollbar-thumb:hover {
-  background: #cbd5e1;
+  background: var(--color-ink-4);
 }
 
-/* ─── Focus Ring ─── */
+/* ─── Focus ─── */
 *:focus-visible {
-  outline: 2px solid rgba(59, 130, 246, 0.5);
+  outline: 2px solid rgba(236, 184, 86, 0.75);
   outline-offset: 2px;
-  border-radius: 8px;
+  border-radius: inherit;
 }
-
-.companion-chat-input:focus-visible {
+.companion-chat-input:focus-visible,
+.companion-chat-input:focus {
   outline: none;
-  outline-offset: 0;
+  box-shadow: none;
 }
 
-/* ─── Animations ─── */
-@keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
-
-@keyframes slideUp {
-  from { opacity: 0; transform: translateY(12px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-
-@keyframes scaleIn {
-  from { opacity: 0; transform: scale(0.95); }
-  to { opacity: 1; transform: scale(1); }
-}
-
-@keyframes shimmer {
-  0% { background-position: -200% 0; }
-  100% { background-position: 200% 0; }
-}
-
-@keyframes pulseRing {
-  0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.5); }
-  70% { box-shadow: 0 0 0 8px rgba(239, 68, 68, 0); }
-  100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
-}
-
-@keyframes float {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-4px); }
-}
-
-/* Tailwind animate-in support */
-.animate-in {
-  animation-duration: 0.3s;
-  animation-timing-function: var(--transition-smooth);
-  animation-fill-mode: both;
-}
-
-.fade-in {
-  animation-name: fadeIn;
-}
-
-.slide-in-from-bottom-2 {
-  animation-name: slideUp;
-}
-
-.slide-in-from-bottom-4 {
-  animation-name: slideUp;
-}
-
-.zoom-in-95 {
-  animation-name: scaleIn;
-}
-
-.duration-300 {
-  animation-duration: 0.3s;
-}
-
-.duration-500 {
-  animation-duration: 0.5s;
-}
-
-/* ─── MicButton Pulse Ring ─── */
-.mic-pulse-ring {
-  animation: pulseRing 1.5s infinite;
-}
-
-/* ─── Floating animation ─── */
-.animate-float {
-  animation: float 3s ease-in-out infinite;
-}
-
-/* ─── Selection Colors ─── */
+/* ─── Selection ─── */
 ::selection {
-  background: rgba(59, 130, 246, 0.2);
-  color: #1e293b;
+  background: var(--color-accent-200);
+  color: var(--color-ink);
 }
 
-/* ─── Dropdown/Select styling ─── */
+/* ─── Native controls ─── */
 select {
   background-image: none;
 }
-
-/* ─── Smooth transitions on interactive elements ─── */
 button, a, input, select, textarea {
-  transition-timing-function: var(--transition-smooth);
+  transition-timing-function: var(--ease-soft);
 }
+button {
+  cursor: pointer;
+}
+button:disabled {
+  cursor: default;
+}
+
+/* ─── ASCII / stipple accent ─── */
+.ascii-strip {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 1.1;
+  letter-spacing: 0.12em;
+  white-space: pre;
+  user-select: none;
+  pointer-events: none;
+}
+
+/* ─── Legacy animation helpers (kept for existing call sites) ─── */
+.animate-in {
+  animation-duration: 0.3s;
+  animation-timing-function: var(--ease-soft);
+  animation-fill-mode: both;
+}
+.fade-in { animation-name: fade-in; }
+.slide-in-from-bottom-1,
+.slide-in-from-bottom-2,
+.slide-in-from-bottom-4,
+.slide-in-from-top-2 { animation-name: rise-in; }
+.zoom-in-95 { animation-name: pop-in; }
+.duration-150 { animation-duration: 0.15s; }
+.duration-200 { animation-duration: 0.2s; }
+.duration-300 { animation-duration: 0.3s; }
+.duration-500 { animation-duration: 0.5s; }
+.mic-pulse-ring { animation: listen-ring 1.6s ease-out infinite; }

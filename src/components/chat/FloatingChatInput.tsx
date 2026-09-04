@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, useCallback, memo } from "react";
 import type { RefObject } from "react";
+import { Pill, SendIcon, Spinner } from "../ui";
 import { MicButton } from "../MicButton";
 
 type Props = {
@@ -55,23 +56,23 @@ export const FloatingChatInput = memo(function FloatingChatInput({
   );
 
   return (
-    <div className="pointer-events-auto flex w-full max-w-md flex-col items-center gap-2">
+    <div className="pointer-events-auto flex w-full max-w-xl flex-col items-center gap-2">
       {caption && (
-        <div className="w-full max-w-lg rounded-2xl border border-slate-200 bg-white/95 px-4 py-3 shadow-sm backdrop-blur-sm">
+        <div className="w-full rounded-card bg-surface-2/95 px-4 py-3 shadow-soft backdrop-blur">
           {captionSpeaker && (
-            <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-slate-400">{captionSpeaker}</p>
+            <p className="mb-1 text-xs font-semibold text-ink-3">{captionSpeaker}</p>
           )}
-          <p className="text-center text-[15px] leading-snug text-slate-800">{caption}</p>
+          <p className="text-[15px] leading-snug text-ink">{caption}</p>
         </div>
       )}
       {statusLabel && (
-        <div className="rounded-full border border-slate-200 bg-white/90 px-3 py-1 text-[10px] font-semibold uppercase tracking-wider text-slate-500 shadow-sm backdrop-blur-md">
+        <Pill tone="honey" dot pulse>
           {statusLabel}
-        </div>
+        </Pill>
       )}
       <form
         onSubmit={handleSubmit}
-        className="flex w-full items-center gap-1 rounded-full border border-slate-200/90 bg-white/90 py-1 pl-1 pr-1.5 shadow-[0_8px_32px_rgba(15,23,42,0.12)] backdrop-blur-xl ring-1 ring-slate-100 focus-within:ring-1 focus-within:ring-slate-100"
+        className="flex w-full items-center gap-1 rounded-full bg-surface-2 p-1.5 shadow-float"
       >
         <MicButton listening={listening} onToggle={onMicToggle} variant="stage" />
         <input
@@ -81,20 +82,18 @@ export const FloatingChatInput = memo(function FloatingChatInput({
           onChange={handleInputChange}
           placeholder="Type a message..."
           disabled={isProcessing}
-          className="companion-chat-input min-w-0 flex-1 bg-transparent px-2 py-2.5 text-[15px] text-slate-800 outline-none ring-0 placeholder:text-slate-400 focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0 disabled:opacity-50"
+          className="companion-chat-input min-w-0 flex-1 bg-transparent px-2 py-2.5 text-[15px] text-ink outline-none placeholder:text-ink-4 focus:outline-none focus-visible:outline-none disabled:opacity-50"
         />
         <button
           type="submit"
           disabled={isProcessing || !input.trim()}
-          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-blue-600 text-white transition-all hover:bg-blue-700 disabled:opacity-30"
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-ink text-white transition-all hover:bg-ink-2 disabled:opacity-30"
           title="Send"
         >
           {isProcessing ? (
-            <span className="h-4 w-4 rounded-full border-2 border-white/40 border-t-white animate-spin" />
+            <Spinner className="h-4 w-4 border-white/40 border-t-white" />
           ) : (
-            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5" />
-            </svg>
+            <SendIcon className="h-4 w-4" strokeWidth={2} />
           )}
         </button>
       </form>

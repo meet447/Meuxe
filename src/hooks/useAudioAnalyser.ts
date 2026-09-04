@@ -65,9 +65,9 @@ export function useAudioAnalyser() {
     const binCount = dataArray.length; // 128 bins
 
     // Split frequency spectrum into bands
-    // Low: 0-10 (bass, ~0-340Hz) — jaw movement
-    // Mid: 10-40 (mids, ~340-1360Hz) — vowel formants
-    // High: 40-80 (highs, ~1360-2720Hz) — consonants, sibilance
+    // Low: 0-10 (bass, ~0-340Hz): jaw movement
+    // Mid: 10-40 (mids, ~340-1360Hz): vowel formants
+    // High: 40-80 (highs, ~1360-2720Hz): consonants, sibilance
 
     let lowSum = 0, midSum = 0, highSum = 0;
     for (let i = 0; i < binCount; i++) {
@@ -81,10 +81,10 @@ export function useAudioAnalyser() {
     const midAvg = midSum / 30 / 255;
     const highAvg = highSum / 40 / 255;
 
-    // Overall volume — weighted toward mid frequencies (voice range)
+    // Overall volume: weighted toward mid frequencies (voice range)
     const rawVolume = lowAvg * 0.2 + midAvg * 0.6 + highAvg * 0.2;
 
-    // Apply volume curve — boost quiet speech, cap loud
+    // Apply volume curve: boost quiet speech, cap loud
     const scaledVolume = Math.min(1, Math.pow(rawVolume * 2.5, 0.7));
 
     // Smooth volume for mouth open (lerp)

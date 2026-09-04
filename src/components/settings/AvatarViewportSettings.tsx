@@ -1,8 +1,9 @@
 import { BG_PRESETS } from "../../constants/bgPresets";
+import { ChoiceCard, IconButton, MinusIcon, PlusIcon, SectionTitle, Surface } from "../ui";
 
 const STAGE_BACKGROUNDS = [
   { name: "Transparent (match app)", value: "transparent" },
-  { name: "Light", value: "#f8fafc" },
+  { name: "Light", value: "#f4f4f5" },
   ...BG_PRESETS,
 ];
 
@@ -21,58 +22,52 @@ export function AvatarViewportSettings({
 
   return (
     <div className="space-y-6">
-      <p className="text-sm text-slate-500 leading-relaxed">
-        Adjust zoom and background on the main screen. Use the <span className="font-semibold text-slate-600">FULL / HALF</span> button below the settings icon for framing.
+      <p className="text-sm text-ink-2">
+        Use the framing button in the left sidebar to switch between full and half body.
       </p>
 
-      <section className="rounded-2xl border border-slate-100 bg-white p-5 shadow-sm">
-        <h3 className="text-sm font-semibold text-slate-800">Zoom</h3>
-        <div className="mt-3 flex items-center gap-3">
-          <button
-            type="button"
+      <Surface tone="raised" className="p-5">
+        <SectionTitle>Zoom</SectionTitle>
+        <div className="flex items-center gap-3">
+          <IconButton
+            label="Zoom out"
+            variant="secondary"
             onClick={() => onZoomChange(Math.round(Math.max(30, pct - 5)) / 100)}
-            className="flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100"
-            aria-label="Zoom out"
           >
-            −
-          </button>
-          <span className="min-w-[4rem] text-center text-lg font-bold text-slate-800">{pct}%</span>
-          <button
-            type="button"
+            <MinusIcon className="h-4 w-4" />
+          </IconButton>
+          <span className="min-w-16 text-center text-lg font-bold text-ink">{pct}%</span>
+          <IconButton
+            label="Zoom in"
+            variant="secondary"
             onClick={() => onZoomChange(Math.round(Math.min(200, pct + 5)) / 100)}
-            className="flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100"
-            aria-label="Zoom in"
           >
-            +
-          </button>
+            <PlusIcon className="h-4 w-4" />
+          </IconButton>
         </div>
-      </section>
+      </Surface>
 
-      <section className="rounded-2xl border border-slate-100 bg-white p-5 shadow-sm">
-        <h3 className="text-sm font-semibold text-slate-800">Background behind avatar</h3>
-        <div className="mt-3 grid gap-2">
+      <Surface tone="raised" className="p-5">
+        <SectionTitle>Background behind avatar</SectionTitle>
+        <div className="grid grid-cols-2 gap-2">
           {STAGE_BACKGROUNDS.map((preset) => (
-            <button
+            <ChoiceCard
               key={preset.name}
-              type="button"
+              compact
+              selected={background === preset.value}
               onClick={() => onBackgroundChange(preset.value)}
-              className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm transition-all ${
-                background === preset.value
-                  ? "bg-blue-50 text-blue-800 ring-1 ring-blue-200"
-                  : "text-slate-600 hover:bg-slate-50"
-              }`}
-            >
-              <div
-                className="h-8 w-8 shrink-0 rounded-lg ring-1 ring-slate-200/80"
-                style={{
-                  background: preset.value === "transparent" ? "#f1f5f9" : preset.value,
-                }}
-              />
-              {preset.name}
-            </button>
+              leading={
+                preset.value === "transparent" ? (
+                  <span className="h-5 w-5 rounded-full bg-surface ring-1 ring-line-2" />
+                ) : (
+                  <span className="h-5 w-5 rounded-full" style={{ background: preset.value }} />
+                )
+              }
+              title={preset.name}
+            />
           ))}
         </div>
-      </section>
+      </Surface>
     </div>
   );
 }

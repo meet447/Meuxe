@@ -196,7 +196,7 @@ export function useVoice() {
             }
             lastLoudTimeRef.current = now;
           } else if (speechDetectedRef.current && now - lastLoudTimeRef.current >= SILENCE_MS) {
-            // Silence after speech — auto stop
+            // Silence after speech: auto stop
             autoStopped = true;
             if (
               mediaRecorderRef.current &&

@@ -97,16 +97,16 @@ export const VRMCanvas = memo(function VRMCanvas({
         variant="model"
       />
       {!modelPath && !showMiniUi && (
-        <div className="text-slate-500 text-center px-6">
-          <p className="text-lg font-medium">No VRM model loaded</p>
-          <p className="text-sm mt-2 text-slate-400">
-            Add a <code className="text-slate-600">.vrm</code> file to <code className="text-slate-600">models/vrm/</code>
+        <div className="px-6 text-center">
+          <p className="text-lg font-medium text-ink-2">No VRM model loaded</p>
+          <p className="mt-2 text-sm text-ink-3">
+            Add a <code className="rounded-[6px] bg-well px-1 font-mono text-[12px] text-ink-2">.vrm</code> file to <code className="rounded-[6px] bg-well px-1 font-mono text-[12px] text-ink-2">models/vrm/</code>
           </p>
         </div>
       )}
       {!modelPath && showMiniUi && (
-        <div className="text-amber-200/50 text-center">
-          <p className="text-lg">No VRM model loaded</p>
+        <div className="text-center">
+          <p className="text-lg text-ink-3">No VRM model loaded</p>
         </div>
       )}
       <canvas

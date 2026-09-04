@@ -11,10 +11,23 @@ import { COMPANION_VIBE_PACKS } from "../lib/companionVibes";
 import type { ModelInfo } from "../types";
 import { CompanionAvatarPreview } from "./onboarding/CompanionAvatarPreview";
 import { ModelPicker } from "./onboarding/ModelPicker";
-
-const inputClass =
-  "w-full px-5 py-3.5 rounded-2xl bg-slate-50 hover:bg-slate-100/50 text-slate-700 text-[15px] outline-none transition-all placeholder-slate-400 border border-slate-100 focus:bg-white focus:ring-2 focus:ring-blue-100 focus:border-blue-300";
-const labelClass = "block text-sm font-semibold text-slate-700 tracking-wide mb-2 pl-1";
+import {
+  Button,
+  ChevronDownIcon,
+  ChoiceCard,
+  CloseIcon,
+  cn,
+  Field,
+  IconButton,
+  Input,
+  Notice,
+  Select,
+  Surface,
+  Textarea,
+  UploadIcon,
+  VibeGlyph,
+  WandIcon,
+} from "./ui";
 
 const RELATIONSHIP_OPTIONS = ["Gentle", "Teasing", "Protective", "Devoted", "Chaotic"] as const;
 const SPEECH_OPTIONS = ["Poetic", "Playful", "Calm", "Sharp", "Intimate"] as const;
@@ -70,7 +83,9 @@ export function AddCharacterModal({
         setModels(availableModels);
         if (availableModels.length > 0) {
           setModelId((current) =>
-            availableModels.some((model) => model.id === current) ? current : defaultModelId(availableModels),
+            availableModels.some((model) => model.id === current)
+              ? current
+              : defaultModelId(availableModels),
           );
         }
       })
@@ -197,27 +212,31 @@ export function AddCharacterModal({
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6">
-      <div className="absolute inset-0 bg-slate-900/20 backdrop-blur-sm" onClick={resetAndClose} />
-      <div className="relative z-[101] flex w-full max-w-5xl max-h-[92vh] flex-col overflow-hidden rounded-[2rem] border border-white/70 bg-white/95 shadow-[0_20px_80px_rgba(15,23,42,0.18)] ring-1 ring-slate-100/80">
-        <div className="flex items-center justify-between border-b border-slate-100 bg-white px-6 py-5 shrink-0">
+    <div className="fixed inset-0 z-[100] flex animate-fade-in items-center justify-center p-4 sm:p-6">
+      <div
+        className="absolute inset-0 bg-ink/20 backdrop-blur-[2px]"
+        onClick={resetAndClose}
+      />
+      <Surface
+        radius="sheet"
+        tone="surface"
+        elevation="pop"
+        className="relative z-[101] flex max-h-[92vh] w-full max-w-5xl animate-pop-in flex-col overflow-hidden"
+      >
+        <div className="flex shrink-0 items-start justify-between gap-4 px-7 pb-4 pt-6">
           <div>
-            <h2 className="text-xl font-bold tracking-tight text-slate-800">Add Character</h2>
-            <p className="mt-1 text-sm text-slate-500">Name them, pick a look, tune personality—uses your current voice settings.</p>
+            <h2 className="text-[22px] font-bold tracking-tight text-ink">Add a companion</h2>
+            <p className="mt-1 text-sm text-ink-2">
+              Name them, pick a look, and tune their personality. They use your current voice settings.
+            </p>
           </div>
-          <button
-            type="button"
-            onClick={resetAndClose}
-            className="flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 transition-all hover:-translate-y-0.5 hover:border-slate-300 hover:text-red-500"
-          >
-            <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden>
-              <path d="M3 3L13 13M13 3L3 13" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-          </button>
+          <IconButton label="Close" size="sm" onClick={resetAndClose}>
+            <CloseIcon className="h-4 w-4" />
+          </IconButton>
         </div>
 
         <div className="min-h-0 flex-1 overflow-y-auto">
-          <div className="grid gap-6 p-6 lg:grid-cols-[minmax(240px,340px)_1fr] lg:gap-8">
+          <div className="grid gap-6 px-7 lg:grid-cols-[minmax(240px,340px)_1fr] lg:gap-8">
             <div className="lg:sticky lg:top-0 lg:self-start">
               <CompanionAvatarPreview
                 model={previewModel}
@@ -226,182 +245,158 @@ export function AddCharacterModal({
               />
             </div>
 
-            <div className="space-y-6 min-w-0">
-              <div>
-                <label className={labelClass}>Companion name</label>
-                <input
+            <div className="min-w-0 space-y-6">
+              <Field label="Companion name">
+                <Input
                   type="text"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   placeholder="What should they be called?"
-                  className={inputClass}
                 />
-              </div>
+              </Field>
 
-              <div>
-                <label className={labelClass}>Look</label>
-                <p className="mb-3 text-xs text-slate-500">Live2D or 3D VRM—preview updates as you choose.</p>
+              <Field
+                label="Look"
+                hint="Live2D or 3D VRM. The preview updates as you choose."
+              >
                 {models.length > 0 ? (
                   <ModelPicker models={models} selectedId={modelId} onSelect={setModelId} />
                 ) : (
-                  <div className="rounded-2xl border border-slate-100 bg-slate-50 px-5 py-4 text-sm text-slate-600">
-                    No models detected yet. Import one below.
-                  </div>
+                  <Notice tone="neutral">No models detected yet. Import one below.</Notice>
                 )}
                 <div className="mt-3 flex flex-wrap gap-2">
-                  <button
-                    type="button"
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    leading={<UploadIcon className="h-4 w-4" />}
+                    loading={importing === "live2d"}
+                    disabled={importing !== null}
                     onClick={() => handleImportModel("live2d")}
-                    disabled={importing !== null}
-                    className="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-[13px] font-semibold text-slate-600 shadow-sm transition-all hover:border-slate-300 hover:bg-slate-50 disabled:opacity-50"
                   >
-                    {importing === "live2d" ? "Importing…" : "Import Live2D"}
-                  </button>
-                  <button
-                    type="button"
+                    Import Live2D
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    leading={<UploadIcon className="h-4 w-4" />}
+                    loading={importing === "vrm"}
+                    disabled={importing !== null}
                     onClick={() => handleImportModel("vrm")}
-                    disabled={importing !== null}
-                    className="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-[13px] font-semibold text-slate-600 shadow-sm transition-all hover:border-slate-300 hover:bg-slate-50 disabled:opacity-50"
                   >
-                    {importing === "vrm" ? "Importing…" : "Import VRM"}
-                  </button>
+                    Import VRM
+                  </Button>
                 </div>
                 {importMessage ? (
-                  <div className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+                  <Notice tone="success" className="mt-3">
                     {importMessage}
-                  </div>
+                  </Notice>
                 ) : null}
-              </div>
+              </Field>
 
-              <div>
-                <label className={labelClass}>Personality</label>
+              <Field label="Personality">
                 <div className="grid grid-cols-2 gap-2.5">
-                  {COMPANION_VIBE_PACKS.map((pack) => {
-                    const selected = vibe === pack.id;
-                    return (
-                      <button
-                        key={pack.id}
-                        type="button"
-                        onClick={() => selectVibePack(pack.id)}
-                        className={`flex items-center gap-2.5 rounded-2xl border px-3 py-3 text-left transition-all ${
-                          selected
-                            ? "border-blue-400 bg-blue-50 ring-1 ring-blue-200/80 shadow-sm"
-                            : "border-slate-200 bg-white hover:border-slate-300"
-                        }`}
-                      >
-                        <span className="text-xl">{pack.emoji}</span>
-                        <div className="min-w-0">
-                          <div className={`text-sm font-semibold ${selected ? "text-blue-900" : "text-slate-800"}`}>
-                            {pack.title}
-                          </div>
-                          <div className={`text-xs ${selected ? "text-blue-600/85" : "text-slate-400"}`}>
-                            {pack.subtitle}
-                          </div>
-                        </div>
-                      </button>
-                    );
-                  })}
+                  {COMPANION_VIBE_PACKS.map((pack) => (
+                    <ChoiceCard
+                      key={pack.id}
+                      compact
+                      selected={vibe === pack.id}
+                      onClick={() => selectVibePack(pack.id)}
+                      leading={<VibeGlyph id={pack.id} />}
+                      title={pack.title}
+                      description={pack.subtitle}
+                    />
+                  ))}
                 </div>
-              </div>
+              </Field>
 
-              <div className="rounded-[1.4rem] border border-slate-200 bg-slate-50/60">
+              <Surface tone="well" elevation="none" className="overflow-hidden">
                 <button
                   type="button"
                   onClick={() => setAdvancedOpen((v) => !v)}
-                  className="flex w-full items-center justify-between px-5 py-4 text-left"
+                  className="flex w-full items-center justify-between px-5 py-4 text-left text-sm font-semibold text-ink"
                 >
-                  <span className="text-sm font-semibold text-slate-700">Advanced personality</span>
-                  <span className="text-xs text-slate-400">{advancedOpen ? "Hide" : "Show"}</span>
+                  Advanced personality
+                  <ChevronDownIcon
+                    className={cn(
+                      "h-4 w-4 text-ink-3 transition-transform",
+                      advancedOpen && "rotate-180",
+                    )}
+                  />
                 </button>
                 {advancedOpen ? (
-                  <div className="space-y-4 border-t border-slate-200/80 px-5 pb-5 pt-4">
+                  <div className="space-y-4 border-t border-line px-5 pb-5 pt-4">
                     <div className="grid gap-4 sm:grid-cols-2">
-                      <div>
-                        <label className="mb-2 block text-xs font-semibold uppercase tracking-wide text-slate-500">
-                          Relationship
-                        </label>
-                        <select
+                      <Field label="Relationship">
+                        <Select
                           value={relationshipStyle}
                           onChange={(e) => setRelationshipStyle(e.target.value)}
-                          className={`${inputClass} cursor-pointer appearance-none`}
                         >
                           {RELATIONSHIP_OPTIONS.map((opt) => (
                             <option key={opt} value={opt}>
                               {opt}
                             </option>
                           ))}
-                        </select>
-                      </div>
-                      <div>
-                        <label className="mb-2 block text-xs font-semibold uppercase tracking-wide text-slate-500">
-                          Speech style
-                        </label>
-                        <select
+                        </Select>
+                      </Field>
+                      <Field label="Speech style">
+                        <Select
                           value={speechStyle}
                           onChange={(e) => setSpeechStyle(e.target.value)}
-                          className={`${inputClass} cursor-pointer appearance-none`}
                         >
                           {SPEECH_OPTIONS.map((opt) => (
                             <option key={opt} value={opt}>
                               {opt}
                             </option>
                           ))}
-                        </select>
-                      </div>
+                        </Select>
+                      </Field>
                     </div>
-                    <div>
-                      <label className="mb-2 block text-xs font-semibold uppercase tracking-wide text-slate-500">
-                        Personality draft
-                      </label>
-                      <textarea
+                    <Field label="Personality draft">
+                      <Textarea
                         value={personality}
                         onChange={(e) => {
                           setPersonalityTouched(true);
                           setPersonality(e.target.value);
                         }}
                         rows={8}
-                        className={`${inputClass} resize-none rounded-3xl`}
                       />
-                      <button
-                        type="button"
+                      <Button
+                        size="sm"
+                        variant="soft"
+                        leading={<WandIcon className="h-4 w-4" />}
+                        className="mt-3"
                         onClick={() => {
                           setPersonalityTouched(false);
                           setPersonality(buildCompanionPersonalityDraft(draftInput));
                         }}
-                        className="mt-3 rounded-full border border-slate-200 bg-white px-4 py-2 text-[12px] font-semibold uppercase tracking-[0.18em] text-slate-600 shadow-sm transition-all hover:-translate-y-0.5"
                       >
                         Regenerate from presets
-                      </button>
-                    </div>
+                      </Button>
+                    </Field>
                   </div>
                 ) : null}
-              </div>
+              </Surface>
 
-              {error ? (
-                <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>
-              ) : null}
+              {error ? <Notice tone="danger">{error}</Notice> : null}
             </div>
           </div>
         </div>
 
-        <div className="flex shrink-0 items-center justify-between gap-4 border-t border-slate-100/80 bg-white/90 px-6 py-5">
-          <button
-            type="button"
-            onClick={resetAndClose}
-            className="rounded-2xl border border-slate-200 bg-white px-6 py-3 text-[14px] font-semibold text-slate-600 shadow-sm transition-all hover:border-slate-300 hover:bg-slate-50"
-          >
+        <div className="flex shrink-0 items-center justify-between gap-4 bg-well/50 px-7 py-5">
+          <Button variant="secondary" size="lg" onClick={resetAndClose}>
             Cancel
-          </button>
-          <button
-            type="button"
+          </Button>
+          <Button
+            variant="primary"
+            size="lg"
+            loading={saving}
+            disabled={!name.trim() || !personality.trim()}
             onClick={handleCreate}
-            disabled={saving || !name.trim() || !personality.trim()}
-            className="rounded-2xl bg-blue-600 px-6 py-3 text-[14px] font-semibold text-white shadow-sm transition-all hover:bg-blue-700 disabled:opacity-50"
           >
-            {saving ? "Creating…" : "Create character"}
-          </button>
+            Create companion
+          </Button>
         </div>
-      </div>
+      </Surface>
     </div>
   );
 }

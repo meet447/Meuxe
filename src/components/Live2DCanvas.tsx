@@ -88,16 +88,16 @@ export const Live2DCanvas = memo(function Live2DCanvas({
         variant="model"
       />
       {!modelPath && !showMiniUi && (
-        <div className="text-slate-500 text-center px-6">
-          <p className="text-lg font-medium">No Live2D model loaded</p>
-          <p className="text-sm mt-2 text-slate-400">
-            Add a model to <code className="text-slate-600">models/live2d/</code> and select a character
+        <div className="px-6 text-center">
+          <p className="text-lg font-medium text-ink-2">No Live2D model loaded</p>
+          <p className="mt-2 text-sm text-ink-3">
+            Add a model to <code className="rounded-[6px] bg-well px-1 font-mono text-[12px] text-ink-2">models/live2d/</code> and select a character
           </p>
         </div>
       )}
       {!modelPath && showMiniUi && (
-        <div className="text-amber-200/50 text-center">
-          <p className="text-lg">No Live2D model loaded</p>
+        <div className="text-center">
+          <p className="text-lg text-ink-3">No Live2D model loaded</p>
         </div>
       )}
       <canvas
