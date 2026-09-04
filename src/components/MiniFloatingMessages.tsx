@@ -1,5 +1,6 @@
 import { useEffect, useState, useRef } from "react";
 import type { ChatMessage } from "../types";
+import { Dots } from "./ui";
 
 interface Props {
   messages: ChatMessage[];
@@ -61,10 +62,10 @@ export function MiniFloatingMessages({ messages, streamingText, isStreaming }: P
           setVisible((prev) => prev.filter((m) => !keysToFade.has(m.key)));
         }, 500);
 
-        fadeTimers.current.set('remove-batch', removeTimer);
+        fadeTimers.current.set("remove-batch", removeTimer);
       }, FADE_AFTER_MS);
 
-      fadeTimers.current.set('fade-batch', timer);
+      fadeTimers.current.set("fade-batch", timer);
     }
 
     return () => {
@@ -78,7 +79,7 @@ export function MiniFloatingMessages({ messages, streamingText, isStreaming }: P
     text.length > max ? text.slice(0, max) + "..." : text;
 
   return (
-    <div className="absolute top-3 left-3 right-3 z-10 flex flex-col gap-1.5 pointer-events-none">
+    <div className="pointer-events-none absolute left-3 right-3 top-3 z-10 flex flex-col gap-1.5">
       {visible.map((msg) => (
         <div
           key={msg.key}
@@ -87,10 +88,10 @@ export function MiniFloatingMessages({ messages, streamingText, isStreaming }: P
           } ${msg.role === "user" ? "self-end" : "self-start"}`}
         >
           <div
-            className={`max-w-[85%] rounded-2xl px-3 py-1.5 text-[11px] leading-relaxed backdrop-blur-xl shadow-sm ${
+            className={`max-w-[85%] rounded-card px-3 py-1.5 text-[11px] leading-relaxed shadow-soft backdrop-blur ${
               msg.role === "user"
-                ? "bg-blue-500/80 text-white/95 rounded-tr-sm"
-                : "bg-white/75 text-slate-700 border border-white/40 rounded-tl-sm"
+                ? "rounded-tr-[10px] bg-peach-100/95 text-ink"
+                : "rounded-tl-[10px] bg-surface-2/95 text-ink"
             }`}
           >
             {truncate(msg.text, 100)}
@@ -100,13 +101,11 @@ export function MiniFloatingMessages({ messages, streamingText, isStreaming }: P
 
       {/* Streaming preview */}
       {isStreaming && streamingText && (
-        <div className="self-start transition-all duration-200 opacity-90">
-          <div className="max-w-[85%] rounded-2xl rounded-tl-sm px-3 py-1.5 text-[11px] leading-relaxed bg-white/75 text-slate-700 border border-white/40 backdrop-blur-xl shadow-sm">
+        <div className="self-start opacity-90 transition-all duration-200">
+          <div className="max-w-[85%] rounded-card rounded-tl-[10px] bg-surface-2/95 px-3 py-1.5 text-[11px] leading-relaxed text-ink shadow-soft backdrop-blur">
             {truncate(streamingText, 80)}
-            <span className="inline-flex gap-0.5 ml-1 align-middle">
-              <span className="w-1 h-1 rounded-full bg-blue-400 animate-pulse" />
-              <span className="w-1 h-1 rounded-full bg-blue-400 animate-pulse [animation-delay:0.15s]" />
-              <span className="w-1 h-1 rounded-full bg-blue-400 animate-pulse [animation-delay:0.3s]" />
+            <span className="ml-1 inline-flex align-middle">
+              <Dots size="sm" />
             </span>
           </div>
         </div>

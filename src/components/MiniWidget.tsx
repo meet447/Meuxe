@@ -4,6 +4,15 @@ import { getCurrentWindow, LogicalSize } from "@tauri-apps/api/window";
 import { useWindow } from "../hooks/useWindow";
 import { MicButton } from "./MicButton";
 import type { ToolCallStatus } from "./ToolCallBubble";
+import {
+  Button,
+  ExpandIcon,
+  IconButton,
+  Pill,
+  SendIcon,
+  Spinner,
+  Surface,
+} from "./ui";
 
 interface MiniWidgetProps {
   avatarComponent: ReactNode;
@@ -45,7 +54,10 @@ export function MiniWidget({
 }: MiniWidgetProps) {
   const { expand } = useWindow();
   const pointerStateRef = useRef<{ x: number; y: number; dragged: boolean; active: boolean }>({
-    x: 0, y: 0, dragged: false, active: false,
+    x: 0,
+    y: 0,
+    dragged: false,
+    active: false,
   });
   const [input, setInput] = useState("");
   const [sizePresetIndex, setSizePresetIndex] = useState(1);
@@ -71,7 +83,9 @@ export function MiniWidget({
   useEffect(() => {
     if (openComposerTrigger > 0) {
       if (sizePresetIndex === 0) {
-        void getCurrentWindow().setSize(new LogicalSize(MINI_WINDOW_PRESETS[1].width, MINI_WINDOW_PRESETS[1].height));
+        void getCurrentWindow().setSize(
+          new LogicalSize(MINI_WINDOW_PRESETS[1].width, MINI_WINDOW_PRESETS[1].height),
+        );
         setSizePresetIndex(1);
       }
       setBottomDockHover(true);
@@ -96,7 +110,9 @@ export function MiniWidget({
     if (!state.active || state.dragged) return;
     if (Math.hypot(event.clientX - state.x, event.clientY - state.y) < 6) return;
     state.dragged = true;
-    try { await getCurrentWindow().startDragging(); } catch {}
+    try {
+      await getCurrentWindow().startDragging();
+    } catch {}
   };
 
   const handlePointerUpCapture = () => {
@@ -106,7 +122,9 @@ export function MiniWidget({
   const applyWindowPreset = async (nextIndex: number) => {
     const preset = MINI_WINDOW_PRESETS[nextIndex];
     setSizePresetIndex(nextIndex);
-    try { await getCurrentWindow().setSize(new LogicalSize(preset.width, preset.height)); } catch {}
+    try {
+      await getCurrentWindow().setSize(new LogicalSize(preset.width, preset.height));
+    } catch {}
   };
 
   const cycleWindowSize = () => {
@@ -121,7 +139,9 @@ export function MiniWidget({
     setInput("");
   };
 
-  const handleExpand = async () => { await expand(); };
+  const handleExpand = async () => {
+    await expand();
+  };
 
   const focusInput = () => {
     if (sizePresetIndex === 0) {
@@ -142,11 +162,9 @@ export function MiniWidget({
     ? toolCalls.find((tc) => tc.status === "awaiting_confirmation")
     : null;
 
-  const showBottomChrome =
-    bottomDockHover || inputFocused || input.trim().length > 0;
+  const showBottomChrome = bottomDockHover || inputFocused || input.trim().length > 0;
 
-  const showThinkingStatus =
-    !caption && (isStreaming || (speechSessionActive && !speaking));
+  const showThinkingStatus = !caption && (isStreaming || (speechSessionActive && !speaking));
 
   return (
     <div
@@ -170,24 +188,26 @@ export function MiniWidget({
 
       {/* Status pill — top right, subtle */}
       {(listening || showThinkingStatus || (speaking && !caption)) && (
-        <div className="absolute right-3 top-3 z-20 flex items-center gap-1.5 rounded-full border border-slate-200 bg-white/90 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-slate-600 shadow-sm backdrop-blur-xl pointer-events-none">
-          <span className={`h-1.5 w-1.5 rounded-full ${
-            listening ? "bg-red-500 animate-ping"
-              : showThinkingStatus ? "bg-blue-400 animate-pulse"
-              : "bg-blue-400 animate-ping"
-          }`} />
-          <span>{listening ? "Listening" : showThinkingStatus ? "Thinking" : "Speaking"}</span>
+        <div className="pointer-events-none absolute right-3 top-3 z-20">
+          <Pill
+            tone={listening ? "peach" : showThinkingStatus ? "honey" : "accent"}
+            dot
+            pulse
+            className="bg-surface-2/95 shadow-soft"
+          >
+            {listening ? "Listening" : showThinkingStatus ? "Thinking" : "Speaking"}
+          </Pill>
         </div>
       )}
 
       {/* Spoken sentence subtitle */}
       {caption && !pendingTool && (
-        <div className="absolute bottom-[4.75rem] left-3 right-3 z-10 pointer-events-none">
-          <div className="rounded-2xl border border-slate-200 bg-white px-3 py-2.5 shadow-sm">
+        <div className="pointer-events-none absolute bottom-[4.75rem] left-3 right-3 z-10">
+          <div className="rounded-card bg-surface-2/95 px-3.5 py-2.5 shadow-float backdrop-blur">
             {captionSpeaker && (
-              <p className="mb-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-400">{captionSpeaker}</p>
+              <p className="mb-0.5 text-[11px] font-semibold text-ink-3">{captionSpeaker}</p>
             )}
-            <p className="text-[13px] leading-snug text-slate-800">{caption}</p>
+            <p className="text-[13px] leading-snug text-ink">{caption}</p>
           </div>
         </div>
       )}
@@ -198,28 +218,34 @@ export function MiniWidget({
           className="absolute bottom-[4.75rem] left-3 right-3 z-20"
           data-mini-interactive="true"
         >
-          <div className="rounded-2xl border border-amber-200 bg-amber-50/90 backdrop-blur-xl shadow-md px-3 py-2.5">
-            <div className="flex items-center gap-2 mb-2">
-              <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
-              <span className="text-[11px] font-semibold text-amber-800">
+          <Surface tone="raised" elevation="float" className="bg-honey-50/95 px-3.5 py-3 backdrop-blur">
+            <div className="mb-2 flex items-center gap-2">
+              <Pill tone="honey" dot pulse size="xs">
+                Needs approval
+              </Pill>
+              <span className="text-[12px] font-semibold text-ink">
                 Allow {pendingTool.toolName.replace(/_/g, " ")}?
               </span>
             </div>
             <div className="flex gap-2">
-              <button
+              <Button
+                size="sm"
+                variant="primary"
+                className="flex-1"
                 onClick={() => onToolConfirm(pendingTool.requestId, true)}
-                className="flex-1 py-1.5 text-[11px] font-semibold bg-blue-500 text-white rounded-xl hover:bg-blue-600 transition-colors shadow-sm"
               >
                 Allow
-              </button>
-              <button
+              </Button>
+              <Button
+                size="sm"
+                variant="secondary"
+                className="flex-1"
                 onClick={() => onToolConfirm(pendingTool.requestId, false)}
-                className="flex-1 py-1.5 text-[11px] font-semibold bg-white text-slate-600 rounded-xl border border-slate-200 hover:bg-slate-50 transition-colors"
               >
                 Deny
-              </button>
+              </Button>
             </div>
-          </div>
+          </Surface>
         </div>
       )}
 
@@ -237,61 +263,54 @@ export function MiniWidget({
             showBottomChrome ? "opacity-100" : "pointer-events-none opacity-0"
           }`}
         >
-        <div className="flex items-center justify-between px-1">
-          <button
-            type="button"
-            onClick={cycleWindowSize}
-            className="rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-500 hover:bg-slate-50 hover:text-slate-800"
-            title="Window size"
-          >
-            {MINI_WINDOW_PRESETS[sizePresetIndex].label}
-          </button>
-          <button
-            type="button"
-            onClick={handleExpand}
-            className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:text-slate-900"
-            title="Open full app"
-          >
-            <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 3H5a2 2 0 00-2 2v3m16 0V5a2 2 0 00-2-2h-3m0 18h3a2 2 0 002-2v-3M5 16v3a2 2 0 002 2h3" />
-            </svg>
-          </button>
-        </div>
+          <div className="flex items-center justify-between px-1">
+            <Button
+              type="button"
+              size="sm"
+              variant="secondary"
+              className="min-w-9 px-2.5 text-[11px] font-bold"
+              onClick={cycleWindowSize}
+              title="Window size"
+            >
+              {MINI_WINDOW_PRESETS[sizePresetIndex].label}
+            </Button>
+            <IconButton label="Open full app" size="sm" variant="secondary" onClick={handleExpand}>
+              <ExpandIcon className="h-4 w-4" />
+            </IconButton>
+          </div>
 
-        <form
-          onSubmit={handleSubmit}
-          className="pointer-events-auto flex items-center gap-1 rounded-full border border-slate-200 bg-white py-1 pl-1 pr-1.5 shadow-sm ring-1 ring-slate-100 focus-within:ring-slate-200"
-        >
-          <MicButton listening={listening} onToggle={onMicToggle} variant="stage" />
-          <input
-            ref={inputRef}
-            type="text"
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onFocus={() => {
-              focusInput();
-              setInputFocused(true);
-            }}
-            onBlur={() => setInputFocused(false)}
-            placeholder="Type a message..."
-            className="companion-chat-input min-w-0 flex-1 bg-transparent px-2 py-2.5 text-[15px] text-slate-800 outline-none ring-0 placeholder:text-slate-400 focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0 disabled:opacity-50"
-            disabled={isStreaming}
-          />
-          <button
-            type="submit"
-            disabled={!input.trim() || isStreaming}
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-blue-600 text-white transition-colors hover:bg-blue-700 disabled:opacity-30"
-            title="Send"
+          <form
+            onSubmit={handleSubmit}
+            className="pointer-events-auto flex items-center gap-1 rounded-full bg-surface-2 p-1.5 shadow-float"
           >
-            {isStreaming ? (
-              <span className="h-4 w-4 rounded-full border-2 border-white/40 border-t-white animate-spin" />
-            ) : (
-              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5" />
-              </svg>
-            )}
-          </button>
-        </form>
+            <MicButton listening={listening} onToggle={onMicToggle} variant="stage" />
+            <input
+              ref={inputRef}
+              type="text"
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onFocus={() => {
+                focusInput();
+                setInputFocused(true);
+              }}
+              onBlur={() => setInputFocused(false)}
+              placeholder="Type a message..."
+              className="companion-chat-input min-w-0 flex-1 bg-transparent px-2 py-2.5 text-[15px] text-ink outline-none placeholder:text-ink-4 disabled:opacity-50"
+              disabled={isStreaming}
+            />
+            <button
+              type="submit"
+              disabled={!input.trim() || isStreaming}
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-accent-500 text-white transition hover:bg-accent-600 disabled:opacity-30"
+              title="Send"
+            >
+              {isStreaming ? (
+                <Spinner />
+              ) : (
+                <SendIcon className="h-4 w-4" strokeWidth={2} />
+              )}
+            </button>
+          </form>
         </div>
       </div>
     </div>
