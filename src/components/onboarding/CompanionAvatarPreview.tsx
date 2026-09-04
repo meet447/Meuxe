@@ -1,7 +1,6 @@
 import { lazy, Suspense, useEffect, useState } from "react";
 import { resolveAssetUrl } from "../../api/tauri";
-import { BG_PRESETS } from "../../constants/bgPresets";
-import { Mascot, Pill } from "../ui";
+import { Mascot } from "../ui";
 
 const Live2DCanvas = lazy(() =>
   import("../Live2DCanvas").then((m) => ({ default: m.Live2DCanvas })),
@@ -13,7 +12,7 @@ import type { PreviewModel } from "./ModelPicker";
 export type { PreviewModel };
 
 const noop = () => undefined;
-const previewBg = BG_PRESETS[2].value;
+const previewBg = "#f0f0f2";
 
 export function CompanionAvatarPreview({
   model,
@@ -45,37 +44,32 @@ export function CompanionAvatarPreview({
   }, [model?.path]);
 
   return (
-    <div
-      className="squircle relative w-full overflow-hidden rounded-panel shadow-float aspect-[4/5] max-h-[min(440px,52vh)]"
-      style={{ background: previewBg }}
-    >
+    <div className="relative h-[180px] w-full overflow-hidden rounded-card bg-well">
       {companionName?.trim() && (
-        <div className="absolute left-3 top-3 z-10 rounded-full bg-black/35 px-3 py-1 text-xs font-semibold text-white backdrop-blur">
+        <div className="absolute left-3 top-3 z-10 rounded-full bg-white/85 px-3 py-1 text-xs font-semibold text-ink shadow-soft">
           {companionName.trim()}
         </div>
       )}
       {vibeLabel && (
-        <div className="absolute right-3 top-3 z-10">
-          <Pill tone="neutral" className="bg-surface-2/90">
-            {vibeLabel}
-          </Pill>
+        <div className="absolute right-3 top-3 z-10 rounded-full bg-white/85 px-3 py-1 text-xs font-semibold text-ink shadow-soft">
+          {vibeLabel}
         </div>
       )}
       {!model && (
-        <div className="flex h-full min-h-[220px] flex-col items-center justify-center gap-3 px-6 text-center">
-          <Mascot mood="sleepy" tone="light" className="h-16 w-16" />
-          <p className="text-sm text-white/60">Your companion will appear here</p>
+        <div className="flex h-full flex-col items-center justify-center gap-2 px-6 text-center">
+          <Mascot mood="sleepy" tone="light" className="h-12 w-12" />
+          <p className="text-xs text-ink-3">Your companion will appear here</p>
         </div>
       )}
       {model && (
         <Suspense
           fallback={
-            <div className="flex h-full min-h-[220px] items-center justify-center text-sm text-white/50">
+            <div className="flex h-full items-center justify-center text-sm text-ink-3">
               Loading avatar…
             </div>
           }
         >
-          <div className="h-full w-full min-h-[220px]">
+          <div className="h-full w-full">
             {model.type === "vrm" ? (
               <VRMCanvas
                 modelPath={url}

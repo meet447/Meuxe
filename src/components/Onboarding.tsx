@@ -21,21 +21,20 @@ import { CompanionAvatarPreview } from "./onboarding/CompanionAvatarPreview";
 import { ModelPicker } from "./onboarding/ModelPicker";
 import { OnboardingShell } from "./onboarding/OnboardingShell";
 import {
-  ArrowRightIcon,
   BackIcon,
   Button,
   ChatIcon,
+  ChevronRightIcon,
   ChoiceCard,
   FaceIcon,
   Field,
   Input,
   LockIcon,
-  Mascot,
   Notice,
   PlayIcon,
   Select,
+  SparkIcon,
   SpeakerIcon,
-  Surface,
   Textarea,
   VibeGlyph,
 } from "./ui";
@@ -303,14 +302,28 @@ export function Onboarding({ onComplete }: { onComplete: () => void }) {
   );
 
   if (step === 5) {
+    const companionName = form.companion.name.trim() || "Your companion";
     return (
       <OnboardingShell step={step}>
-        <div className="animate-fade-in py-8 text-center">
-          <Mascot mood="happy" className="mx-auto h-24 w-24" />
-          <h2 className="mt-5 text-[26px] font-bold tracking-tight text-ink">You&apos;re all set</h2>
-          <p className="mx-auto mt-2 max-w-sm text-[15px] leading-relaxed text-ink-2">
-            <span className="font-semibold text-accent-600">{form.companion.name}</span> is waiting on your desktop.
-          </p>
+        <div className="flex flex-col items-center gap-6">
+          <div className="flex w-full items-center gap-3 rounded-card bg-accent-200 px-4 py-3 text-ink">
+            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[10px] bg-white/60">
+              <SparkIcon className="h-4 w-4" />
+            </span>
+            <p className="flex-1 text-sm font-semibold">
+              {companionName} is waiting on your desktop
+            </p>
+            <ChevronRightIcon className="h-4 w-4 shrink-0 text-ink-3" />
+          </div>
+          <Button
+            type="button"
+            variant="primary"
+            size="lg"
+            className="min-w-[160px]"
+            onClick={onComplete}
+          >
+            Get started
+          </Button>
         </div>
       </OnboardingShell>
     );
@@ -319,33 +332,30 @@ export function Onboarding({ onComplete }: { onComplete: () => void }) {
   return (
     <OnboardingShell step={step} preview={preview}>
       {step === 0 && (
-        <div className="animate-fade-in">
-          <h2 className="text-[26px] font-bold tracking-tight text-ink">A companion on your desktop</h2>
-          <p className="mt-1.5 mb-6 text-[15px] leading-relaxed text-ink-2">
-            Talk to someone who remembers you. They live on your computer—not in a generic chat app.
-          </p>
-          <div className="grid gap-3 sm:grid-cols-3">
-            {FEATURE_TILES.map((f) => (
-              <Surface key={f.title} tone="raised" className="flex items-start gap-3 p-4">
-                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[13px] bg-accent-100 text-accent-600">
-                  <f.icon className="h-5 w-5" />
-                </span>
-                <div>
-                  <div className="text-sm font-semibold text-ink">{f.title}</div>
-                  <div className="text-xs text-ink-3">{f.sub}</div>
-                </div>
-              </Surface>
-            ))}
+        <>
+          <div className="flex items-center gap-3 rounded-card bg-accent-200 px-4 py-3 text-ink">
+            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[10px] bg-white/60">
+              <SparkIcon className="h-4 w-4" />
+            </span>
+            <p className="flex-1 text-sm font-semibold">Set up takes about two minutes</p>
+            <ChevronRightIcon className="h-4 w-4 shrink-0 text-ink-3" />
           </div>
-        </div>
+          <ul className="mt-6 grid grid-cols-3 gap-4">
+            {FEATURE_TILES.map((f) => (
+              <li key={f.title} className="text-center">
+                <span className="mx-auto flex h-9 w-9 items-center justify-center rounded-[10px] bg-well text-ink">
+                  <f.icon className="h-4 w-4" />
+                </span>
+                <div className="mt-2 text-sm font-semibold text-ink">{f.title}</div>
+                <div className="mt-0.5 text-xs text-ink-3">{f.sub}</div>
+              </li>
+            ))}
+          </ul>
+        </>
       )}
 
       {step === 1 && (
-        <div className="animate-fade-in">
-          <h2 className="text-[26px] font-bold tracking-tight text-ink">First, your name</h2>
-          <p className="mt-1.5 mb-6 text-[15px] leading-relaxed text-ink-2">
-            So they know who they&apos;re talking to. Only saved on this device.
-          </p>
+        <>
           <Field label="Name">
             <Input
               type="text"
@@ -355,7 +365,7 @@ export function Onboarding({ onComplete }: { onComplete: () => void }) {
               autoFocus
             />
           </Field>
-          <Field label="Anything they should know" optional>
+          <Field label="Anything they should know" optional className="mt-4">
             <Textarea
               value={form.user.about}
               onChange={(e) => updateForm("user", "about", e.target.value)}
@@ -363,16 +373,11 @@ export function Onboarding({ onComplete }: { onComplete: () => void }) {
               rows={2}
             />
           </Field>
-        </div>
+        </>
       )}
 
       {step === 2 && (
-        <div className="animate-fade-in">
-          <h2 className="text-[26px] font-bold tracking-tight text-ink">Meet them</h2>
-          <p className="mt-1.5 mb-6 text-[15px] leading-relaxed text-ink-2">
-            Name, look, and personality—in one place.
-          </p>
-
+        <>
           <Field label="Their name">
             <Input
               type="text"
@@ -382,8 +387,8 @@ export function Onboarding({ onComplete }: { onComplete: () => void }) {
             />
           </Field>
 
-          <Field label="Personality">
-            <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+          <Field label="Personality" className="mt-4">
+            <div className="grid grid-cols-2 gap-2.5">
               {COMPANION_VIBE_PACKS.map((pack) => (
                 <ChoiceCard
                   key={pack.id}
@@ -398,22 +403,19 @@ export function Onboarding({ onComplete }: { onComplete: () => void }) {
             </div>
           </Field>
 
-          <Field label="Look" className="mb-0">
+          <Field label="Look" className="mt-4 mb-0">
             <ModelPicker
               models={models}
               selectedId={form.companion.model_id}
               onSelect={(id) => updateForm("companion", "model_id", id)}
             />
           </Field>
-        </div>
+        </>
       )}
 
       {step === 3 && (
-        <div className="animate-fade-in">
-          <h2 className="text-[26px] font-bold tracking-tight text-ink">How they sound</h2>
-          <p className="mt-1.5 mb-6 text-[15px] leading-relaxed text-ink-2">Pick a voice and tap listen.</p>
-
-          <div className="mb-4 grid gap-2.5 sm:grid-cols-3">
+        <>
+          <div className="mb-4 grid grid-cols-1 gap-2.5 sm:grid-cols-3">
             {Object.entries(ttsPresets).map(([id, preset]) => (
               <ChoiceCard
                 key={id}
@@ -460,16 +462,11 @@ export function Onboarding({ onComplete }: { onComplete: () => void }) {
               </Button>
             </div>
           </Field>
-        </div>
+        </>
       )}
 
       {step === 4 && (
-        <div className="animate-fade-in">
-          <h2 className="text-[26px] font-bold tracking-tight text-ink">Who answers for them?</h2>
-          <p className="mt-1.5 mb-6 text-[15px] leading-relaxed text-ink-2">
-            Meuxe is the face and memory. Choose the assistant on your computer that powers chat.
-          </p>
-
+        <>
           <div className="mb-4 grid grid-cols-1 gap-3">
             {ACP_AGENT_PRESET_IDS.map((id) => (
               <AgentPresetCard
@@ -524,32 +521,33 @@ export function Onboarding({ onComplete }: { onComplete: () => void }) {
               friendly
             />
           )}
-        </div>
+        </>
       )}
 
       {error && (
         <Notice tone="danger" className="mt-4">{error}</Notice>
       )}
 
-      <div className="mt-8 flex gap-3">
-        {step > 0 && (
+      <div className="mt-10 flex items-center justify-between">
+        {step > 0 ? (
           <Button
             type="button"
-            variant="secondary"
-            size="lg"
+            variant="ghost"
             leading={<BackIcon className="h-4 w-4" />}
             onClick={() => setStep(step - 1)}
           >
             Back
           </Button>
+        ) : (
+          <span />
         )}
         {step < 4 ? (
           <Button
             type="button"
             variant="primary"
             size="lg"
-            className="flex-1"
-            trailing={<ArrowRightIcon className="h-4 w-4" />}
+            className="min-w-[160px]"
+            trailing={<ChevronRightIcon className="h-4 w-4" />}
             onClick={() => setStep(step + 1)}
             disabled={!canProceed()}
           >
@@ -560,8 +558,8 @@ export function Onboarding({ onComplete }: { onComplete: () => void }) {
             type="button"
             variant="primary"
             size="lg"
-            className="flex-1"
-            trailing={<ArrowRightIcon className="h-4 w-4" />}
+            className="min-w-[160px]"
+            trailing={<ChevronRightIcon className="h-4 w-4" />}
             onClick={handleFinish}
             disabled={!canProceed() || submitting}
             loading={submitting}

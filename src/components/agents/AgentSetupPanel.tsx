@@ -74,7 +74,7 @@ export function AgentSetupPanel({
   const usingNpx = agent?.install_source === "npx";
 
   return (
-    <Surface tone="well" elevation="none" className="p-4">
+    <Surface tone="surface" elevation="soft" className="p-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <span className="text-xs font-semibold text-ink-2">
           {friendly ? "Agent on your system" : "Agent CLI"}
