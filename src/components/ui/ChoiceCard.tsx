@@ -41,7 +41,7 @@ export function ChoiceCard({
         compact ? "px-3 py-2.5" : "px-3.5 py-3",
         selected
           ? "bg-accent-100 ring-2 ring-accent-300/70"
-          : "bg-surface-2 shadow-soft hover:bg-white hover:shadow-float",
+          : "bg-surface-2 shadow-soft hover:bg-well/60 hover:shadow-float",
         className,
       )}
     >
@@ -72,7 +72,7 @@ export function ChoiceCard({
         <span
           className={cn(
             "flex h-5 w-5 shrink-0 items-center justify-center rounded-full transition-all",
-            selected ? "bg-accent-500 text-white" : "bg-well text-transparent group-hover:bg-well-2",
+            selected ? "bg-ink text-white" : "bg-well text-transparent group-hover:bg-well-2",
           )}
         >
           <CheckIcon className="h-3 w-3" strokeWidth={2.4} />

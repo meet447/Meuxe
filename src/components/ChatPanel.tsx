@@ -144,7 +144,7 @@ const MessageBubble = memo(function MessageBubble({
         className={`max-w-[88%] rounded-card px-4 py-3 ${
           isUser
             ? dark
-              ? "rounded-tr-[10px] bg-accent-500 text-white"
+              ? "rounded-tr-[10px] bg-accent-300 text-ink"
               : "rounded-tr-[10px] bg-peach-100 text-ink"
             : dark
               ? "rounded-tl-[10px] bg-white/10 text-white/90 shadow-soft"
@@ -248,7 +248,7 @@ const ChatInput = memo(function ChatInput({
         <button
           type="submit"
           disabled={isProcessing || !input.trim()}
-          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-accent-500 text-white transition hover:bg-accent-600 disabled:opacity-30"
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-ink text-white transition hover:bg-ink-2 disabled:opacity-30"
         >
           {isProcessing ? (
             <Spinner />

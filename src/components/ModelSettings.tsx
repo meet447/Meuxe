@@ -114,7 +114,7 @@ export const ModelSettings = memo(function ModelSettings({
               onClick={() => handlePreview(expr)}
               className={`rounded-full px-3 py-1.5 text-[13px] font-medium transition ${
                 activePreview === expr
-                  ? "bg-accent-500 text-white shadow-soft"
+                  ? "bg-ink text-white shadow-soft"
                   : "bg-well text-ink-2 hover:bg-well-2"
               }`}
             >

@@ -87,7 +87,7 @@ export const FloatingChatInput = memo(function FloatingChatInput({
         <button
           type="submit"
           disabled={isProcessing || !input.trim()}
-          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-accent-500 text-white transition-all hover:bg-accent-600 disabled:opacity-30"
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-ink text-white transition-all hover:bg-ink-2 disabled:opacity-30"
           title="Send"
         >
           {isProcessing ? (

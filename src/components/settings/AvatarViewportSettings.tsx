@@ -3,7 +3,7 @@ import { ChoiceCard, IconButton, MinusIcon, PlusIcon, SectionTitle, Surface } fr
 
 const STAGE_BACKGROUNDS = [
   { name: "Transparent (match app)", value: "transparent" },
-  { name: "Light", value: "#f8fafc" },
+  { name: "Light", value: "#f4f4f5" },
   ...BG_PRESETS,
 ];
 

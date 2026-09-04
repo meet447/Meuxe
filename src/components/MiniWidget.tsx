@@ -301,7 +301,7 @@ export function MiniWidget({
             <button
               type="submit"
               disabled={!input.trim() || isStreaming}
-              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-accent-500 text-white transition hover:bg-accent-600 disabled:opacity-30"
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-ink text-white transition hover:bg-ink-2 disabled:opacity-30"
               title="Send"
             >
               {isStreaming ? (
