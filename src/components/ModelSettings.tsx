@@ -5,6 +5,16 @@ import {
   getSupportedExpressions,
   saveExpressions,
 } from "../api/tauri";
+import {
+  Button,
+  Hint,
+  IconButton,
+  InfoIcon,
+  Pill,
+  PlayIcon,
+  SectionTitle,
+  Select,
+} from "./ui";
 
 interface Props {
   modelId: string;
@@ -32,7 +42,6 @@ export const ModelSettings = memo(function ModelSettings({
   modelId,
   onPreviewExpression,
   onSaved,
-  onClose,
 }: Props) {
   const [globalExpressions, setGlobalExpressions] = useState<string[]>([]);
   const [modelExpressions, setModelExpressions] = useState<string[]>([]);
@@ -50,7 +59,6 @@ export const ModelSettings = memo(function ModelSettings({
         setGlobalExpressions(FALLBACK_EXPRESSIONS);
       });
 
-    // Fetch model's available expressions from the model3.json file
     getModelExpressions(modelId)
       .then((exprs) => {
         setModelExpressions(exprs);
@@ -60,7 +68,6 @@ export const ModelSettings = memo(function ModelSettings({
         setModelExpressions([]);
       });
 
-    // Get saved mapping
     getExpressions(modelId)
       .then((saved) => {
         setMapping(saved || {});
@@ -92,113 +99,80 @@ export const ModelSettings = memo(function ModelSettings({
   };
 
   return (
-    <div className="flex-1 flex flex-col bg-transparent relative h-full">
-      {/* Header */}
-      <div className="px-6 py-5 border-b border-slate-100 bg-white z-10">
-        <h2 className="text-[16px] font-bold text-slate-800 tracking-tight">Expression Mapping</h2>
-        <p className="text-xs text-slate-400 mt-1 font-medium">Model: <span className="text-blue-500">{modelId || "none"}</span></p>
+    <div className="flex flex-col gap-6">
+      <p className="text-xs text-ink-3">
+        Model: <span className="font-mono text-ink-2">{modelId || "none"}</span>
+      </p>
+
+      <div>
+        <SectionTitle>Model expressions ({modelExpressions.length})</SectionTitle>
+        <div className="flex flex-wrap gap-2">
+          {modelExpressions.map((expr) => (
+            <button
+              key={expr}
+              type="button"
+              onClick={() => handlePreview(expr)}
+              className={`rounded-full px-3 py-1.5 text-[13px] font-medium transition ${
+                activePreview === expr
+                  ? "bg-accent-500 text-white shadow-soft"
+                  : "bg-well text-ink-2 hover:bg-well-2"
+              }`}
+            >
+              {expr}
+            </button>
+          ))}
+          {modelExpressions.length === 0 && <Pill>No expressions found</Pill>}
+        </div>
+        <Hint className="mt-3 flex items-center gap-1">
+          <InfoIcon className="h-3.5 w-3.5" />
+          Click a badge above to preview it on the model
+        </Hint>
       </div>
 
-      {/* Content */}
-      <div className="flex-1 overflow-y-auto p-6 space-y-6 scrollbar-thin scrollbar-thumb-slate-200 scrollbar-track-transparent">
-        {/* Model expressions preview */}
-        <div>
-          <div className="text-[11px] font-semibold tracking-wide text-slate-400 uppercase mb-3">
-            Model Expressions ({modelExpressions.length})
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {modelExpressions.map((expr) => (
-              <button
-                key={expr}
-                onClick={() => handlePreview(expr)}
-                className={`text-[13px] px-3 py-1.5 rounded-full font-medium transition-all ${
-                  activePreview === expr
-                    ? "bg-blue-500 text-white shadow-md shadow-blue-500/20 ring-2 ring-blue-500/30"
-                    : "bg-slate-50 text-slate-600 hover:bg-slate-100 border border-slate-200/60"
-                }`}
-              >
-                {expr}
-              </button>
-            ))}
-            {modelExpressions.length === 0 && (
-              <span className="text-xs text-slate-500 italic bg-slate-50 px-3 py-1.5 rounded-full">No expressions found</span>
-            )}
-          </div>
-          <p className="text-[11px] text-slate-400 mt-3 italic flex items-center gap-1">
-            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-            Click a badge above to preview it on the model
-          </p>
-        </div>
-
-        {/* Divider */}
-        <div className="h-px bg-slate-100 w-full" />
-
-        {/* Mapping table */}
-        <div>
-          <div className="text-[11px] font-semibold tracking-wide text-slate-400 uppercase mb-3">
-            Global to Model Mapping
-          </div>
-          <div className="space-y-2">
-            {globalExpressions.map((globalName) => (
-              <div
-                key={globalName}
-                className="flex items-center gap-3 p-3 rounded-2xl bg-slate-50/80 border border-slate-100 transition-colors hover:bg-slate-50"
-              >
-                <div className="w-24 shrink-0 flex items-center gap-2">
-                  <div className="w-1.5 h-1.5 rounded-full bg-blue-400"></div>
-                  <span className="text-[13px] text-slate-700 font-semibold capitalize">
-                    {globalName}
-                  </span>
-                </div>
-                <span className="text-slate-300 text-sm">{"\u2192"}</span>
-                <select
-                  value={mapping[globalName] || ""}
-                  onChange={(e) => handleMappingChange(globalName, e.target.value)}
-                  className="flex-1 bg-white text-slate-700 text-[13px] rounded-xl px-3 py-2 border border-slate-200 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-50 cursor-pointer shadow-sm shadow-slate-200/20"
-                >
-                  <option value="">-- select --</option>
-                  {modelExpressions.map((expr) => (
-                    <option key={expr} value={expr}>
-                      {expr}
-                    </option>
-                  ))}
-                </select>
-                {/* Preview the mapped expression */}
-                {mapping[globalName] && (
-                  <button
-                    onClick={() => handlePreview(mapping[globalName])}
-                    className={`w-8 h-8 rounded-full flex items-center justify-center transition-all ${
-                      activePreview === mapping[globalName]
-                        ? "bg-blue-100 text-blue-600"
-                        : "bg-white text-slate-400 border border-slate-200 hover:text-blue-500 hover:bg-slate-50"
-                    }`}
-                    title="Preview this expression"
-                  >
-                    {"\u25B6"}
-                  </button>
-                )}
+      <div>
+        <SectionTitle>Global to model mapping</SectionTitle>
+        <div className="space-y-2">
+          {globalExpressions.map((globalName) => (
+            <div
+              key={globalName}
+              className="flex items-center gap-3 rounded-card bg-surface-2 p-3 shadow-soft"
+            >
+              <div className="flex w-24 shrink-0 items-center gap-2">
+                <div className="h-1.5 w-1.5 rounded-full bg-accent-400" />
+                <span className="text-[13px] font-semibold capitalize text-ink">{globalName}</span>
               </div>
-            ))}
-          </div>
+              <span className="text-sm text-ink-4">{"\u2192"}</span>
+              <Select
+                wrapperClassName="flex-1"
+                className="py-2 text-[13px]"
+                value={mapping[globalName] || ""}
+                onChange={(e) => handleMappingChange(globalName, e.target.value)}
+              >
+                <option value="">-- select --</option>
+                {modelExpressions.map((expr) => (
+                  <option key={expr} value={expr}>
+                    {expr}
+                  </option>
+                ))}
+              </Select>
+              {mapping[globalName] && (
+                <IconButton
+                  label="Preview"
+                  size="sm"
+                  variant={activePreview === mapping[globalName] ? "soft" : "secondary"}
+                  onClick={() => handlePreview(mapping[globalName])}
+                >
+                  <PlayIcon className="h-4 w-4" />
+                </IconButton>
+              )}
+            </div>
+          ))}
         </div>
       </div>
 
-      {/* Footer */}
-      <div className="p-5 bg-white/80 backdrop-blur-md border-t border-slate-100/80 flex gap-3 z-10">
-        <button
-          onClick={onClose}
-          className="px-6 py-3 bg-white border border-slate-200 hover:bg-slate-50 hover:border-slate-300 text-slate-600 rounded-2xl text-[14px] font-semibold shadow-sm transition-all"
-        >
-          Cancel
-        </button>
-        <button
-          onClick={handleSave}
-          disabled={saving}
-          className="flex-1 bg-blue-500 hover:bg-blue-600 disabled:bg-slate-300 text-white shadow-md shadow-blue-500/20 rounded-2xl px-5 py-3 text-[14px] font-semibold transition-all hover:-translate-y-0.5 active:translate-y-0"
-        >
-          {saving ? "Saving..." : "Save Mapping"}
-        </button>
-      </div>
+      <Button variant="primary" fullWidth loading={saving} onClick={handleSave}>
+        Save mapping
+      </Button>
     </div>
   );
 });
