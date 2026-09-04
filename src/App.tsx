@@ -4,8 +4,9 @@ import { listen } from "@tauri-apps/api/event";
 import { register, unregister } from "@tauri-apps/plugin-global-shortcut";
 import { ChatPanel } from "./components/ChatPanel";
 import { HistoryDrawer } from "./components/chat/HistoryDrawer";
-import { StageCornerToolbar } from "./components/chat/StageCornerToolbar";
 import { FloatingChatInput } from "./components/chat/FloatingChatInput";
+import { Sidebar } from "./components/shell/Sidebar";
+import { Button, Dots, Mascot, Pill } from "./components/ui";
 import { AddCharacterModal } from "./components/AddCharacterModal";
 import { CharacterSelect } from "./components/CharacterSelect";
 import { Onboarding } from "./components/Onboarding";
@@ -481,7 +482,7 @@ function App() {
   const avatarCanvas = useMemo(() => (
     <Suspense
       fallback={
-        <div className="w-full h-full flex items-center justify-center text-slate-400 font-medium">
+        <div className="flex h-full w-full items-center justify-center text-sm text-ink-3">
           Loading model...
         </div>
       }
@@ -534,14 +535,11 @@ function App() {
 
   if (onboardingComplete === null) {
     return (
-      <div className="h-screen flex items-center justify-center bg-slate-50">
-        <div className="flex flex-col items-center gap-5">
-          <div className="flex gap-2">
-            <span className="w-3 h-3 rounded-full bg-blue-400 animate-bounce [animation-delay:-0.3s]" />
-            <span className="w-3 h-3 rounded-full bg-blue-400 animate-bounce [animation-delay:-0.15s]" />
-            <span className="w-3 h-3 rounded-full bg-blue-400 animate-bounce" />
-          </div>
-          <div className="text-slate-400 font-semibold text-sm tracking-wide uppercase">Loading</div>
+      <div className="flex h-screen items-center justify-center bg-canvas">
+        <div className="flex flex-col items-center gap-4">
+          <Mascot mood="sleepy" className="h-20 w-20" />
+          <Dots tone="accent" />
+          <p className="text-sm text-ink-3">Waking up…</p>
         </div>
       </div>
     );
@@ -566,152 +564,153 @@ function App() {
     );
   }
 
+  const companionStatus = listening
+    ? { tone: "peach" as const, label: "Listening" }
+    : speaking
+      ? { tone: "accent" as const, label: "Speaking" }
+      : isStreaming || (speechSessionActive && !speaking)
+        ? { tone: "honey" as const, label: "Thinking" }
+        : null;
+
   return (
-    <div className="companion-stage-light relative flex h-screen flex-col overflow-hidden font-sans text-slate-900">
-      <div className="relative flex min-h-0 flex-1">
-        <main className="relative min-h-0 min-w-0 flex-1">
-          {expressionsConfigured === null ? (
-            <div className="flex h-full items-center justify-center">
-              <div className="flex gap-2">
-                <span className="h-2.5 w-2.5 rounded-full bg-slate-400/60 animate-bounce [animation-delay:-0.3s]" />
-                <span className="h-2.5 w-2.5 rounded-full bg-slate-400/60 animate-bounce [animation-delay:-0.15s]" />
-                <span className="h-2.5 w-2.5 rounded-full bg-slate-400/60 animate-bounce" />
-              </div>
-            </div>
-          ) : !expressionsConfigured ? (
-            <div className="flex h-full flex-col items-center justify-center p-8 text-center">
-              <p className="mb-6 max-w-sm text-sm text-slate-500 leading-relaxed">
-                Map avatar expressions in Settings before you chat.
-              </p>
-              <button
-                onClick={() => setSettingsOpen(true)}
-                className="rounded-full border border-slate-200 bg-white px-6 py-3 text-sm font-semibold text-slate-800 shadow-sm hover:bg-slate-50"
-              >
-                Open Settings
-              </button>
-            </div>
-          ) : (
-            <>
-              <div className="absolute inset-0">{avatarCanvas}</div>
+    <div className="flex h-screen gap-3 bg-canvas p-3 font-sans text-ink">
+      {expressionsConfigured && (
+        <Sidebar
+          historyOpen={historyOpen}
+          onHistoryToggle={() => {
+            setHistoryOpen((o) => !o);
+            setCharSelectOpen(false);
+          }}
+          onMini={() => toggleMini(selectedCharId)}
+          onSettings={() => {
+            setSettingsOpen((o) => !o);
+            setCharSelectOpen(false);
+          }}
+          settingsOpen={settingsOpen}
+          onCharacters={() => {
+            setCharSelectOpen((o) => !o);
+            setHistoryOpen(false);
+          }}
+          charSelectOpen={charSelectOpen}
+          framing={framing}
+          onFramingChange={setFraming}
+        />
+      )}
 
-              <StageCornerToolbar
-                historyOpen={historyOpen}
-                onHistoryToggle={() => {
-                  setHistoryOpen((o) => !o);
-                  setCharSelectOpen(false);
-                }}
-                onMini={() => toggleMini(selectedCharId)}
-                onSettings={() => {
-                  setSettingsOpen((o) => !o);
-                  setCharSelectOpen(false);
-                }}
-                settingsOpen={settingsOpen}
-                onCharacters={() => {
-                  setCharSelectOpen((o) => !o);
-                  setHistoryOpen(false);
-                }}
-                charSelectOpen={charSelectOpen}
-                framing={framing}
-                onFramingChange={setFraming}
-              />
+      <main className="squircle relative min-h-0 min-w-0 flex-1 overflow-hidden rounded-panel bg-surface shadow-soft">
+        {expressionsConfigured === null ? (
+          <div className="flex h-full flex-col items-center justify-center gap-4">
+            <Mascot mood="sleepy" className="h-20 w-20" />
+            <Dots tone="accent" />
+            <p className="text-sm text-ink-3">Waking up…</p>
+          </div>
+        ) : !expressionsConfigured ? (
+          <div className="flex h-full flex-col items-center justify-center gap-5 p-8 text-center">
+            <Mascot mood="thinking" className="h-20 w-20" />
+            <p className="max-w-sm text-sm leading-relaxed text-ink-2">
+              Map your companion&apos;s expressions in Settings before you chat.
+            </p>
+            <Button variant="primary" onClick={() => setSettingsOpen(true)}>
+              Open settings
+            </Button>
+          </div>
+        ) : (
+          <>
+            <div className="absolute inset-0">{avatarCanvas}</div>
 
-              <CharacterSelect
-                menuOnly
-                characters={characters}
-                selected={selectedCharId}
-                onSelect={handleCharacterChange}
-                onAddCharacter={() => setAddCharacterOpen(true)}
-                open={charSelectOpen}
-                onToggle={() => setCharSelectOpen(false)}
-              />
-
-              <div className="pointer-events-none absolute bottom-6 left-5 z-20 hidden sm:block">
-                <p className="text-sm font-semibold text-slate-800">{charName}</p>
-              </div>
-
-              <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20 flex flex-col items-center px-4 pb-6 pt-16">
-                <FloatingChatInput
-                  isProcessing={isStreaming}
-                  onSend={handleSend}
-                  onTypingChange={handleTypingChange}
-                  listening={listening}
-                  onMicToggle={handleMicToggle}
-                  inputRef={fullChatInputRef}
-                  caption={spokenCaption}
-                  captionSpeaker={spokenCaption ? charName : undefined}
-                  statusLabel={
-                    spokenCaption
-                      ? null
-                      : isStreaming || (speechSessionActive && !speaking)
-                        ? "Thinking…"
-                        : null
-                  }
-                />
-              </div>
-            </>
-          )}
-        </main>
-
-        {expressionsConfigured && (
-          <HistoryDrawer
-            open={historyOpen}
-            onClose={() => setHistoryOpen(false)}
-            title={`Chat with ${charName}`}
-          >
-            <ChatPanel
-              hideInput
-              appearance="light"
-              timeline={timeline}
-              loading={isStreaming}
-              streamingText={streamingText}
-              characterName={charName}
-              onSend={handleSend}
-              onTypingChange={handleTypingChange}
-              listening={listening}
-              onMicToggle={handleMicToggle}
-              onToolConfirm={handleConfirm}
+            <CharacterSelect
+              menuOnly
+              characters={characters}
+              selected={selectedCharId}
+              onSelect={handleCharacterChange}
+              onAddCharacter={() => setAddCharacterOpen(true)}
+              open={charSelectOpen}
+              onToggle={() => setCharSelectOpen(false)}
             />
-          </HistoryDrawer>
-        )}
 
-        {settingsOpen && (
-          <aside
-            className="absolute inset-y-0 right-0 z-30 flex w-full max-w-[420px] flex-col border-l border-slate-200 bg-white/95 shadow-2xl backdrop-blur-xl"
-          >
-            <Settings
-              characterId={selectedCharId}
-              characterName={charName}
-              modelId={expressionModelId || ""}
-              onPreviewExpression={(expr) => setCurrentExpression(expr)}
-              onExpressionsSaved={() => {
-                refreshExpressionConfiguration().catch(console.error);
-              }}
-              onConversationCleared={async () => {
-                await clearMessages(selectedCharId);
-              }}
-              onResetAll={() => {
-                setSettingsOpen(false);
-                setOnboardingComplete(false);
-                setCharacters([]);
-                setSelectedCharId("");
-                setMessages([]);
-                clearQueue();
-                setExpressionsConfigured(null);
-                setCurrentExpression("neutral");
-              }}
-              onResetOnboarding={() => {
-                setSettingsOpen(false);
-                setOnboardingComplete(false);
-              }}
-              onClose={handleSettingsClose}
-              avatarZoom={zoom}
-              avatarBackground={background}
-              onAvatarZoomChange={setZoom}
-              onAvatarBackgroundChange={setBackground}
-            />
-          </aside>
+            <div className="pointer-events-none absolute left-5 top-5 z-20 flex items-center gap-2.5 rounded-full bg-surface-2/90 py-1.5 pl-1.5 pr-3.5 shadow-soft backdrop-blur">
+              <div className="flex h-7 w-7 items-center justify-center rounded-full bg-accent-100 text-xs font-bold text-accent-700">
+                {charName.charAt(0).toUpperCase()}
+              </div>
+              <span className="text-sm font-semibold text-ink">{charName}</span>
+              {companionStatus && (
+                <Pill tone={companionStatus.tone} dot pulse>
+                  {companionStatus.label}
+                </Pill>
+              )}
+            </div>
+
+            <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20 flex flex-col items-center px-4 pb-6 pt-16">
+              <FloatingChatInput
+                isProcessing={isStreaming}
+                onSend={handleSend}
+                onTypingChange={handleTypingChange}
+                listening={listening}
+                onMicToggle={handleMicToggle}
+                inputRef={fullChatInputRef}
+                caption={spokenCaption}
+                captionSpeaker={spokenCaption ? charName : undefined}
+              />
+            </div>
+          </>
         )}
-      </div>
+      </main>
+
+      {expressionsConfigured && (
+        <HistoryDrawer
+          open={historyOpen}
+          onClose={() => setHistoryOpen(false)}
+          title={`Chat with ${charName}`}
+        >
+          <ChatPanel
+            hideInput
+            appearance="light"
+            timeline={timeline}
+            loading={isStreaming}
+            streamingText={streamingText}
+            characterName={charName}
+            onSend={handleSend}
+            onTypingChange={handleTypingChange}
+            listening={listening}
+            onMicToggle={handleMicToggle}
+            onToolConfirm={handleConfirm}
+          />
+        </HistoryDrawer>
+      )}
+
+      {settingsOpen && (
+        <Settings
+          characterId={selectedCharId}
+          characterName={charName}
+          modelId={expressionModelId || ""}
+          onPreviewExpression={(expr) => setCurrentExpression(expr)}
+          onExpressionsSaved={() => {
+            refreshExpressionConfiguration().catch(console.error);
+          }}
+          onConversationCleared={async () => {
+            await clearMessages(selectedCharId);
+          }}
+          onResetAll={() => {
+            setSettingsOpen(false);
+            setOnboardingComplete(false);
+            setCharacters([]);
+            setSelectedCharId("");
+            setMessages([]);
+            clearQueue();
+            setExpressionsConfigured(null);
+            setCurrentExpression("neutral");
+          }}
+          onResetOnboarding={() => {
+            setSettingsOpen(false);
+            setOnboardingComplete(false);
+          }}
+          onClose={handleSettingsClose}
+          avatarZoom={zoom}
+          avatarBackground={background}
+          onAvatarZoomChange={setZoom}
+          onAvatarBackgroundChange={setBackground}
+        />
+      )}
 
       <AddCharacterModal
         open={addCharacterOpen}

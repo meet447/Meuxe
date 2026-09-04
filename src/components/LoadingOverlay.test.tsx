@@ -25,26 +25,26 @@ describe('LoadingOverlay', () => {
   });
 
   it('applies default variant color class', () => {
-    const { container } = render(<LoadingOverlay visible={true} />);
-    const svgElement = container.querySelector('svg');
-    expect(svgElement).toHaveClass('text-blue-500');
+    render(<LoadingOverlay visible={true} />);
+    const svgElement = screen.getByTestId('loading-spinner');
+    expect(svgElement).toHaveClass('text-accent-500');
   });
 
   it('applies model variant color class', () => {
-    const { container } = render(<LoadingOverlay visible={true} variant="model" />);
-    const svgElement = container.querySelector('svg');
-    expect(svgElement).toHaveClass('text-indigo-500');
+    render(<LoadingOverlay visible={true} variant="model" />);
+    const svgElement = screen.getByTestId('loading-spinner');
+    expect(svgElement).toHaveClass('text-peach-500');
   });
 
   it('applies chat variant color class', () => {
-    const { container } = render(<LoadingOverlay visible={true} variant="chat" />);
-    const svgElement = container.querySelector('svg');
-    expect(svgElement).toHaveClass('text-sky-500');
+    render(<LoadingOverlay visible={true} variant="chat" />);
+    const svgElement = screen.getByTestId('loading-spinner');
+    expect(svgElement).toHaveClass('text-honey-500');
   });
 
   it('applies tts variant color class', () => {
-    const { container } = render(<LoadingOverlay visible={true} variant="tts" />);
-    const svgElement = container.querySelector('svg');
-    expect(svgElement).toHaveClass('text-emerald-500');
+    render(<LoadingOverlay visible={true} variant="tts" />);
+    const svgElement = screen.getByTestId('loading-spinner');
+    expect(svgElement).toHaveClass('text-sage-500');
   });
 });

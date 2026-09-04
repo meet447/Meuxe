@@ -1,4 +1,12 @@
 import type { Character } from "../types";
+import {
+  Button,
+  ChevronDownIcon,
+  PeopleIcon,
+  PlusIcon,
+  Surface,
+  cn,
+} from "./ui";
 
 interface Props {
   characters: Character[];
@@ -22,17 +30,21 @@ export function CharacterSelect({
 }: Props) {
   const panel = open && (
     <>
-      <div className="fixed inset-0 z-40" onClick={onToggle} />
-      <div
-        className={`z-50 w-80 overflow-hidden rounded-2xl border border-slate-200 bg-white/95 shadow-2xl backdrop-blur-xl ring-1 ring-slate-100 animate-in fade-in slide-in-from-top-2 duration-300 ${
-          menuOnly ? "fixed left-5 top-28" : "absolute right-0 top-full mt-3"
-        }`}
+      <div className="fixed inset-0 z-40" onClick={onToggle} aria-hidden />
+      <Surface
+        tone="raised"
+        elevation="pop"
+        radius="panel"
+        className={cn(
+          "z-50 w-72 overflow-hidden animate-rise-in",
+          menuOnly ? "fixed left-20 top-20" : "absolute right-0 top-full mt-3",
+        )}
       >
-        <div className="border-b border-slate-100 px-5 py-4">
-          <h3 className="text-[15px] font-bold tracking-tight text-slate-900">Characters</h3>
-          <p className="mt-1 text-xs text-slate-500">Switch companion</p>
+        <div className="px-5 pt-4 pb-3">
+          <h3 className="text-sm font-semibold text-ink">Companions</h3>
+          <p className="mt-0.5 text-xs text-ink-3">Switch companion</p>
         </div>
-        <div className="max-h-72 overflow-y-auto p-3 scrollbar-thin">
+        <div className="max-h-72 overflow-y-auto px-3 pb-3 scrollbar-thin">
           {characters.map((char) => (
             <button
               key={char.id}
@@ -40,24 +52,24 @@ export function CharacterSelect({
                 onSelect(char.id);
                 onToggle();
               }}
-              className={`mb-1.5 flex w-full items-center justify-between rounded-2xl px-4 py-3.5 text-left transition-all ${
+              className={cn(
+                "mb-1 flex w-full items-center gap-3 rounded-card px-3 py-2.5 text-left transition-all",
                 selected === char.id
-                  ? "bg-blue-50 font-medium text-blue-900 ring-1 ring-blue-100"
-                  : "text-slate-700 hover:bg-slate-50 hover:text-slate-900"
-              }`}
+                  ? "bg-accent-100 text-accent-700"
+                  : "text-ink hover:bg-well",
+              )}
             >
-              <div className="flex items-center gap-3.5">
-                <div
-                  className={`flex h-9 w-9 items-center justify-center rounded-xl text-sm font-bold ${
-                    selected === char.id ? "bg-indigo-500 text-white" : "bg-slate-100 text-slate-600"
-                  }`}
-                >
-                  {char.name.charAt(0).toUpperCase()}
-                </div>
-                <div>
-                  <div className="text-[14px] font-semibold">{char.name}</div>
-                  <div className="mt-0.5 text-xs text-slate-400">{char.live2d_model || "default"}</div>
-                </div>
+              <div
+                className={cn(
+                  "flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sm font-bold",
+                  selected === char.id ? "bg-accent-200 text-accent-700" : "bg-well text-ink-2",
+                )}
+              >
+                {char.name.charAt(0).toUpperCase()}
+              </div>
+              <div className="min-w-0">
+                <div className="text-sm font-semibold">{char.name}</div>
+                <div className="mt-0.5 text-xs text-ink-3">{char.live2d_model || "default"}</div>
               </div>
             </button>
           ))}
@@ -66,17 +78,15 @@ export function CharacterSelect({
               onToggle();
               onAddCharacter();
             }}
-            className="mb-1.5 flex w-full items-center gap-3.5 rounded-2xl border border-dashed border-slate-200 px-4 py-3.5 text-left text-slate-700 hover:bg-slate-50"
+            className="flex w-full items-center gap-3 rounded-card px-3 py-2.5 text-left text-ink transition-all hover:bg-well"
           >
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-indigo-500 text-sm font-bold text-white">
-              +
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-well">
+              <PlusIcon className="h-4 w-4 text-ink-2" />
             </div>
-            <div>
-              <div className="text-[14px] font-semibold">Add character</div>
-            </div>
+            <div className="text-sm font-semibold">Add companion</div>
           </button>
         </div>
-      </div>
+      </Surface>
     </>
   );
 
@@ -86,25 +96,18 @@ export function CharacterSelect({
 
   return (
     <div className="relative flex items-center">
-      <button
+      <Button
+        variant="ghost"
         onClick={onToggle}
-        className={`flex items-center gap-1.5 rounded-full px-4 py-1.5 text-sm font-medium transition-all ${
-          open ? "bg-blue-50 text-blue-600" : "hover:bg-slate-100/80 text-slate-600"
-        }`}
+        leading={<PeopleIcon className="h-4 w-4" />}
+        trailing={
+          <ChevronDownIcon
+            className={cn("h-3.5 w-3.5 transition-transform duration-200", open && "rotate-180")}
+          />
+        }
       >
-        <svg className="w-4 h-4 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-        </svg>
-        Characters
-        <svg
-          className={`ml-0.5 h-3.5 w-3.5 transition-transform duration-200 ${open ? "rotate-180" : ""}`}
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-        </svg>
-      </button>
+        Companions
+      </Button>
       {panel}
     </div>
   );
