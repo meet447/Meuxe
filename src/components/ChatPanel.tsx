@@ -26,12 +26,12 @@ interface Props {
   speaking?: boolean;
   onToolConfirm?: (requestId: string, approved: boolean) => void;
   inputRef?: React.RefObject<HTMLInputElement | null>;
-  /** Timeline only — for sidebar layout with external input bar */
+  /** Timeline only: for sidebar layout with external input bar */
   hideInput?: boolean;
   appearance?: "light" | "dark";
 }
 
-// Markdown component config — shared between messages and streaming
+// Markdown component config: shared between messages and streaming
 const markdownComponents = {
   p: ({ children }: { children?: React.ReactNode }) => (
     <p className="mb-2 last:mb-0 leading-relaxed">{children}</p>
@@ -343,8 +343,7 @@ export function ChatPanel({
             <Mascot mood="neutral" className="h-16 w-16" />
             <p className="mt-4 text-sm font-semibold text-ink">Say hello to {characterName}</p>
             <p className="mt-1 max-w-xs text-xs leading-relaxed text-ink-3">
-              Share what&apos;s on your mind—a small update, a worry, or just because you want
-              company.
+              Share what&apos;s on your mind: a small update, a worry, or just because you want to talk.
             </p>
             <AsciiAccent rows={3} cols={18} density={0.7} className="mt-4" />
           </div>
@@ -352,7 +351,7 @@ export function ChatPanel({
 
         {renderedTimeline}
 
-        {/* Streaming text — always the latest assistant turn */}
+        {/* Streaming text: always the latest assistant turn */}
         {streamingText && (
           <div className="flex flex-col items-start animate-in fade-in duration-150">
             <div
@@ -375,7 +374,7 @@ export function ChatPanel({
           </div>
         )}
 
-        {/* Loading indicator — after tools finish, before the next assistant reply */}
+        {/* Loading indicator: after tools finish, before the next assistant reply */}
         {loading && !streamingText && !hasRunningTool && (
           <div className="flex justify-start animate-in fade-in duration-200">
             <div
@@ -393,7 +392,7 @@ export function ChatPanel({
           </div>
         )}
 
-        {/* TTS Generating indicator */}
+        {/* Voice generating indicator */}
         {ttsLoading && !loading && (
           <div className="flex justify-start">
             <div

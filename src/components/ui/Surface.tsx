@@ -32,7 +32,7 @@ export interface SurfaceProps extends HTMLAttributes<HTMLElement> {
 
 /**
  * The basic container. Elevation is expressed through surface-colour shifts
- * and ultra-soft shadows — never through hard borders.
+ * and ultra-soft shadows: never through hard borders.
  */
 export function Surface({
   as = "div",

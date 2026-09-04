@@ -1,6 +1,6 @@
 import { cn } from "./cn";
 
-/** Three soft bouncing dots — "thinking", "loading", "speaking". */
+/** Three soft bouncing dots: "thinking", "loading", "speaking". */
 export function Dots({
   tone = "accent",
   size = "md",

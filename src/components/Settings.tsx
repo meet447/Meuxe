@@ -57,11 +57,11 @@ const SETTINGS_TTS_PRESETS: Record<string, { name: string; needs_key: boolean }>
 const PAGE_META: Record<SettingsPage, { title: string; description: string }> = {
   llm: {
     title: "Agent",
-    description: "Chat runs through your local ACP agent. Meuxe supplies persona, memory, voice, and avatar.",
+    description: "Your companion thinks with an assistant already on your computer. Meuxe adds their personality, memory, voice, and face.",
   },
   tts: {
     title: "Voice",
-    description: "Choose how your companion speaks — built-in or an external provider.",
+    description: "Choose how your companion sounds. Use the built-in voice or connect a voice service.",
   },
   avatar: {
     title: "Avatar on screen",
@@ -103,7 +103,7 @@ const YOU_NAV: NavItem[] = [
 function LocalFirstNotice({ needsKey }: { needsKey: boolean }) {
   return (
     <Notice tone={needsKey ? "info" : "success"}>
-      Memory and chat stay on this device. Voice and your CLI agent only use the network when you configure them.
+      Memory and chat stay on this device. Voice and your assistant only use the network when you configure them.
     </Notice>
   );
 }
@@ -352,7 +352,7 @@ export function Settings({
             <Textarea
               value={userAbout}
               onChange={(e) => setUserAbout(e.target.value)}
-              placeholder="Tell your companion about yourself — interests, what you do, what you enjoy..."
+              placeholder="Tell your companion about yourself: interests, what you do, what you enjoy..."
               rows={5}
             />
           </Field>
@@ -375,17 +375,17 @@ export function Settings({
                 {
                   keys: isMac ? "Cmd + Shift + E" : "Ctrl + Shift + E",
                   action: "Toggle mini mode",
-                  context: "Global — works from any app",
+                  context: "Works from any app",
                 },
                 {
                   keys: isMac ? "Cmd + Shift + Space" : "Ctrl + Shift + Space",
                   action: "Open text input",
-                  context: "Global — mini mode",
+                  context: "Mini mode, works from any app",
                 },
                 {
                   keys: isMac ? "Cmd + Shift + M" : "Ctrl + Shift + M",
                   action: "Toggle microphone",
-                  context: "Global — mini mode",
+                  context: "Mini mode, works from any app",
                 },
                 { keys: "Escape", action: "Close text input", context: "Mini mode" },
               ].map((shortcut) => (
@@ -454,7 +454,7 @@ export function Settings({
           <LocalFirstNotice needsKey={!!SETTINGS_TTS_PRESETS[ttsProvider]?.needs_key} />
 
           <div>
-            <SectionTitle>Provider</SectionTitle>
+            <SectionTitle>Voice service</SectionTitle>
             <div className="grid gap-2.5 sm:grid-cols-2">
               {Object.entries(SETTINGS_TTS_PRESETS).map(([id, preset]) => (
                 <ChoiceCard
@@ -464,7 +464,7 @@ export function Settings({
                   onClick={() => setTtsProvider(id)}
                   leading={<SpeakerIcon className="h-5 w-5" />}
                   title={preset.name}
-                  description={preset.needs_key ? "Needs an API key" : "Built in — no key"}
+                  description={preset.needs_key ? "Needs an API key" : "Built in, no key needed"}
                   trailing={
                     configuredTts[id]?.configured && ttsProvider !== id ? (
                       <Pill tone="sage" size="xs">
@@ -489,7 +489,7 @@ export function Settings({
           )}
 
           {!SETTINGS_TTS_PRESETS[ttsProvider]?.needs_key && (
-            <Notice tone="success">Meuxe TTS is built in — no API key required.</Notice>
+            <Notice tone="success">The built-in voice works right away. No account or key needed.</Notice>
           )}
 
           <Field label="Voice">
@@ -519,7 +519,7 @@ export function Settings({
           />
           <PrivacyCard
             title="Uses the network when you choose"
-            items={["Speaking (voice provider)", "Your chat assistant", "Anything that assistant does online"]}
+            items={["Speaking (voice service)", "Your chat assistant", "Anything that assistant does online"]}
             tone="accent"
           />
           <PrivacyCard
@@ -531,7 +531,7 @@ export function Settings({
           <Surface tone="well" elevation="none" className="p-5">
             <h3 className="text-sm font-semibold text-ink">Run onboarding again</h3>
             <p className="mt-2 text-sm leading-relaxed text-ink-2">
-              Reopen the first-run setup to change your companion, voice, or CLI agent. Your chat history, memories,
+              Reopen the first-run setup to change your companion, voice, or assistant. Your chat history, memories,
               and API keys stay on this device.
             </p>
             {onboardingResetError && (
@@ -583,7 +583,7 @@ export function Settings({
 
     if (page === "expressions") {
       if (!modelId) {
-        return <Notice tone="neutral">No model loaded — select a companion first.</Notice>;
+        return <Notice tone="neutral">Pick a companion first to tune their expressions.</Notice>;
       }
       return (
         <ModelSettings

@@ -15,9 +15,9 @@ const STEP_HEADINGS = [
 ];
 
 const STEP_SUBTITLES = [
-  "Talk to someone who remembers you. They live on your computer—not in a generic chat app.",
+  "Talk to someone who remembers you. They live on your computer, not in a chat tab.",
   "So they know who they're talking to. Only saved on this device.",
-  "Name, look, and personality—in one place.",
+  "Name, look, and personality, all in one place.",
   "Pick a voice and tap listen.",
   "Meuxe is the face and memory. Choose the assistant on your computer that powers chat.",
   "",

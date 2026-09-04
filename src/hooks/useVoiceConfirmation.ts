@@ -72,7 +72,7 @@ export function useVoiceConfirmation({
     const prevId = prevPendingRef.current;
 
     if (currentId && currentId !== prevId) {
-      // New confirmation appeared — auto-start listening
+      // New confirmation appeared: auto-start listening
       if (!listening) {
         console.log("[voice-confirm] auto-starting listen for:", currentId);
         startListening(handleVoiceResult);
@@ -81,7 +81,7 @@ export function useVoiceConfirmation({
     }
 
     if (!currentId && prevId) {
-      // Confirmation resolved — stop if we were listening for it
+      // Confirmation resolved: stop if we were listening for it
       if (isConfirmListeningRef.current) {
         stopListening();
         isConfirmListeningRef.current = false;

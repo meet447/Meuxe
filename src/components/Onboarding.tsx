@@ -231,7 +231,7 @@ export function Onboarding({ onComplete }: { onComplete: () => void }) {
       !agentSetup.agent.ready &&
       agentSetup.prerequisites.node_available
     ) {
-      return "Finish will install the agent globally if it is not on your system yet.";
+      return "Finish will install the assistant globally if it is not on your system yet.";
     }
     return null;
   };
@@ -244,7 +244,7 @@ export function Onboarding({ onComplete }: { onComplete: () => void }) {
         const installed = await installAgentSetup(form.agent.preset);
         setAgentSetup(installed);
         if (!installed.agent.ready) {
-          setError(installed.agent.detail || "Could not install the agent CLI. Try Install above, then finish again.");
+          setError(installed.agent.detail || "Could not install the assistant. Try Install above, then finish again.");
           setSubmitting(false);
           return;
         }
@@ -435,7 +435,7 @@ export function Onboarding({ onComplete }: { onComplete: () => void }) {
                 type="password"
                 value={form.tts.api_key}
                 onChange={(e) => updateForm("tts", "api_key", e.target.value)}
-                placeholder="Paste key from your provider"
+                placeholder="Paste key from your voice service"
               />
             </Field>
           )}

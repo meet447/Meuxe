@@ -20,7 +20,7 @@
   --color-well: #f0f0f2;      /* sunken insets, sidebars, code wells */
   --color-well-2: #e6e6e9;    /* deeper inset, pressed states */
 
-  /* Hairlines — a quiet 1px edge is allowed where white meets white */
+  /* Hairlines: a quiet 1px edge is allowed where white meets white */
   --color-line: #ebebee;
   --color-line-2: #dcdce0;
 
@@ -30,7 +30,7 @@
   --color-ink-3: #8b8b92;
   --color-ink-4: #bbbbc2;
 
-  /* Accent — pastel amber (highlights, selection, links). Not for white text. */
+  /* Accent: pastel amber (highlights, selection, links). Not for white text. */
   --color-accent-50: #fdf8ec;
   --color-accent-100: #fbefd1;
   --color-accent-200: #f7dfa4;
@@ -40,7 +40,7 @@
   --color-accent-600: #b5802a;
   --color-accent-700: #8a611f;
 
-  /* Peach — pastel rose (user bubbles, soft highlights) */
+  /* Peach: pastel rose (user bubbles, soft highlights) */
   --color-peach-50: #fdf3f5;
   --color-peach-100: #fbe4e9;
   --color-peach-200: #f6cad4;
@@ -48,7 +48,7 @@
   --color-peach-400: #e4889d;
   --color-peach-500: #c9607a;
 
-  /* Honey — pastel lemon (attention / in-progress) */
+  /* Honey: pastel lemon (attention / in-progress) */
   --color-honey-50: #fdfae9;
   --color-honey-100: #fbf4c7;
   --color-honey-200: #f6ea98;
@@ -57,7 +57,7 @@
   --color-honey-500: #bfa920;
   --color-honey-700: #7f7113;
 
-  /* Sage — pastel mint (success / ready) */
+  /* Sage: pastel mint (success / ready) */
   --color-sage-50: #f0f8f3;
   --color-sage-100: #dcefe3;
   --color-sage-200: #bfe2cb;
@@ -65,7 +65,7 @@
   --color-sage-500: #5aa477;
   --color-sage-700: #386f51;
 
-  /* Clay — pastel coral (danger / destructive) */
+  /* Clay: pastel coral (danger / destructive) */
   --color-clay-50: #fdf2f0;
   --color-clay-100: #fbe1dc;
   --color-clay-200: #f6c4bb;
@@ -77,14 +77,14 @@
   --font-sans: "Figtree", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
 
-  /* Radii — soft but crisp */
+  /* Radii: soft but crisp */
   --radius-control: 0.75rem; /* 12px: buttons, small chips */
   --radius-field: 0.75rem;   /* 12px: inputs */
   --radius-card: 1rem;       /* 16px: cards, tiles */
   --radius-panel: 1.25rem;   /* 20px: panels, docks */
   --radius-sheet: 1.5rem;    /* 24px: modals, onboarding sheet */
 
-  /* Elevation — flat. "Shadows" are hairline edges, not drop shadows.
+  /* Elevation: flat. "Shadows" are hairline edges, not drop shadows.
      soft/float: 1px ring so a white card still reads on a white page.
      pop: overlays (modals, popovers) get the ring plus one very faint
      blur so they separate from the scrim beneath. Nothing floats. */

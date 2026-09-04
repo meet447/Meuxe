@@ -204,7 +204,7 @@ export function useVRM(canvasRef: React.RefObject<HTMLCanvasElement | null>) {
               )
             );
           } else {
-            // No rest pose found — use raw values (fallback)
+            // No rest pose found: use raw values (fallback)
             tracks.push(
               new THREE.QuaternionKeyframeTrack(
                 `${vrmBoneNode.name}.quaternion`,
@@ -271,7 +271,7 @@ export function useVRM(canvasRef: React.RefObject<HTMLCanvasElement | null>) {
       // Update animation mixer
       mixerRef.current?.update(delta);
 
-      // Post-animation arm correction — bring arms down from T-pose
+      // Post-animation arm correction: bring arms down from T-pose
       // The animation delta may be near-zero for arms in breathing idle,
       // so we blend in a natural resting arm rotation
       if (vrm.humanoid) {
@@ -461,7 +461,7 @@ export function useVRM(canvasRef: React.RefObject<HTMLCanvasElement | null>) {
         const vrm = gltf.userData.vrm as VRM;
 
         if (!vrm || !sceneRef.current || !rendererRef.current) {
-          console.error("[VRM] Failed to load — scene or renderer destroyed");
+          console.error("[VRM] Failed to load: scene or renderer destroyed");
           return;
         }
 
@@ -656,7 +656,7 @@ export function useVRM(canvasRef: React.RefObject<HTMLCanvasElement | null>) {
   }, [syncStageLayout]);
 
   const setTypingReaction = useCallback((_isTyping: boolean) => {
-    // Handled by the animation system — no manual bone manipulation needed
+    // Handled by the animation system: no manual bone manipulation needed
   }, []);
 
   const triggerMotion = useCallback((_group: string, _index?: number) => {}, []);

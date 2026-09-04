@@ -9,7 +9,7 @@ function hash(seed: number, r: number, c: number) {
 }
 
 /**
- * Stippled text-art strip — the "craft-hacker" accent. Deterministic for a
+ * Stippled text-art strip: the "craft-hacker" accent. Deterministic for a
  * given seed so it never flickers between renders. Decorative only.
  *
  * `direction="vertical"` renders a tall narrow column (sidebar rail);

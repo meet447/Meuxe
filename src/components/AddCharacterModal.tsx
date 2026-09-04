@@ -227,7 +227,7 @@ export function AddCharacterModal({
           <div>
             <h2 className="text-[22px] font-bold tracking-tight text-ink">Add a companion</h2>
             <p className="mt-1 text-sm text-ink-2">
-              Name them, pick a look, tune personality—uses your current voice settings.
+              Name them, pick a look, and tune their personality. They use your current voice settings.
             </p>
           </div>
           <IconButton label="Close" size="sm" onClick={resetAndClose}>
@@ -257,7 +257,7 @@ export function AddCharacterModal({
 
               <Field
                 label="Look"
-                hint="Live2D or 3D VRM—preview updates as you choose."
+                hint="Live2D or 3D VRM. The preview updates as you choose."
               >
                 {models.length > 0 ? (
                   <ModelPicker models={models} selectedId={modelId} onSelect={setModelId} />

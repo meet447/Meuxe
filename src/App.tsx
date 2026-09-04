@@ -49,7 +49,7 @@ function App() {
   // Ref for mic toggle
   const handleMicToggleRef = useRef<() => void>(() => {});
 
-  // Global shortcuts — registered once from main window, work in all modes
+  // Global shortcuts: registered once from main window, work in all modes
   // Actions are dispatched via Tauri events so both windows can respond
   useEffect(() => {
     if (isMiniMode) return; // only main window registers shortcuts

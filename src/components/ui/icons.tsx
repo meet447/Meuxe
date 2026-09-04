@@ -1,7 +1,7 @@
 import type { SVGProps } from "react";
 
 /**
- * Meuxe icon set — single consistent stroke weight (1.6), round caps/joins,
+ * Meuxe icon set: single consistent stroke weight (1.6), round caps/joins,
  * 24×24 grid. Every icon in the UI should come from here so line weights
  * stay uniform. Size with `className` (default h-5 w-5).
  */

@@ -186,7 +186,7 @@ export function MiniWidget({
       {/* Avatar canvas */}
       {avatarComponent}
 
-      {/* Status pill — top right, subtle */}
+      {/* Status pill: top right, subtle */}
       {(listening || showThinkingStatus || (speaking && !caption)) && (
         <div className="pointer-events-none absolute right-3 top-3 z-20">
           <Pill
@@ -212,7 +212,7 @@ export function MiniWidget({
         </div>
       )}
 
-      {/* Tool confirmation overlay — compact card */}
+      {/* Tool confirmation overlay: compact card */}
       {pendingTool && (
         <div
           className="absolute bottom-[4.75rem] left-3 right-3 z-20"
@@ -249,7 +249,7 @@ export function MiniWidget({
         </div>
       )}
 
-      {/* Bottom hover zone — input + utilities appear on hover (or while typing / focused) */}
+      {/* Bottom hover zone: input + utilities appear on hover (or while typing / focused) */}
       <div
         className="absolute bottom-0 left-0 right-0 z-30 flex justify-center pb-3 pt-12"
         data-mini-interactive="true"

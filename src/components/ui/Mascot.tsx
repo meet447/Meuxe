@@ -18,7 +18,7 @@ const GAZE: Record<MascotMood, { x: number; y: number }> = {
 };
 
 /**
- * The Meuxe blob — a soft, wide-eyed mascot used for the logo mark,
+ * The Meuxe blob: a soft, wide-eyed mascot used for the logo mark,
  * empty states and loading moments. Purely decorative (aria-hidden).
  */
 export function Mascot({

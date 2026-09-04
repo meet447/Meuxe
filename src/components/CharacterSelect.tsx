@@ -15,7 +15,7 @@ interface Props {
   onAddCharacter: () => void;
   open: boolean;
   onToggle: () => void;
-  /** Corner toolbar mode — no trigger button, fixed panel */
+  /** Corner toolbar mode: no trigger button, fixed panel */
   menuOnly?: boolean;
 }
 

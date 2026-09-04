@@ -77,7 +77,7 @@ export function AgentSetupPanel({
     <Surface tone="surface" elevation="soft" className="p-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <span className="text-xs font-semibold text-ink-2">
-          {friendly ? "Agent on your system" : "Agent CLI"}
+          {friendly ? "Assistant on your system" : "Assistant setup"}
         </span>
         {loading && <span className="text-xs text-ink-3">Checking…</span>}
       </div>
@@ -88,7 +88,7 @@ export function AgentSetupPanel({
             <StatusPill ok={agent.ready} label={agent.ready ? `${title} ready` : `${title} needed`} />
             {usingSystem && <StatusPill ok label="System PATH" />}
             {usingManaged && <StatusPill ok label="Meuxe fallback" />}
-            {usingNpx && <StatusPill ok label="via npx" />}
+            {usingNpx && <StatusPill ok label="On demand" />}
             <StatusPill ok={status.prerequisites.node_available} label="Node.js" />
             {status.prerequisites.node_version && (
               <span className="text-[11px] text-ink-3">{status.prerequisites.node_version}</span>

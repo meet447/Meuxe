@@ -12,7 +12,7 @@ const TONE: Record<NoticeTone, { box: string; icon: string }> = {
   danger: { box: "bg-clay-50 text-clay-700", icon: "text-clay-500" },
 };
 
-/** Soft inline callout. No border — tone comes from the tinted surface. */
+/** Soft inline callout. No border: tone comes from the tinted surface. */
 export function Notice({
   tone = "info",
   title,

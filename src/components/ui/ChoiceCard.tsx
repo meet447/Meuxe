@@ -3,8 +3,8 @@ import { cn } from "./cn";
 import { CheckIcon } from "./icons";
 
 /**
- * Selectable card used for personality packs, voice providers, agents,
- * backgrounds — anywhere the user picks one of several options.
+ * Selectable card used for personality packs, voice services, agents,
+ * backgrounds: anywhere the user picks one of several options.
  * Selection is shown through a warm tint + soft ring, not a hard border.
  */
 export function ChoiceCard({

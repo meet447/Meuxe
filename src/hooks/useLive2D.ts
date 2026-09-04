@@ -165,7 +165,7 @@ export function useLive2D(canvasRef: React.RefObject<HTMLCanvasElement | null>) 
     let doubleBlink = false;
     const BLINK_DURATION = 150;
 
-    // Eye saccade state — subtle micro eye movements
+    // Eye saccade state: subtle micro eye movements
     let saccadeX = 0;
     let saccadeY = 0;
     let saccadeTargetX = 0;
@@ -314,7 +314,7 @@ export function useLive2D(canvasRef: React.RefObject<HTMLCanvasElement | null>) 
       const coreModel = model.internalModel.coreModel;
 
       try {
-        // Subtle head nod while speaking — varies speed to look natural
+        // Subtle head nod while speaking: varies speed to look natural
         const nodX = Math.sin(elapsed * 1.8) * 2 + Math.sin(elapsed * 3.1) * 1;
         const nodY = Math.sin(elapsed * 2.3) * 1.5 + Math.cos(elapsed * 1.5) * 0.8;
         const nodZ = Math.sin(elapsed * 1.2) * 1.5;

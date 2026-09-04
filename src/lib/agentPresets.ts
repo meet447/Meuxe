@@ -8,23 +8,23 @@ export const ACP_AGENT_PRESETS: Record<
 > = {
   opencode: {
     title: "OpenCode",
-    tagline: "Open-source CLI agent",
-    blurb: "Runs as opencode acp. Install the OpenCode CLI or use Meuxe’s installer.",
+    tagline: "Free and open source",
+    blurb: "Installs with one command. No account needed to start.",
   },
   claude: {
     title: "Claude Code",
-    tagline: "Anthropic’s coding agent",
-    blurb: "ACP adapter via npx. Sign in in the terminal when prompted.",
+    tagline: "By Anthropic",
+    blurb: "Uses your Claude subscription. Sign in in the terminal when prompted.",
   },
   codex: {
     title: "Codex",
-    tagline: "OpenAI coding agent",
-    blurb: "ACP adapter via npx @agentclientprotocol/codex-acp.",
+    tagline: "By OpenAI",
+    blurb: "Uses your OpenAI account. Sign in when prompted.",
   },
   custom: {
     title: "Custom",
-    tagline: "Your own ACP command",
-    blurb: "Any ACP-compatible program on your machine.",
+    tagline: "Bring your own",
+    blurb: "Point Meuxe at any compatible assistant already on your machine.",
   },
 };
 
