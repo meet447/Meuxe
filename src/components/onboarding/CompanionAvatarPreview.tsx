@@ -1,6 +1,7 @@
 import { lazy, Suspense, useEffect, useState } from "react";
 import { resolveAssetUrl } from "../../api/tauri";
 import { BG_PRESETS } from "../../constants/bgPresets";
+import { Mascot, Pill } from "../ui";
 
 const Live2DCanvas = lazy(() =>
   import("../Live2DCanvas").then((m) => ({ default: m.Live2DCanvas })),
@@ -45,22 +46,25 @@ export function CompanionAvatarPreview({
 
   return (
     <div
-      className="relative w-full overflow-hidden rounded-[1.75rem] border border-slate-200/90 bg-slate-900 shadow-lg shadow-slate-900/10 aspect-[4/5] max-h-[min(440px,52vh)]"
+      className="squircle relative w-full overflow-hidden rounded-panel shadow-float aspect-[4/5] max-h-[min(440px,52vh)]"
+      style={{ background: previewBg }}
     >
       {companionName?.trim() && (
-        <div className="absolute left-3 top-3 z-10 rounded-full bg-black/40 px-3 py-1 text-xs font-semibold text-white backdrop-blur-sm">
+        <div className="absolute left-3 top-3 z-10 rounded-full bg-black/35 px-3 py-1 text-xs font-semibold text-white backdrop-blur">
           {companionName.trim()}
         </div>
       )}
       {vibeLabel && (
-        <div className="absolute right-3 top-3 z-10 rounded-full bg-white/90 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-slate-600">
-          {vibeLabel}
+        <div className="absolute right-3 top-3 z-10">
+          <Pill tone="neutral" className="bg-surface-2/90">
+            {vibeLabel}
+          </Pill>
         </div>
       )}
       {!model && (
-        <div className="flex h-full min-h-[220px] flex-col items-center justify-center gap-2 px-6 text-center text-white/60">
-          <span className="text-4xl">🎭</span>
-          <p className="text-sm">Your companion will appear here</p>
+        <div className="flex h-full min-h-[220px] flex-col items-center justify-center gap-3 px-6 text-center">
+          <Mascot mood="sleepy" tone="light" className="h-16 w-16" />
+          <p className="text-sm text-white/60">Your companion will appear here</p>
         </div>
       )}
       {model && (

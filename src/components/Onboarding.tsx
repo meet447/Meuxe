@@ -20,7 +20,25 @@ import { AgentSetupPanel } from "./agents/AgentSetupPanel";
 import { CompanionAvatarPreview } from "./onboarding/CompanionAvatarPreview";
 import { ModelPicker } from "./onboarding/ModelPicker";
 import { OnboardingShell } from "./onboarding/OnboardingShell";
-import { MeuxeMark } from "./ui/MeuxeMark";
+import {
+  ArrowRightIcon,
+  BackIcon,
+  Button,
+  ChatIcon,
+  ChoiceCard,
+  FaceIcon,
+  Field,
+  Input,
+  LockIcon,
+  Mascot,
+  Notice,
+  PlayIcon,
+  Select,
+  SpeakerIcon,
+  Surface,
+  Textarea,
+  VibeGlyph,
+} from "./ui";
 
 interface Voice {
   id: string;
@@ -53,11 +71,11 @@ interface FormData {
   };
 }
 
-const inputClass =
-  "w-full px-5 py-3.5 rounded-2xl bg-slate-50 hover:bg-slate-100/50 text-slate-700 text-[15px] outline-none transition-all placeholder-slate-400 border border-slate-100 focus:bg-white focus:ring-2 focus:ring-indigo-100 focus:border-indigo-300 mb-4";
-const labelClass = "block text-sm font-semibold text-slate-700 mb-2";
-const headingClass = "text-2xl sm:text-[1.65rem] font-bold text-slate-900 mb-1.5 tracking-tight";
-const descriptionClass = "text-slate-500 text-sm mb-5 leading-relaxed";
+const FEATURE_TILES = [
+  { icon: ChatIcon, title: "Real conversations", sub: "They grow with you" },
+  { icon: FaceIcon, title: "Face & voice", sub: "See them react" },
+  { icon: LockIcon, title: "Your device", sub: "Memories stay local" },
+] as const;
 
 export function Onboarding({ onComplete }: { onComplete: () => void }) {
   const [step, setStep] = useState(0);
@@ -287,11 +305,11 @@ export function Onboarding({ onComplete }: { onComplete: () => void }) {
   if (step === 5) {
     return (
       <OnboardingShell step={step}>
-        <div className="text-center py-8 animate-in fade-in zoom-in-95 duration-500">
-          <MeuxeMark className="h-16 w-16 mx-auto mb-5" />
-          <h2 className="text-2xl font-bold text-slate-900 mb-2">You&apos;re all set</h2>
-          <p className="text-slate-500 text-[15px] max-w-sm mx-auto">
-            <span className="font-semibold text-indigo-600">{form.companion.name}</span> is waiting on your desktop.
+        <div className="animate-fade-in py-8 text-center">
+          <Mascot mood="happy" className="mx-auto h-24 w-24" />
+          <h2 className="mt-5 text-[26px] font-bold tracking-tight text-ink">You&apos;re all set</h2>
+          <p className="mx-auto mt-2 max-w-sm text-[15px] leading-relaxed text-ink-2">
+            <span className="font-semibold text-accent-600">{form.companion.name}</span> is waiting on your desktop.
           </p>
         </div>
       </OnboardingShell>
@@ -301,187 +319,158 @@ export function Onboarding({ onComplete }: { onComplete: () => void }) {
   return (
     <OnboardingShell step={step} preview={preview}>
       {step === 0 && (
-        <div className="animate-in fade-in duration-500">
-          <h2 className={headingClass}>A companion on your desktop</h2>
-          <p className={descriptionClass}>
+        <div className="animate-fade-in">
+          <h2 className="text-[26px] font-bold tracking-tight text-ink">A companion on your desktop</h2>
+          <p className="mt-1.5 mb-6 text-[15px] leading-relaxed text-ink-2">
             Talk to someone who remembers you. They live on your computer—not in a generic chat app.
           </p>
           <div className="grid gap-3 sm:grid-cols-3">
-            {[
-              { emoji: "💬", title: "Real conversations", sub: "They grow with you" },
-              { emoji: "🎭", title: "Face & voice", sub: "See them react" },
-              { emoji: "🔒", title: "Your device", sub: "Memories stay local" },
-            ].map((f) => (
-              <div
-                key={f.title}
-                className="flex items-center gap-3 rounded-2xl border border-slate-100 bg-slate-50/90 px-4 py-3.5"
-              >
-                <span className="text-2xl">{f.emoji}</span>
+            {FEATURE_TILES.map((f) => (
+              <Surface key={f.title} tone="raised" className="flex items-start gap-3 p-4">
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[13px] bg-accent-100 text-accent-600">
+                  <f.icon className="h-5 w-5" />
+                </span>
                 <div>
-                  <div className="text-sm font-semibold text-slate-800">{f.title}</div>
-                  <div className="text-xs text-slate-500">{f.sub}</div>
+                  <div className="text-sm font-semibold text-ink">{f.title}</div>
+                  <div className="text-xs text-ink-3">{f.sub}</div>
                 </div>
-              </div>
+              </Surface>
             ))}
           </div>
         </div>
       )}
 
       {step === 1 && (
-        <div className="animate-in fade-in duration-500">
-          <h2 className={headingClass}>First, your name</h2>
-          <p className={descriptionClass}>So they know who they&apos;re talking to. Only saved on this device.</p>
-          <label className={labelClass}>Name</label>
-          <input
-            type="text"
-            value={form.user.name}
-            onChange={(e) => updateForm("user", "name", e.target.value)}
-            placeholder="e.g. Alex"
-            className={inputClass}
-            autoFocus
-          />
-          <label className={labelClass}>
-            Anything they should know <span className="font-normal text-slate-400">(optional)</span>
-          </label>
-          <textarea
-            value={form.user.about}
-            onChange={(e) => updateForm("user", "about", e.target.value)}
-            placeholder="A line or two about you…"
-            rows={2}
-            className={`${inputClass} resize-none rounded-2xl mb-0`}
-          />
+        <div className="animate-fade-in">
+          <h2 className="text-[26px] font-bold tracking-tight text-ink">First, your name</h2>
+          <p className="mt-1.5 mb-6 text-[15px] leading-relaxed text-ink-2">
+            So they know who they&apos;re talking to. Only saved on this device.
+          </p>
+          <Field label="Name">
+            <Input
+              type="text"
+              value={form.user.name}
+              onChange={(e) => updateForm("user", "name", e.target.value)}
+              placeholder="e.g. Alex"
+              autoFocus
+            />
+          </Field>
+          <Field label="Anything they should know" optional>
+            <Textarea
+              value={form.user.about}
+              onChange={(e) => updateForm("user", "about", e.target.value)}
+              placeholder="A line or two about you…"
+              rows={2}
+            />
+          </Field>
         </div>
       )}
 
       {step === 2 && (
-        <div className="animate-in fade-in duration-500">
-          <h2 className={headingClass}>Meet them</h2>
-          <p className={descriptionClass}>Name, look, and personality—in one place.</p>
+        <div className="animate-fade-in">
+          <h2 className="text-[26px] font-bold tracking-tight text-ink">Meet them</h2>
+          <p className="mt-1.5 mb-6 text-[15px] leading-relaxed text-ink-2">
+            Name, look, and personality—in one place.
+          </p>
 
-          <label className={labelClass}>Their name</label>
-          <input
-            type="text"
-            value={form.companion.name}
-            onChange={(e) => updateForm("companion", "name", e.target.value)}
-            placeholder="Who are you creating?"
-            className={inputClass}
-          />
+          <Field label="Their name">
+            <Input
+              type="text"
+              value={form.companion.name}
+              onChange={(e) => updateForm("companion", "name", e.target.value)}
+              placeholder="Who are you creating?"
+            />
+          </Field>
 
-          <label className={labelClass}>Personality</label>
-          <div className="grid grid-cols-2 gap-2.5 mb-5">
-            {COMPANION_VIBE_PACKS.map((pack) => {
-              const selected = form.companion.vibe === pack.id;
-              return (
-                <button
+          <Field label="Personality">
+            <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+              {COMPANION_VIBE_PACKS.map((pack) => (
+                <ChoiceCard
                   key={pack.id}
-                  type="button"
+                  selected={form.companion.vibe === pack.id}
                   onClick={() => selectVibePack(pack.id)}
-                  className={`flex items-center gap-2.5 rounded-2xl border px-3 py-3 text-left transition-all ${
-                    selected
-                      ? "border-indigo-400 bg-indigo-50 ring-1 ring-indigo-200/80 shadow-sm"
-                      : "border-slate-200 bg-white hover:border-slate-300"
-                  }`}
-                >
-                  <span className="text-xl">{pack.emoji}</span>
-                  <div className="min-w-0">
-                    <div className={`text-sm font-semibold ${selected ? "text-indigo-900" : "text-slate-800"}`}>
-                      {pack.title}
-                    </div>
-                    <div className={`text-xs ${selected ? "text-indigo-600/85" : "text-slate-400"}`}>
-                      {pack.subtitle}
-                    </div>
-                  </div>
-                </button>
-              );
-            })}
-          </div>
+                  leading={<VibeGlyph id={pack.id} />}
+                  title={pack.title}
+                  description={pack.subtitle}
+                  compact
+                />
+              ))}
+            </div>
+          </Field>
 
-          <label className={labelClass}>Look</label>
-          <ModelPicker
-            models={models}
-            selectedId={form.companion.model_id}
-            onSelect={(id) => updateForm("companion", "model_id", id)}
-          />
+          <Field label="Look" className="mb-0">
+            <ModelPicker
+              models={models}
+              selectedId={form.companion.model_id}
+              onSelect={(id) => updateForm("companion", "model_id", id)}
+            />
+          </Field>
         </div>
       )}
 
       {step === 3 && (
-        <div className="animate-in fade-in duration-500">
-          <h2 className={headingClass}>How they sound</h2>
-          <p className={descriptionClass}>Pick a voice and tap listen.</p>
+        <div className="animate-fade-in">
+          <h2 className="text-[26px] font-bold tracking-tight text-ink">How they sound</h2>
+          <p className="mt-1.5 mb-6 text-[15px] leading-relaxed text-ink-2">Pick a voice and tap listen.</p>
 
-          <div className="grid gap-2.5 mb-5 sm:grid-cols-3">
-            {Object.entries(ttsPresets).map(([id, preset]) => {
-              const selected = form.tts.provider === id;
-              return (
-                <button
-                  key={id}
-                  type="button"
-                  onClick={() => updateForm("tts", "provider", id)}
-                  className={`rounded-2xl border px-4 py-3 text-left transition-all ${
-                    selected
-                      ? "border-indigo-400 bg-indigo-50 shadow-sm ring-1 ring-indigo-200/70"
-                      : "border-slate-200 bg-white hover:border-slate-300"
-                  }`}
-                >
-                  <div className={`text-sm font-semibold ${selected ? "text-indigo-900" : "text-slate-800"}`}>
-                    {preset.name}
-                  </div>
-                  <div className={`text-xs mt-0.5 ${selected ? "text-indigo-600/80" : "text-slate-400"}`}>
-                    {ttsPresets[id]?.hint}
-                  </div>
-                </button>
-              );
-            })}
+          <div className="mb-4 grid gap-2.5 sm:grid-cols-3">
+            {Object.entries(ttsPresets).map(([id, preset]) => (
+              <ChoiceCard
+                key={id}
+                selected={form.tts.provider === id}
+                onClick={() => updateForm("tts", "provider", id)}
+                leading={<SpeakerIcon />}
+                title={preset.name}
+                description={preset.hint}
+                compact
+              />
+            ))}
           </div>
 
           {ttsPresets[form.tts.provider]?.needs_key && (
-            <>
-              <label className={labelClass}>API key</label>
-              <input
+            <Field label="API key">
+              <Input
                 type="password"
                 value={form.tts.api_key}
                 onChange={(e) => updateForm("tts", "api_key", e.target.value)}
                 placeholder="Paste key from your provider"
-                className={inputClass}
               />
-            </>
+            </Field>
           )}
 
-          <label className={labelClass}>Voice</label>
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-start">
-            <div className="relative flex-1">
-              <select
+          <Field label="Voice" error={previewError || undefined} className="mb-0">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-start">
+              <Select
+                wrapperClassName="flex-1"
                 value={form.tts.voice}
                 onChange={(e) => updateForm("tts", "voice", e.target.value)}
-                className={`${inputClass} appearance-none cursor-pointer mb-0`}
               >
                 {voices.map((v) => (
                   <option key={v.id} value={v.id}>{v.name}</option>
                 ))}
-              </select>
+              </Select>
+              <Button
+                variant="soft"
+                leading={<PlayIcon className="h-4 w-4" />}
+                loading={previewing}
+                onClick={playSample}
+                className="shrink-0"
+              >
+                Listen
+              </Button>
             </div>
-            <button
-              type="button"
-              onClick={playSample}
-              disabled={previewing}
-              className="shrink-0 rounded-2xl border border-slate-200 bg-white px-5 py-3.5 text-sm font-semibold text-indigo-600 shadow-sm hover:bg-slate-50 disabled:opacity-50"
-            >
-              {previewing ? "Loading…" : "Listen"}
-            </button>
-          </div>
-          {previewError && <p className="mt-2 text-xs text-red-600">{previewError}</p>}
+          </Field>
         </div>
       )}
 
       {step === 4 && (
-        <div className="animate-in fade-in duration-500">
-          <h2 className={headingClass}>Who answers for them?</h2>
-          <p className={descriptionClass}>
+        <div className="animate-fade-in">
+          <h2 className="text-[26px] font-bold tracking-tight text-ink">Who answers for them?</h2>
+          <p className="mt-1.5 mb-6 text-[15px] leading-relaxed text-ink-2">
             Meuxe is the face and memory. Choose the assistant on your computer that powers chat.
           </p>
 
-          <div className="grid grid-cols-1 gap-3 mb-4">
+          <div className="mb-4 grid grid-cols-1 gap-3">
             {ACP_AGENT_PRESET_IDS.map((id) => (
               <AgentPresetCard
                 key={id}
@@ -499,32 +488,32 @@ export function Onboarding({ onComplete }: { onComplete: () => void }) {
 
           {form.agent.preset === "custom" && (
             <>
-              <label className={labelClass}>Program to run</label>
-              <input
-                type="text"
-                value={form.agent.program}
-                onChange={(e) =>
-                  setForm((prev) => ({
-                    ...prev,
-                    agent: { ...prev.agent, program: e.target.value },
-                  }))
-                }
-                placeholder="Path or command"
-                className={inputClass}
-              />
-              <label className={labelClass}>Extra options (optional)</label>
-              <input
-                type="text"
-                value={form.agent.args}
-                onChange={(e) =>
-                  setForm((prev) => ({
-                    ...prev,
-                    agent: { ...prev.agent, args: e.target.value },
-                  }))
-                }
-                placeholder="Optional flags"
-                className={inputClass}
-              />
+              <Field label="Program to run">
+                <Input
+                  type="text"
+                  value={form.agent.program}
+                  onChange={(e) =>
+                    setForm((prev) => ({
+                      ...prev,
+                      agent: { ...prev.agent, program: e.target.value },
+                    }))
+                  }
+                  placeholder="Path or command"
+                />
+              </Field>
+              <Field label="Extra options" optional>
+                <Input
+                  type="text"
+                  value={form.agent.args}
+                  onChange={(e) =>
+                    setForm((prev) => ({
+                      ...prev,
+                      agent: { ...prev.agent, args: e.target.value },
+                    }))
+                  }
+                  placeholder="Optional flags"
+                />
+              </Field>
             </>
           )}
 
@@ -539,44 +528,50 @@ export function Onboarding({ onComplete }: { onComplete: () => void }) {
       )}
 
       {error && (
-        <div className="mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-2.5 text-sm text-red-700">
-          {error}
-        </div>
+        <Notice tone="danger" className="mt-4">{error}</Notice>
       )}
 
       <div className="mt-8 flex gap-3">
-        <button
-          type="button"
-          onClick={() => setStep(step - 1)}
-          disabled={step === 0}
-          className={`rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm font-medium text-slate-600 shadow-sm transition-all ${
-            step === 0 ? "opacity-0 pointer-events-none w-0 px-0 border-0" : "hover:bg-slate-50"
-          }`}
-        >
-          Back
-        </button>
-        {step < 4 ? (
-          <button
+        {step > 0 && (
+          <Button
             type="button"
+            variant="secondary"
+            size="lg"
+            leading={<BackIcon className="h-4 w-4" />}
+            onClick={() => setStep(step - 1)}
+          >
+            Back
+          </Button>
+        )}
+        {step < 4 ? (
+          <Button
+            type="button"
+            variant="primary"
+            size="lg"
+            className="flex-1"
+            trailing={<ArrowRightIcon className="h-4 w-4" />}
             onClick={() => setStep(step + 1)}
             disabled={!canProceed()}
-            className="flex-1 rounded-2xl bg-indigo-600 py-3.5 text-[15px] font-semibold text-white shadow-md shadow-indigo-600/25 hover:bg-indigo-700 disabled:opacity-40"
           >
             Continue
-          </button>
+          </Button>
         ) : (
-          <button
+          <Button
             type="button"
+            variant="primary"
+            size="lg"
+            className="flex-1"
+            trailing={<ArrowRightIcon className="h-4 w-4" />}
             onClick={handleFinish}
             disabled={!canProceed() || submitting}
-            className="flex-1 rounded-2xl bg-indigo-600 py-3.5 text-[15px] font-semibold text-white shadow-md shadow-indigo-600/25 hover:bg-indigo-700 disabled:opacity-40"
+            loading={submitting}
           >
             {submitting ? "Creating…" : "Finish"}
-          </button>
+          </Button>
         )}
       </div>
       {stepHint() && (
-        <p className="mt-3 text-center text-xs text-slate-500">{stepHint()}</p>
+        <p className="mt-3 text-center text-xs text-ink-3">{stepHint()}</p>
       )}
     </OnboardingShell>
   );
