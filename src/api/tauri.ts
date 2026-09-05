@@ -37,6 +37,10 @@ export async function saveConfig(config: unknown) {
   return invoke("config_save", { config });
 }
 
+export async function setActiveCharacter(characterId: string) {
+  return invoke("config_set_active_character", { characterId });
+}
+
 export async function resetAllAppData() {
   return invoke("config_reset_all");
 }

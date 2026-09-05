@@ -64,10 +64,43 @@ const cleanExpressionTags = (text: string) =>
     .replace(/<<\/?[^>]*>>\s*/g, "")
     .replace(/\[(?:expression:\s*)?[a-zA-Z0-9_\-]+\]\s*/g, "");
 
+const TURN_NOTE_KEYS = new Set([
+  "remember",
+  "moment",
+  "mood",
+  "closeness",
+  "open_threads",
+  "closed_threads",
+]);
+
+function stripTrailingTurnNotesJson(text: string): string {
+  const end = text.lastIndexOf("}");
+  if (end === -1) return text;
+  const start = text.lastIndexOf("{", end);
+  if (start === -1) return text;
+  const after = text.slice(end + 1).trim();
+  if (after !== "" && after !== "```") return text;
+  try {
+    const value = JSON.parse(text.slice(start, end + 1)) as Record<string, unknown>;
+    const keys = Object.keys(value);
+    if (
+      keys.length >= 2 &&
+      keys.every((key) => TURN_NOTE_KEYS.has(key))
+    ) {
+      return text.slice(0, start).replace(/```json\s*$/i, "").replace(/```\s*$/, "").trimEnd();
+    }
+  } catch {
+    /* not JSON */
+  }
+  return text;
+}
+
 export function cleanCompanionDisplayText(text: string) {
-  return cleanExpressionTags(text)
-    .replace(/<<<meuxe[\s\S]*?(>>>|$)/g, "")
-    .trim();
+  return stripTrailingTurnNotesJson(
+    cleanExpressionTags(text)
+      .replace(/<<<meuxe[\s\S]*?(>>>|$)/g, "")
+      .trim(),
+  ).trim();
 }
 
 function timelineToMessages(items: ChatTimelineItem[]): Message[] {
@@ -124,7 +157,7 @@ export function useChat() {
   );
 
   const commitStreamingSegment = useCallback(() => {
-    const text = cleanExpressionTags(displayTextRef.current).trim();
+    const text = cleanCompanionDisplayText(displayTextRef.current).trim();
     displayTextRef.current = "";
     setStreamingText("");
 
@@ -187,7 +220,7 @@ export function useChat() {
         "chat:text-chunk",
         (event) => {
           displayTextRef.current += event.payload.text;
-          setStreamingText(cleanExpressionTags(displayTextRef.current));
+          setStreamingText(cleanCompanionDisplayText(displayTextRef.current));
         },
       );
 

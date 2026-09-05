@@ -42,7 +42,9 @@ impl TrailerSplitter {
             return emitted;
         }
 
-        let emit_len = self.visible.len() - longest_marker_prefix_suffix(&self.visible);
+        let hold = longest_marker_prefix_suffix(&self.visible)
+            .max(trailing_possible_turn_notes_hold(&self.visible));
+        let emit_len = self.visible.len() - hold;
         self.visible.drain(0..emit_len).collect()
     }
 
@@ -54,7 +56,10 @@ impl TrailerSplitter {
             } else {
                 Some(trailer)
             };
-            (self.visible, trailer)
+            return (self.visible, trailer);
+        }
+        if let Some((visible, recovered)) = recover_turn_notes_from_reply(&self.visible) {
+            (visible, Some(recovered))
         } else {
             (self.visible, None)
         }
@@ -196,7 +201,103 @@ fn looks_like_turn_notes_json(json: &str) -> bool {
     let Some(obj) = value.as_object() else {
         return false;
     };
-    TURN_NOTE_KEYS.iter().any(|key| obj.contains_key(*key))
+    if obj.is_empty() {
+        return false;
+    }
+    let known = obj
+        .keys()
+        .filter(|key| TURN_NOTE_KEYS.contains(&key.as_str()))
+        .count();
+    known >= 2 && obj.keys().all(|key| TURN_NOTE_KEYS.contains(&key.as_str()))
+}
+
+fn looks_like_json_object_start(after_brace: &str) -> bool {
+    let rest = after_brace.trim_start();
+    rest.is_empty() || rest.starts_with('"') || rest.starts_with('}')
+}
+
+fn last_json_object_start(text: &str) -> Option<usize> {
+    let mut last = None;
+    for (idx, ch) in text.char_indices() {
+        if ch == '{' && looks_like_json_object_start(&text[idx + '{'.len_utf8()..]) {
+            last = Some(idx);
+        }
+    }
+    last
+}
+
+fn matching_object_end(text: &str, start: usize) -> Option<usize> {
+    let mut depth = 0i32;
+    let mut in_str = false;
+    let mut escape = false;
+    for (offset, ch) in text[start..].char_indices() {
+        if in_str {
+            if escape {
+                escape = false;
+                continue;
+            }
+            if ch == '\\' {
+                escape = true;
+                continue;
+            }
+            if ch == '"' {
+                in_str = false;
+            }
+            continue;
+        }
+        match ch {
+            '"' => in_str = true,
+            '{' => depth += 1,
+            '}' => {
+                depth -= 1;
+                if depth == 0 {
+                    return Some(start + offset + ch.len_utf8());
+                }
+            }
+            _ => {}
+        }
+    }
+    None
+}
+
+fn include_leading_fence(text: &str, json_start: usize) -> usize {
+    let before = &text[..json_start];
+    let trimmed = before.trim_end();
+    if let Some(rest) = trimmed.strip_suffix("```json") {
+        return rest.len();
+    }
+    if let Some(rest) = trimmed.strip_suffix("```") {
+        return rest.len();
+    }
+    json_start
+}
+
+fn suffix_is_trailer_framing(after: &str) -> bool {
+    let mut rest = after.trim_start();
+    if let Some(stripped) = rest.strip_prefix(">>>") {
+        rest = stripped.trim_start();
+    }
+    rest.trim().is_empty() || rest.trim() == "```"
+}
+
+/// Hold a trailing `{...}` that may still be an unwrapped turn-notes block.
+fn trailing_possible_turn_notes_hold(text: &str) -> usize {
+    let Some(start) = last_json_object_start(text) else {
+        return 0;
+    };
+    let hold_from = include_leading_fence(text, start);
+    match matching_object_end(text, start) {
+        None => text.len() - hold_from,
+        Some(end) => {
+            if suffix_is_trailer_framing(&text[end..])
+                && looks_like_turn_notes_json(&text[start..end])
+            {
+                text.len() - hold_from
+            } else {
+                0
+            }
+        }
+    }
 }
 
 fn find_last_json_object(text: &str) -> Option<(usize, usize)> {
@@ -257,6 +358,9 @@ fn strip_trailer_wrapper(text: &mut String, json_start: usize, json_end: usize) 
 /// Recover a turn-notes JSON object when the agent omitted the `<<<meuxe` wrapper.
 pub fn recover_turn_notes_from_reply(text: &str) -> Option<(String, String)> {
     let (start, end) = find_last_json_object(text)?;
+    if !suffix_is_trailer_framing(&text[end..]) {
+        return None;
+    }
     let json = &text[start..end];
     if !looks_like_turn_notes_json(json) {
         return None;
@@ -285,6 +389,48 @@ mod tests {
     fn recover_does_not_strip_ordinary_braces() {
         let reply = "I think {braces} in prose are fine.";
         assert!(recover_turn_notes_from_reply(reply).is_none());
+    }
+
+    #[test]
+    fn recover_ignores_single_field_json() {
+        let reply = r#"Here is the weather: {"mood":"sunny"}"#;
+        assert!(recover_turn_notes_from_reply(reply).is_none());
+    }
+
+    #[test]
+    fn recover_ignores_json_with_extra_keys() {
+        let reply = r#"{"remember":["Rex"],"mood":"happy","temperature":72}"#;
+        assert!(recover_turn_notes_from_reply(reply).is_none());
+    }
+
+    #[test]
+    fn recover_ignores_json_followed_by_speech() {
+        let reply = r#"{"remember":["Rex"],"mood":"happy"} and then I kept talking."#;
+        assert!(recover_turn_notes_from_reply(reply).is_none());
+    }
+
+    #[test]
+    fn splitter_holds_unwrapped_turn_notes_off_the_stream() {
+        let mut splitter = TrailerSplitter::new();
+        let a = splitter.feed("Sure thing.\n");
+        assert_eq!(a, "Sure thing.\n");
+        let b = splitter.feed(r#"{ "remember": ["Rex is a corgi"], "mood": "happy" }"#);
+        assert_eq!(b, "");
+        let (rest, trailer) = splitter.finish();
+        assert_eq!(rest, "");
+        let notes = parse_turn_notes(trailer.as_deref().unwrap()).unwrap();
+        assert_eq!(notes.remember, vec!["Rex is a corgi"]);
+        assert_eq!(notes.mood.unwrap().name, "happy");
+    }
+
+    #[test]
+    fn splitter_emits_ordinary_json_the_user_asked_for() {
+        let mut splitter = TrailerSplitter::new();
+        let visible = splitter.feed(r#"Here: {"mood":"sunny"}"#);
+        assert_eq!(visible, r#"Here: {"mood":"sunny"}"#);
+        let (rest, trailer) = splitter.finish();
+        assert_eq!(rest, "");
+        assert!(trailer.is_none());
     }
 
     #[test]

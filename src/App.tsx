@@ -18,7 +18,7 @@ import { useVoice } from "./hooks/useVoice";
 import { useWindow } from "./hooks/useWindow";
 import {
   getConfig,
-  saveConfig,
+  setActiveCharacter,
   listCharacters,
   listModels,
   getExpressions,
@@ -505,7 +505,7 @@ function App() {
       clearQueue();
       setCurrentExpression("neutral");
       setZoom(1.1);
-      saveConfig({ active_character: id }).catch(console.error);
+      setActiveCharacter(id).catch(console.error);
     },
     [setMessages, clearQueue]
   );
@@ -524,7 +524,7 @@ function App() {
       setCurrentExpression("neutral");
       setZoom(1.1);
       setSettingsOpen(false);
-      saveConfig({ active_character: characterId }).catch(console.error);
+      setActiveCharacter(characterId).catch(console.error);
     },
     [refreshCharacters, setMessages, clearQueue]
   );

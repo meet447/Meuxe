@@ -138,6 +138,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             commands::config::config_get,
             commands::config::config_save,
+            commands::config::config_set_active_character,
             commands::config::config_reset_all,
             commands::config::config_reset_onboarding,
             commands::characters::characters_list,
