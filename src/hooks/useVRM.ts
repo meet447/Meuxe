@@ -28,6 +28,8 @@ function applyEmotion(vrm: VRM, expressionName: string) {
   for (const preset of EMOTION_PRESETS) {
     vrm.expressionManager.setValue(preset, 0);
   }
+  // VRM 0 models often leave Neutral at 1; that blend washes out angry/sad.
+  vrm.expressionManager.setValue(VRMExpressionPresetName.Neutral, expressionName ? 0 : 1);
   if (expressionName) {
     vrm.expressionManager.setValue(expressionName, 1);
   }
