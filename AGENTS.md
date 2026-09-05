@@ -1,6 +1,6 @@
 # Meuxe — Agent Development Guide
 
-See [`docs/DIRECTION.md`](docs/DIRECTION.md) for product north star, [`docs/ROADMAP.md`](docs/ROADMAP.md) for phased work, and [`docs/DESIGN.md`](docs/DESIGN.md) for the UI design language (tokens, primitives in `src/components/ui/`, and rules for new screens).
+See [`docs/DIRECTION.md`](docs/DIRECTION.md) for product north star, [`docs/ROADMAP.md`](docs/ROADMAP.md) for phased work, [`docs/DESIGN.md`](docs/DESIGN.md) for the UI design language (tokens, primitives in `src/components/ui/`, and rules for new screens), and [`docs/MEMORY.md`](docs/MEMORY.md) for how companion memory and mood work.
 
 ## Cursor Cloud specific instructions
 

@@ -13,7 +13,7 @@ Their **mind** should eventually run on **your chosen agent** (Claude Code, Code
 | Layer | Responsibility |
 |--------|----------------|
 | **Persona** | Layered character files (`soul.md`, style, rules)—opinionated defaults, not blank slop |
-| **Memory & relationship** | Local vault, episodic recall, trust/mood/energy over time |
+| **Memory & relationship** | Facts about you, shared moments, and a bond with a persistent mood that has a cause (see `MEMORY.md`) |
 | **Presence** | Expressions, lip sync, TTS, mini desktop widget |
 | **Companion home** | Local workspace the agent can use (journals, memory exports, character data) |
 | **Shell UX** | One chat surface; tool activity as subtle status, not a terminal takeover |
