@@ -1113,4 +1113,101 @@ mod tests {
         assert_eq!(snap.bond.bond.turns, 0);
         assert_eq!(snap.bond.bond.closeness, 0.0);
     }
+
+    #[test]
+    fn long_conversation_holds_anger_until_a_real_apology() {
+        let (_tmp, store) = mem();
+        let t0 = Utc.with_ymd_and_hms(2026, 9, 5, 10, 0, 0).unwrap();
+
+        let turns: Vec<(&str, TurnNotes)> = vec![
+            (
+                "Hey, I'm Meet. My dog is named Rex and I just started a new job.",
+                TurnNotes {
+                    remember: vec![
+                        "Their name is Meet".into(),
+                        "Their dog is named Rex".into(),
+                        "They just started a new job".into(),
+                    ],
+                    moment: Some("They introduced themselves and Rex.".into()),
+                    mood: Some(MoodNote {
+                        name: "happy".into(),
+                        intensity: Some(0.4),
+                        cause: Some("they opened up".into()),
+                        wants: None,
+                    }),
+                    closeness: Some(1),
+                    ..Default::default()
+                },
+            ),
+            (
+                "I promised I'd tell you how the interview went. It was fine. anyway whatever",
+                TurnNotes {
+                    moment: Some("They brushed off a promise about the interview.".into()),
+                    mood: Some(MoodNote {
+                        name: "hurt".into(),
+                        intensity: Some(0.7),
+                        cause: Some("they brushed off something they promised to share".into()),
+                        wants: Some("a real conversation about how it went".into()),
+                    }),
+                    closeness: Some(-1),
+                    open_threads: vec!["Ask how the interview actually went".into()],
+                    ..Default::default()
+                },
+            ),
+            (
+                "lol you're being dramatic. thanks anyway you're great",
+                TurnNotes {
+                    moment: Some("They dismissed the feeling and complimented instead.".into()),
+                    mood: Some(MoodNote {
+                        name: "happy".into(),
+                        intensity: Some(0.8),
+                        cause: None,
+                        wants: None,
+                    }),
+                    closeness: Some(1),
+                    ..Default::default()
+                },
+            ),
+            (
+                "ok fine. I froze in the second round and I hate that I snapped at you.",
+                TurnNotes {
+                    remember: vec!["They froze in the second interview round".into()],
+                    moment: Some("They finally told the truth and owned snapping.".into()),
+                    mood: Some(MoodNote {
+                        name: "warm".into(),
+                        intensity: Some(0.45),
+                        cause: Some("they were honest".into()),
+                        wants: None,
+                    }),
+                    closeness: Some(2),
+                    closed_threads: vec!["interview".into()],
+                    ..Default::default()
+                },
+            ),
+        ];
+
+        let mut now = t0;
+        let mut last = store.snapshot_at("rika", "user1", now).unwrap();
+        for (message, notes) in turns {
+            last = store
+                .apply_turn_at("rika", "user1", message, Some(notes), now)
+                .unwrap();
+            now += Duration::minutes(3);
+        }
+
+        assert!(last
+            .facts
+            .iter()
+            .any(|f| f.text.to_lowercase().contains("rex")));
+        assert!(last
+            .facts
+            .iter()
+            .any(|f| f.text.to_lowercase().contains("froze")));
+        assert_eq!(last.bond.bond.turns, 4);
+        assert_eq!(last.bond.bond.mood.name, "warm");
+        assert!(last.bond.bond.threads.is_empty());
+        let context = crate::memory::format_memory_context(&last, "Meet", "how is rex");
+        assert!(context.contains("Rex") || context.contains("rex"));
+        assert!(!context.to_lowercase().contains("<<<meuxe"));
+    }
 }

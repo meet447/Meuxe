@@ -65,7 +65,9 @@ const cleanExpressionTags = (text: string) =>
     .replace(/\[(?:expression:\s*)?[a-zA-Z0-9_\-]+\]\s*/g, "");
 
 export function cleanCompanionDisplayText(text: string) {
-  return cleanExpressionTags(text).trim();
+  return cleanExpressionTags(text)
+    .replace(/<<<meuxe[\s\S]*?(>>>|$)/g, "")
+    .trim();
 }
 
 function timelineToMessages(items: ChatTimelineItem[]): Message[] {

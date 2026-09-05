@@ -19,8 +19,29 @@ pub const GLOBAL_EXPRESSIONS: &[&str] = &[
     "disgusted",
 ];
 
+/// Map companion-mood words (and common aliases) onto a global expression.
+pub fn canonical_expression(name: &str) -> String {
+    match name.trim().to_ascii_lowercase().as_str() {
+        "hurt" | "lonely" | "disappointed" | "sad" | "missed you" | "missed_you" => {
+            "sad".to_string()
+        }
+        "worried" | "thinking" => "thinking".to_string(),
+        "annoyed" | "frustrated" | "cold" | "upset" | "jealous" | "angry" => "angry".to_string(),
+        "happy" | "content" | "playful" | "glad" => "happy".to_string(),
+        "excited" => "excited".to_string(),
+        "surprised" => "surprised".to_string(),
+        "embarrassed" | "shy" => "embarrassed".to_string(),
+        "blush" => "blush".to_string(),
+        "smirk" => "smirk".to_string(),
+        "scared" => "scared".to_string(),
+        "disgusted" => "disgusted".to_string(),
+        "neutral" | "settled" => "neutral".to_string(),
+        other => other.to_string(),
+    }
+}
+
 fn fallback_candidates(name: &str) -> &'static [&'static str] {
-    match name {
+    match canonical_expression(name).as_str() {
         "blush" => &["embarrassed", "happy", "neutral"],
         "embarrassed" => &["blush", "happy", "sad", "neutral"],
         "smirk" => &["happy", "neutral"],
@@ -28,6 +49,8 @@ fn fallback_candidates(name: &str) -> &'static [&'static str] {
         "excited" => &["happy", "surprised", "neutral"],
         "scared" => &["surprised", "sad", "neutral"],
         "disgusted" => &["angry", "sad", "neutral"],
+        "sad" => &["neutral"],
+        "angry" => &["sad", "neutral"],
         _ => &["neutral"],
     }
 }
@@ -95,7 +118,7 @@ impl ExpressionManager {
     /// Returns the mapped name if one exists, otherwise returns the global name as fallback.
     pub fn resolve(&self, model_id: &str, global_name: &str) -> String {
         let mapping = self.get_mapping(model_id);
-        let normalized = global_name.trim().to_lowercase();
+        let normalized = canonical_expression(global_name);
 
         if let Some(mapped) = mapping.get(&normalized).filter(|value| !value.is_empty()) {
             return mapped.clone();
@@ -117,10 +140,10 @@ impl ExpressionManager {
     /// Validate an expression name against a list of available expressions.
     /// Performs case-insensitive matching. Returns the matching available name if found.
     pub fn validate_expression(name: &str, available: &[String]) -> Option<String> {
-        let lower = name.to_lowercase();
+        let canonical = canonical_expression(name);
         available
             .iter()
-            .find(|a| a.to_lowercase() == lower)
+            .find(|a| a.to_lowercase() == canonical)
             .cloned()
     }
 }
@@ -190,8 +213,9 @@ mod tests {
         assert_eq!(mgr.resolve("model_a", "happy"), "joy");
         assert_eq!(mgr.resolve("model_a", "sad"), "sorrow");
 
-        // Unmapped expressions fall back to the global name.
-        assert_eq!(mgr.resolve("model_a", "angry"), "angry");
+        // Unmapped expressions use the mood fallback chain (angry → sad).
+        assert_eq!(mgr.resolve("model_a", "angry"), "sorrow");
+        assert_eq!(mgr.resolve("model_a", "hurt"), "sorrow");
     }
 
     #[test]
@@ -212,6 +236,14 @@ mod tests {
         assert_eq!(
             ExpressionManager::validate_expression("confused", &available),
             None
+        );
+        assert_eq!(
+            ExpressionManager::validate_expression("hurt", &available),
+            Some("Sad".to_string())
+        );
+        assert_eq!(
+            ExpressionManager::validate_expression("worried", &["thinking".into()]),
+            Some("thinking".to_string())
         );
     }
 

@@ -5,6 +5,11 @@ import { useAudioAnalyser } from "./useAudioAnalyser";
 
 export type { SentenceTask } from "../audio/orderedAudioQueue";
 
+function captionHoldMs(text: string): number {
+  const words = text.trim().split(/\s+/).filter(Boolean).length;
+  return Math.min(4000, Math.max(1400, words * 280));
+}
+
 interface CurrentPlayback {
   audio: HTMLAudioElement;
   finish: () => void;
@@ -124,6 +129,17 @@ export function useAudioQueue() {
           break;
         }
         if (action.kind === "skip") {
+          if (action.task) {
+            setSpeaking(true);
+            setSpeakingSentence(action.task.text);
+            onExpressionChangeRef.current?.(action.task.expression);
+            const holdMs =
+              import.meta.env.MODE === "test" ? 0 : captionHoldMs(action.task.text);
+            if (holdMs > 0) {
+              await new Promise((resolve) => setTimeout(resolve, holdMs));
+            }
+            if (queueRef.current.activeRequestId() !== action.requestId) break;
+          }
           queueRef.current.advance(action.requestId, action.index);
           continue;
         }
