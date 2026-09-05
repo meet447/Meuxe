@@ -515,31 +515,34 @@ async fn run_chat_stream(
         .map_err(|e| e.to_string())?;
     let model_id = character.live2d_model.clone();
 
+    let user_name = if config.user.name.is_empty() {
+        "the user"
+    } else {
+        config.user.name.as_str()
+    };
+
     // 2. Build prompt
     let prompt_result =
         meuxe_core::prompt::build_chat_prompt(meuxe_core::prompt::ChatPromptParams {
             character_loader: &state.characters,
             session_store: &state.sessions,
-            memory_store: &state.memories,
-            memory_vault: Some(&state.memory_vault),
+            memory: &state.memory,
             _expression_manager: &state.expressions,
             character_id: &character_id,
             user_id: &user_id,
+            user_name,
             user_message: &message,
             history_limit: None,
-            memory_limit: None,
         })
         .map_err(|e| e.to_string())?;
 
     let mut persona_context = prompt_result.system_prompt.clone();
-    if !prompt_result.relationship_prompt.is_empty() {
+    if !prompt_result.memory_context.is_empty() {
         persona_context.push_str("\n\n");
-        persona_context.push_str(&prompt_result.relationship_prompt);
+        persona_context.push_str(&prompt_result.memory_context);
     }
-    if !prompt_result.memory_prompt.is_empty() {
-        persona_context.push_str("\n\n");
-        persona_context.push_str(&prompt_result.memory_prompt);
-    }
+    persona_context.push_str("\n\n## Memory notes (required)\n");
+    persona_context.push_str(meuxe_core::memory::TURN_NOTES_INSTRUCTIONS);
 
     let acp_prompt = build_acp_agent_prompt(&persona_context, &prompt_result.messages, &message);
 
@@ -552,6 +555,7 @@ async fn run_chat_stream(
         request_id,
         cancel,
         persona_context,
+        memory_snapshot: prompt_result.snapshot,
         model_id,
         tts_config: config.tts.clone(),
         agent_config: config.agent.clone(),

@@ -37,7 +37,7 @@ data_dir/companion-home/
 │   ├── brief.md              # Facts and recent moments (what the prompt receives)
 │   └── exports/              # Reserved for future exports
 ├── journal/
-│   └── YYYY-MM-DD.md         # Companion-facing daily notes (agent or dream runs)
+│   └── YYYY-MM-DD.md         # Companion-facing daily notes (agent-written)
 └── workspace/                # ACP working directory (agent scratch, tool I/O)
     └── .gitkeep
 ```
