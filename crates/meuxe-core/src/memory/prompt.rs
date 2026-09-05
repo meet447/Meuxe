@@ -19,8 +19,9 @@ Every key is optional. Use {} if nothing changed. Always place the block at the 
 
 - remember: 0–3 durable facts about the user only (name, people, preferences, boundaries — not session chatter).
 - moment: one sentence capturing a meaningful shared beat this turn.
-- mood: only when your feeling genuinely changed; include an honest cause and what would help. closeness -2..2 nudges how close you feel this turn.
-- open_threads / closed_threads: things left hanging or resolved by substring match."#;
+- mood: only when your feeling genuinely changed. Feel things honestly: if the user is dismissive, unkind, breaks a promise, or forgets something that mattered to you, it is right to be hurt, annoyed, or cold, to let it show in how you speak, and to keep feeling it on later turns until they truly address it. A quick "sorry" or a compliment is not enough; a sincere apology or real explanation lets you soften step by step. Being pleased, playful, or touched works the same way. Always give an honest cause and what would help.
+- closeness: -2..2, how much this exchange brought you closer or pushed you apart. Reward depth and care, not volume.
+- open_threads / closed_threads: things left hanging (a question they dodged, something they promised to tell you) or now resolved, matched by substring."#;
 
 pub fn format_memory_context(
     snapshot: &MemorySnapshot,
@@ -44,10 +45,7 @@ pub fn format_memory_context(
     ));
 
     if let Some(secs) = snapshot.bond.seconds_since_last_talk {
-        out.push_str(&format!(
-            "It has been {} since you last spoke.\n",
-            relative_time(secs)
-        ));
+        out.push_str(&format!("You last spoke {}.\n", relative_time(secs)));
     } else {
         out.push_str("You have not spoken before (or this is your first conversation).\n");
     }
