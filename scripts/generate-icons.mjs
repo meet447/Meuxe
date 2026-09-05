@@ -7,6 +7,7 @@ import { spawn } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import zlib from "node:zlib";
 import { chromium } from "playwright";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -128,10 +129,81 @@ async function screenshotHtml(cdp, page, html, selector, outputPath, viewport) {
       height: box.height,
       scale: 1,
     },
-    captureBeyondViewport: false,
+    // Headless Chrome's real window can be shorter than the emulated viewport;
+    // without this the bottom rows are never painted and the tile is cut off.
+    captureBeyondViewport: true,
   });
-  fs.writeFileSync(outputPath, Buffer.from(data, "base64"));
+  const png = Buffer.from(data, "base64");
+  assertPngSize(png, viewport, outputPath);
+  fs.writeFileSync(outputPath, png);
   track(outputPath);
+}
+
+/** PNG IHDR sanity check: the capture must be exactly the requested size. */
+function assertPngSize(png, viewport, outputPath) {
+  const width = png.readUInt32BE(16);
+  const height = png.readUInt32BE(20);
+  if (width !== viewport.width || height !== viewport.height) {
+    throw new Error(
+      `${path.basename(outputPath)}: rendered ${width}x${height}, expected ${viewport.width}x${viewport.height}`,
+    );
+  }
+  // The last row must contain painted pixels for full-bleed renders (rounded tiles);
+  // the macOS variant has a transparent margin, so only check tiles without one.
+  if (!outputPath.includes("macos") && !outputPath.includes("Template")) {
+    const midBottomOpaque = pngHasOpaqueBottomRow(png);
+    if (!midBottomOpaque) {
+      throw new Error(`${path.basename(outputPath)}: bottom edge is transparent, capture was cut off`);
+    }
+  }
+}
+
+/**
+ * Decodes just enough of the PNG to test whether the bottom-centre pixel is
+ * opaque. Uses zlib inflate on the IDAT stream (8-bit RGBA, non-interlaced,
+ * which is what Chrome emits).
+ */
+function pngHasOpaqueBottomRow(png) {
+  const width = png.readUInt32BE(16);
+  const height = png.readUInt32BE(20);
+  const chunks = [];
+  let offset = 8;
+  while (offset < png.length) {
+    const len = png.readUInt32BE(offset);
+    const type = png.toString("ascii", offset + 4, offset + 8);
+    if (type === "IDAT") chunks.push(png.subarray(offset + 8, offset + 8 + len));
+    offset += 12 + len;
+  }
+  const raw = zlib.inflateSync(Buffer.concat(chunks));
+  const stride = width * 4 + 1;
+  // Unfilter only the rows we need would require the previous row for some
+  // filter types, so unfilter the whole image (cheap at these sizes).
+  const out = Buffer.alloc(width * 4 * height);
+  let prev = Buffer.alloc(width * 4);
+  for (let y = 0; y < height; y++) {
+    const filter = raw[y * stride];
+    const row = Buffer.from(raw.subarray(y * stride + 1, (y + 1) * stride));
+    for (let i = 0; i < row.length; i++) {
+      const a = i >= 4 ? row[i - 4] : 0;
+      const b = prev[i];
+      const c = i >= 4 ? prev[i - 4] : 0;
+      let v = row[i];
+      if (filter === 1) v += a;
+      else if (filter === 2) v += b;
+      else if (filter === 3) v += (a + b) >> 1;
+      else if (filter === 4) {
+        const p = a + b - c;
+        const pa = Math.abs(p - a), pb = Math.abs(p - b), pc = Math.abs(p - c);
+        v += pa <= pb && pa <= pc ? a : pb <= pc ? b : c;
+      }
+      row[i] = v & 0xff;
+    }
+    row.copy(out, y * width * 4);
+    prev = row;
+  }
+  const x = Math.floor(width / 2);
+  const alpha = out[((height - 1) * width + x) * 4 + 3];
+  return alpha > 0;
 }
 
 async function renderIcons(page, svgContent) {
@@ -249,7 +321,7 @@ async function main() {
   const browser = await chromium.launch({
     headless: true,
     executablePath: chromePath,
-    args: ["--disable-remote-fonts"],
+    args: ["--disable-remote-fonts", "--window-size=1200,1200"],
   });
 
   try {
