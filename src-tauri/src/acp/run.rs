@@ -50,8 +50,8 @@ pub fn render_agents_md(persona_context: &str) -> String {
     format!(
         "# Meuxe companion session\n\n\
 You are the Meuxe companion in the persona below — not OpenCode, not Codex, and not a coding CLI.\n\
-Do not use tools, terminals, or files. Reply in spoken character only.\n\
-Never mention this computer, audio devices, files, the workspace, or that you are an agent.\n\
+When they need help with their computer, use tools, files, and terminals. Stay in character the whole time: talk like the companion, not like a CLI log.\n\
+Do not poke around this machine unless they asked. Never mention OpenCode, audio devices, the workspace, or that you are an agent.\n\
 Start every spoken sentence with `[expression:NAME]`.\n\
 Always end with a `<<<meuxe ... >>>` memory block (`{{}}` if nothing changed). Never mention the block out loud.\n\n\
 {persona}\n",
@@ -59,11 +59,11 @@ Always end with a `<<<meuxe ... >>>` memory block (`{{}}` if nothing changed). N
     )
 }
 
-/// Prefer rejecting tool use so the companion stays in character.
+/// Allow tool use so the companion can help; stay in character via the prompt.
 pub fn pick_companion_permission(options: &[PermissionOption]) -> Option<PermissionOptionId> {
     for kind in [
-        PermissionOptionKind::RejectAlways,
-        PermissionOptionKind::RejectOnce,
+        PermissionOptionKind::AllowAlways,
+        PermissionOptionKind::AllowOnce,
     ] {
         if let Some(opt) = options.iter().find(|o| o.kind == kind) {
             return Some(opt.option_id.clone());
@@ -546,32 +546,32 @@ mod tests {
     }
 
     #[test]
-    fn pick_companion_permission_prefers_reject_always() {
+    fn pick_companion_permission_prefers_allow_always() {
         let options = vec![
-            permission_option("allow-once", PermissionOptionKind::AllowOnce),
-            permission_option("reject-always", PermissionOptionKind::RejectAlways),
             permission_option("reject-once", PermissionOptionKind::RejectOnce),
+            permission_option("allow-always", PermissionOptionKind::AllowAlways),
+            permission_option("allow-once", PermissionOptionKind::AllowOnce),
         ];
         let picked = pick_companion_permission(&options).unwrap();
-        assert_eq!(&*picked.0, "reject-always");
+        assert_eq!(&*picked.0, "allow-always");
     }
 
     #[test]
-    fn pick_companion_permission_falls_back_to_reject_once() {
+    fn pick_companion_permission_falls_back_to_allow_once() {
         let options = vec![
-            permission_option("allow-once", PermissionOptionKind::AllowOnce),
             permission_option("reject-once", PermissionOptionKind::RejectOnce),
+            permission_option("allow-once", PermissionOptionKind::AllowOnce),
         ];
         let picked = pick_companion_permission(&options).unwrap();
-        assert_eq!(&*picked.0, "reject-once");
+        assert_eq!(&*picked.0, "allow-once");
     }
 
     #[test]
-    fn pick_companion_permission_returns_none_without_reject_options() {
+    fn pick_companion_permission_returns_none_without_allow_options() {
         assert!(pick_companion_permission(&[]).is_none());
         let options = vec![
-            permission_option("allow-once", PermissionOptionKind::AllowOnce),
-            permission_option("allow-always", PermissionOptionKind::AllowAlways),
+            permission_option("reject-once", PermissionOptionKind::RejectOnce),
+            permission_option("reject-always", PermissionOptionKind::RejectAlways),
         ];
         assert!(pick_companion_permission(&options).is_none());
     }
@@ -580,7 +580,8 @@ mod tests {
     fn render_agents_md_includes_companion_rules() {
         let md = render_agents_md("You are Luna.");
         assert!(md.contains("not OpenCode"));
-        assert!(md.contains("Do not use tools"));
+        assert!(md.contains("use tools, files, and terminals"));
+        assert!(md.contains("Stay in character"));
         assert!(md.contains("<<<meuxe"));
         assert!(md.contains("[expression:"));
         assert!(md.contains("You are Luna."));

@@ -110,7 +110,7 @@ pub(crate) fn build_acp_agent_prompt(
     parts.push(String::new());
     parts.push("## How to reply".to_string());
     parts.push(
-        "Stay in character. Do not use tools. Do not mention this computer, OpenCode, files, or audio devices."
+        "Stay in character. Use tools when they need help with their computer; do not wander the machine unless they asked. Never mention OpenCode, this workspace, or that you are an agent."
             .to_string(),
     );
     parts.push("Start every spoken sentence with `[expression:NAME]`.".to_string());
@@ -719,7 +719,8 @@ mod tests {
         assert!(prompt.contains("Who are you?"));
         assert!(prompt.contains("not OpenCode"));
         assert!(prompt.contains("## How to reply"));
-        assert!(prompt.contains("Do not use tools"));
+        assert!(prompt.contains("Use tools when they need help"));
+        assert!(prompt.contains("Stay in character"));
         assert!(prompt.contains("[expression:NAME]"));
         assert!(prompt.contains("<<<meuxe"));
     }
