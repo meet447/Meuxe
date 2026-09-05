@@ -149,54 +149,47 @@ describe('tauri api utilities', () => {
   });
 
   describe('Memory functions', () => {
-    it('getMemory calls memory_get', async () => {
-      await tauriApi.getMemory('char-1');
-      expect(invoke).toHaveBeenCalledWith('memory_get', { characterId: 'char-1' });
+    it('getMemorySnapshot calls memory_snapshot', async () => {
+      await tauriApi.getMemorySnapshot('char-1');
+      expect(invoke).toHaveBeenCalledWith('memory_snapshot', { characterId: 'char-1' });
     });
 
-    it('searchMemory calls memory_search', async () => {
-      await tauriApi.searchMemory('char-1', 'apples');
-      expect(invoke).toHaveBeenCalledWith('memory_search', { characterId: 'char-1', query: 'apples' });
+    it('addMemoryFact calls memory_add_fact', async () => {
+      await tauriApi.addMemoryFact('char-1', 'They have a dog named Rex');
+      expect(invoke).toHaveBeenCalledWith('memory_add_fact', {
+        characterId: 'char-1',
+        text: 'They have a dog named Rex',
+      });
     });
 
-    it('clearMemory calls memory_clear', async () => {
-      await tauriApi.clearMemory('char-1');
-      expect(invoke).toHaveBeenCalledWith('memory_clear', { characterId: 'char-1' });
+    it('updateMemoryFact calls memory_update_fact', async () => {
+      await tauriApi.updateMemoryFact('char-1', 'fact-1', 'Updated text');
+      expect(invoke).toHaveBeenCalledWith('memory_update_fact', {
+        characterId: 'char-1',
+        factId: 'fact-1',
+        text: 'Updated text',
+      });
     });
 
-    it('getMemoryOverview calls memory_overview', async () => {
-      await tauriApi.getMemoryOverview('char-1');
-      expect(invoke).toHaveBeenCalledWith('memory_overview', { characterId: 'char-1' });
+    it('forgetMemoryFact calls memory_forget_fact', async () => {
+      await tauriApi.forgetMemoryFact('char-1', 'fact-1');
+      expect(invoke).toHaveBeenCalledWith('memory_forget_fact', {
+        characterId: 'char-1',
+        factId: 'fact-1',
+      });
     });
 
-    it('rebuildMemoryVault calls memory_rebuild_vault', async () => {
-      await tauriApi.rebuildMemoryVault('char-1');
-      expect(invoke).toHaveBeenCalledWith('memory_rebuild_vault', { characterId: 'char-1' });
+    it('forgetMemoryMoment calls memory_forget_moment', async () => {
+      await tauriApi.forgetMemoryMoment('char-1', 'moment-1');
+      expect(invoke).toHaveBeenCalledWith('memory_forget_moment', {
+        characterId: 'char-1',
+        momentId: 'moment-1',
+      });
     });
 
-    it('runMemoryDream calls memory_run_dream', async () => {
-      await tauriApi.runMemoryDream('char-1');
-      expect(invoke).toHaveBeenCalledWith('memory_run_dream', { characterId: 'char-1' });
-    });
-
-    it('deleteMemory calls memory_delete', async () => {
-      await tauriApi.deleteMemory('char-1', 'mem-1');
-      expect(invoke).toHaveBeenCalledWith('memory_delete', { characterId: 'char-1', memoryId: 'mem-1' });
-    });
-
-    it('setMemoryPinned calls memory_set_pinned', async () => {
-      await tauriApi.setMemoryPinned('char-1', 'mem-1', true);
-      expect(invoke).toHaveBeenCalledWith('memory_set_pinned', { characterId: 'char-1', memoryId: 'mem-1', pinned: true });
-    });
-
-    it('ingestMemoryNote calls memory_ingest_note', async () => {
-      await tauriApi.ingestMemoryNote('char-1', 'Note', 'Body');
-      expect(invoke).toHaveBeenCalledWith('memory_ingest_note', { characterId: 'char-1', title: 'Note', body: 'Body' });
-    });
-
-    it('getMemorySources calls memory_sources', async () => {
-      await tauriApi.getMemorySources('char-1');
-      expect(invoke).toHaveBeenCalledWith('memory_sources', { characterId: 'char-1' });
+    it('resetMemory calls memory_reset', async () => {
+      await tauriApi.resetMemory('char-1');
+      expect(invoke).toHaveBeenCalledWith('memory_reset', { characterId: 'char-1' });
     });
   });
 

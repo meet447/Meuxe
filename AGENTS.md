@@ -1,6 +1,6 @@
 # Meuxe — Agent Development Guide
 
-See [`docs/DIRECTION.md`](docs/DIRECTION.md) for product north star, [`docs/ROADMAP.md`](docs/ROADMAP.md) for phased work, and [`docs/DESIGN.md`](docs/DESIGN.md) for the UI design language (tokens, primitives in `src/components/ui/`, and rules for new screens).
+See [`docs/DIRECTION.md`](docs/DIRECTION.md) for product north star, [`docs/ROADMAP.md`](docs/ROADMAP.md) for phased work, [`docs/DESIGN.md`](docs/DESIGN.md) for the UI design language (tokens, primitives in `src/components/ui/`, and rules for new screens), and [`docs/MEMORY.md`](docs/MEMORY.md) for how companion memory and mood work.
 
 ## Cursor Cloud specific instructions
 
@@ -27,11 +27,11 @@ The full desktop app (`npm run tauri dev`) requires a display. In a headless Clo
 
 See `package.json` scripts and the CI workflow at `.github/workflows/ci.yml`.
 
-- **Frontend tests:** `npm test` (Vitest, 58 tests)
+- **Frontend tests:** `npm test` (Vitest, 60 tests)
 - **Frontend build:** `npm run build` (tsc + vite build)
 - **Rust format check:** `cargo fmt --all -- --check`
 - **Rust lint:** `cargo clippy --workspace --all-targets -- -D warnings`
-- **Rust tests:** `cargo test --workspace` (65 tests across meuxe-core and tauri crate)
+- **Rust tests:** `cargo test --workspace` (63 tests across meuxe-core and tauri crate)
 
 ### Rust build environment variables
 

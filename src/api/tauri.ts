@@ -1,4 +1,5 @@
 import { invoke, convertFileSrc } from "@tauri-apps/api/core";
+import type { MemoryFact, MemorySnapshot } from "../types";
 
 // Asset paths: in the Tauri app, resolve to convertFileSrc URLs via the backend.
 // In browser-only dev (npm run dev), fall back to Vite /static/ middleware.
@@ -139,76 +140,32 @@ export async function transcribeVoiceLocal(pcmBase64: string) {
 }
 
 // Memory
-export async function getMemory(characterId: string) {
-  return invoke<unknown[]>("memory_get", { characterId });
+export async function getMemorySnapshot(characterId: string): Promise<MemorySnapshot> {
+  return invoke<MemorySnapshot>("memory_snapshot", { characterId });
 }
 
-export async function searchMemory(characterId: string, query: string) {
-  return invoke<unknown[]>("memory_search", { characterId, query });
+export async function addMemoryFact(characterId: string, text: string): Promise<MemoryFact> {
+  return invoke<MemoryFact>("memory_add_fact", { characterId, text });
 }
 
-export async function clearMemory(characterId: string) {
-  return invoke("memory_clear", { characterId });
+export async function updateMemoryFact(
+  characterId: string,
+  factId: string,
+  text: string,
+): Promise<MemoryFact> {
+  return invoke<MemoryFact>("memory_update_fact", { characterId, factId, text });
 }
 
-export async function getMemoryOverview(characterId: string) {
-  return invoke("memory_overview", { characterId });
+export async function forgetMemoryFact(characterId: string, factId: string): Promise<void> {
+  return invoke("memory_forget_fact", { characterId, factId });
 }
 
-export async function rebuildMemoryVault(characterId: string) {
-  return invoke<string>("memory_rebuild_vault", { characterId });
+export async function forgetMemoryMoment(characterId: string, momentId: string): Promise<void> {
+  return invoke("memory_forget_moment", { characterId, momentId });
 }
 
-export async function runMemoryDream(characterId: string) {
-  return invoke("memory_run_dream", { characterId });
-}
-
-export async function getMemoryDreamStatus(characterId: string) {
-  return invoke("memory_dream_status", { characterId });
-}
-
-export async function migrateLegacyMemory(characterId: string) {
-  return invoke<number>("memory_migrate_legacy", { characterId });
-}
-
-export async function deleteMemory(characterId: string, memoryId: string) {
-  return invoke("memory_delete", { characterId, memoryId });
-}
-
-export async function setMemoryPinned(characterId: string, memoryId: string, pinned: boolean) {
-  return invoke("memory_set_pinned", { characterId, memoryId, pinned });
-}
-
-export async function getMemorySources(characterId: string) {
-  return invoke("memory_sources", { characterId });
-}
-
-export async function getMemoryTopics(characterId: string) {
-  return invoke("memory_topics", { characterId });
-}
-
-export async function ingestMemoryNote(characterId: string, title: string, body: string) {
-  return invoke<number>("memory_ingest_note", { characterId, title, body });
-}
-
-export async function ingestMemoryTranscript(characterId: string, title: string, transcript: string) {
-  return invoke<number>("memory_ingest_transcript", { characterId, title, transcript });
-}
-
-export async function ingestMemoryFileDialog(characterId: string) {
-  return invoke<number | null>("memory_ingest_file_dialog", { characterId });
-}
-
-export async function ingestMemoryFolderDialog(characterId: string) {
-  return invoke<number | null>("memory_ingest_folder_dialog", { characterId });
-}
-
-export async function exportMemoryZipDialog(characterId: string) {
-  return invoke<string | null>("memory_export_zip_dialog", { characterId });
-}
-
-export async function importMemoryZipDialog(characterId: string) {
-  return invoke<number | null>("memory_import_zip_dialog", { characterId });
+export async function resetMemory(characterId: string): Promise<void> {
+  return invoke("memory_reset", { characterId });
 }
 
 // Expressions

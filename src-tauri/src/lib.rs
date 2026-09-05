@@ -6,8 +6,7 @@ mod window;
 use meuxe_core::character::CharacterLoader;
 use meuxe_core::config::ConfigManager;
 use meuxe_core::expressions::ExpressionManager;
-use meuxe_core::memory::store::MemoryStore;
-use meuxe_core::memory_vault::MemoryVault;
+use meuxe_core::memory::CompanionMemory;
 use meuxe_core::session::SessionStore;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -19,8 +18,7 @@ pub struct AppState {
     pub config: ConfigManager,
     pub characters: CharacterLoader,
     pub sessions: SessionStore,
-    pub memories: MemoryStore,
-    pub memory_vault: MemoryVault,
+    pub memory: CompanionMemory,
     pub expressions: ExpressionManager,
     pub whisper_ctx: Option<Arc<WhisperContext>>,
     pub chat_cancel: std::sync::Mutex<Option<tokio_util::sync::CancellationToken>>,
@@ -106,8 +104,7 @@ pub fn run() {
                 config: ConfigManager::new(&data_dir),
                 characters: CharacterLoader::new(&data_dir),
                 sessions: SessionStore::new(&data_dir),
-                memories: MemoryStore::new(data_dir.clone()),
-                memory_vault: MemoryVault::new(data_dir.clone()),
+                memory: CompanionMemory::new(&data_dir),
                 expressions: ExpressionManager::new(&data_dir),
                 whisper_ctx,
                 chat_cancel: std::sync::Mutex::new(None),
@@ -136,24 +133,12 @@ pub fn run() {
             commands::chat::chat_clear,
             commands::agent_setup::agent_setup_status,
             commands::agent_setup::agent_setup_install,
-            commands::memory::memory_get,
-            commands::memory::memory_search,
-            commands::memory::memory_clear,
-            commands::memory::memory_overview,
-            commands::memory::memory_rebuild_vault,
-            commands::memory::memory_run_dream,
-            commands::memory::memory_dream_status,
-            commands::memory::memory_migrate_legacy,
-            commands::memory::memory_delete,
-            commands::memory::memory_set_pinned,
-            commands::memory::memory_sources,
-            commands::memory::memory_topics,
-            commands::memory::memory_ingest_note,
-            commands::memory::memory_ingest_transcript,
-            commands::memory::memory_ingest_file_dialog,
-            commands::memory::memory_ingest_folder_dialog,
-            commands::memory::memory_export_zip_dialog,
-            commands::memory::memory_import_zip_dialog,
+            commands::memory::memory_snapshot,
+            commands::memory::memory_add_fact,
+            commands::memory::memory_update_fact,
+            commands::memory::memory_forget_fact,
+            commands::memory::memory_forget_moment,
+            commands::memory::memory_reset,
             commands::expressions::expressions_supported,
             commands::expressions::expressions_model_list,
             commands::expressions::expressions_get,

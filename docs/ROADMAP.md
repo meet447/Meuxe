@@ -25,6 +25,9 @@ Phases are ordered; later work assumes earlier product polish unless noted.
 - [x] Companion context bundle (persona + memory + relationship in prompt / `companion-home`)
 - [x] Companion home directory layout + `AGENTS.md` for agents
 - [x] Onboarding agent install (OpenCode, Claude, Codex presets)
+- [x] Companion memory v2: agent-written facts and moments, persistent mood with cause, no instant forgiveness, absence awareness (`docs/MEMORY.md`)
+- [ ] `forget` key in turn notes so the agent can retract a corrected fact
+- [ ] Consolidate moments older than 90 days into summary moments
 
 ## Phase 3 — Consolidate backend
 
@@ -36,7 +39,7 @@ Phases are ordered; later work assumes earlier product polish unless noted.
 ## Phase 4 — Ecosystem
 
 - [x] Agent picker with validated presets (OpenCode, Claude Code, Codex, custom)
-- [ ] Optional Meuxe MCP server for memory/relationship tools (for agents that support MCP)
+- [ ] Optional Meuxe MCP server (`remember`, `recall`, `how_do_you_feel`) for agents that prefer tools to turn notes
 - [ ] Character packs (file-only distribution)
 
 ## Tracking

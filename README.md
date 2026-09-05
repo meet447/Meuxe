@@ -28,7 +28,7 @@ Meuxe is a character on your screen who remembers past conversations, speaks wit
 
 ## Highlights
 
-- **Remembers you.** Long-term memory (episodic, semantic, reflections) plus a relationship state that evolves: trust, affection, mood, energy.
+- **Remembers you.** Your companion writes down what matters as you talk: facts about you, moments you shared, and how they feel about you. Moods have a cause and stick around until you actually address them. They notice when you have been gone.
 - **Your agent, your choice.** Chat runs through the CLI agent you install and select; Meuxe is the Agent Client Protocol client, not a locked-in model API.
 - **Expressive avatars.** Live2D and VRM characters with lip sync, expression tags parsed from agent replies, and framing controls on stage.
 - **Voice in and out.** Your companion speaks aloud with live captions, and listens through your microphone with optional on-device Whisper transcription.
