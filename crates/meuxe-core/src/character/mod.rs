@@ -597,14 +597,14 @@ fn scan_models_dir(
                     let Some(model_file) = find_vrm_file(&path) else {
                         continue;
                     };
-                seen.insert(key);
-                models.push(ModelInfo {
-                    id: id.clone(),
-                    model_type: "vrm".to_string(),
-                    model_file: model_file.clone(),
-                    path: format!("models/vrm/{id}/{model_file}"),
-                    animations: list_vrm_animations(&path, &id),
-                });
+                    seen.insert(key);
+                    models.push(ModelInfo {
+                        id: id.clone(),
+                        model_type: "vrm".to_string(),
+                        model_file: model_file.clone(),
+                        path: format!("models/vrm/{id}/{model_file}"),
+                        animations: list_vrm_animations(&path, &id),
+                    });
                 } else if is_vrm_extension(path.extension()) {
                     let id = path.file_stem().unwrap().to_string_lossy().to_string();
                     let fname = path.file_name().unwrap().to_string_lossy().to_string();
@@ -681,7 +681,10 @@ pub fn get_model_expressions(data_dir: &Path, model_id: &str) -> Result<Vec<Stri
         let vrm_dir = models_dir.join("vrm").join(model_id);
         let flat_vrm = models_dir.join("vrm").join(format!("{model_id}.vrm"));
         if (vrm_dir.exists() && find_vrm_file(&vrm_dir).is_some()) || flat_vrm.exists() {
-            return Ok(VRM_EXPRESSIONS.iter().map(|name| (*name).to_string()).collect());
+            return Ok(VRM_EXPRESSIONS
+                .iter()
+                .map(|name| (*name).to_string())
+                .collect());
         }
     }
 
@@ -916,7 +919,10 @@ mod tests {
         fs::write(model_dir.join("animations/talking.vrma"), b"vrma").unwrap();
 
         let models = list_models(tmp.path()).unwrap();
-        let utsuwa = models.iter().find(|m| m.id == "utsuwa").expect("utsuwa model");
+        let utsuwa = models
+            .iter()
+            .find(|m| m.id == "utsuwa")
+            .expect("utsuwa model");
         let animations = utsuwa.animations.as_ref().expect("animations");
         assert_eq!(animations.len(), 2);
         assert!(animations.iter().any(|a| a.name == "idle"));
