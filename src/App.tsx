@@ -18,6 +18,7 @@ import { useVoice } from "./hooks/useVoice";
 import { useWindow } from "./hooks/useWindow";
 import {
   getConfig,
+  saveConfig,
   listCharacters,
   listModels,
   getExpressions,
