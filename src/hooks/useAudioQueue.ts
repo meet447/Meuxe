@@ -154,8 +154,9 @@ export function useAudioQueue() {
     } finally {
       playingRef.current = false;
       setSpeaking(false);
-      setSpeakingSentence(null);
-      onExpressionChangeRef.current?.(neutralExpressionRef.current);
+      // Keep the last caption and face until the next user turn. Resetting to
+      // idle here made the avatar go blank the instant TTS (or the no-TTS hold)
+      // finished, which is how most replies look in the desktop app.
       if (queueRef.current.peekNext().kind !== "wait") {
         queueMicrotask(() => processQueueRef.current());
       }

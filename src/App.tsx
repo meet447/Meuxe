@@ -493,6 +493,7 @@ function App() {
       clearQueue();
       setCurrentExpression("neutral");
       setZoom(1.1);
+      saveConfig({ active_character: id }).catch(console.error);
     },
     [setMessages, clearQueue]
   );
@@ -511,6 +512,7 @@ function App() {
       setCurrentExpression("neutral");
       setZoom(1.1);
       setSettingsOpen(false);
+      saveConfig({ active_character: characterId }).catch(console.error);
     },
     [refreshCharacters, setMessages, clearQueue]
   );
@@ -562,11 +564,11 @@ function App() {
   const charName = selectedChar?.name || "Companion";
 
   const spokenCaption = useMemo(() => {
-    if (speaking && speakingSentence?.trim()) {
+    if (speakingSentence?.trim()) {
       return cleanCompanionDisplayText(speakingSentence);
     }
     return null;
-  }, [speaking, speakingSentence]);
+  }, [speakingSentence]);
 
   // Mini mode: render just the avatar in MiniWidget
   if (isMiniMode) {

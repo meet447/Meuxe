@@ -108,4 +108,26 @@ describe("useAudioQueue", () => {
     expect(onAudioDone).toHaveBeenCalledWith("r1");
     expect(FakeAudio.instances).toHaveLength(0);
   });
+
+  it("keeps the last caption and expression after a no-audio reply", async () => {
+    const onExpression = vi.fn();
+    const { result } = renderHook(() => useAudioQueue());
+
+    act(() => {
+      result.current.setOnExpressionChange(onExpression);
+      result.current.beginRequest("r1");
+      result.current.addSentence("r1", sentence(0));
+      result.current.failAudio("r1", 0);
+      result.current.markTextDone("r1");
+    });
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(result.current.speakingSentence).toBe("sentence-0");
+    expect(result.current.speaking).toBe(false);
+    expect(onExpression).toHaveBeenCalledWith("expr-0");
+    expect(onExpression).not.toHaveBeenCalledWith("neutral");
+  });
 });

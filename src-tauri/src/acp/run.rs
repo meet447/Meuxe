@@ -224,6 +224,8 @@ pub async fn run_acp_chat_stream(params: RunAcpChatStreamParams) -> Result<(), S
     let model_id_session = model_id.clone();
     let tts_config_session = tts_config.clone();
     let agent_prompt_send = agent_prompt.clone();
+    let starting_expression =
+        meuxe_core::expressions::canonical_expression(&memory_snapshot.bond.bond.mood.name);
 
     Client
         .builder()
@@ -257,6 +259,7 @@ pub async fn run_acp_chat_stream(params: RunAcpChatStreamParams) -> Result<(), S
             let user_id = user_id.clone();
             let companion_home = companion_home.clone();
             let agent_prompt_send = agent_prompt_send.clone();
+            let starting_expression = starting_expression.clone();
 
             async move {
                 connection
@@ -272,7 +275,7 @@ pub async fn run_acp_chat_stream(params: RunAcpChatStreamParams) -> Result<(), S
                         let mut tts_buffer = String::new();
                         let mut splitter = meuxe_core::memory::TrailerSplitter::new();
                         let mut sentence_index = 0u32;
-                        let mut current_expression = "neutral".to_string();
+                        let mut current_expression = starting_expression.clone();
 
                         session.send_prompt(&agent_prompt_send)?;
 
