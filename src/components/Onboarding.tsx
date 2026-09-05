@@ -415,6 +415,10 @@ export function Onboarding({ onComplete }: { onComplete: () => void }) {
 
       {step === 3 && (
         <>
+          <Notice tone="success" className="mb-4">
+            Meuxe TTS is built in and free — ready to use with no API key. ElevenLabs and OpenAI are optional if you want studio voices.
+          </Notice>
+
           <div className="mb-4 grid grid-cols-1 gap-2.5 sm:grid-cols-3">
             {Object.entries(ttsPresets).map(([id, preset]) => (
               <ChoiceCard

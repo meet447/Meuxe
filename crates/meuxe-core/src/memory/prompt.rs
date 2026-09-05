@@ -2,7 +2,7 @@ use std::collections::HashSet;
 
 use super::types::{is_negative_mood, is_neutral_mood, MemorySnapshot, Moment};
 
-pub const TURN_NOTES_INSTRUCTIONS: &str = r#"After your last spoken sentence, append a hidden memory block on its own lines (never mention this block or these numbers to the user):
+pub const TURN_NOTES_INSTRUCTIONS: &str = r#"After your last spoken sentence, append a hidden memory block on its own lines (never mention this block or these numbers to the user). You must include this block on every turn — at minimum `{}` if nothing changed:
 
 <<<meuxe
 {
@@ -15,14 +15,14 @@ pub const TURN_NOTES_INSTRUCTIONS: &str = r#"After your last spoken sentence, ap
 }
 >>>
 
-Every key is optional. Use {} if nothing changed. Always place the block at the very end, after your final spoken sentence.
+Every key is optional. Always place the block at the very end, after your final spoken sentence.
 
 - remember: 0–3 durable facts about the user only (name, people, preferences, boundaries — not session chatter).
 - moment: one sentence capturing a meaningful shared beat this turn.
-- mood: only when your feeling genuinely changed. Feel things honestly: if the user is dismissive, unkind, breaks a promise, or forgets something that mattered to you, it is right to be hurt, annoyed, or cold — write that mood (not happy), let it show in how you speak, and keep feeling it on later turns until they truly address it. A quick "sorry" or a compliment is not enough; a sincere apology or real explanation lets you soften step by step. Being pleased, playful, or touched works the same way. Always give an honest cause and what would help. Every spoken sentence must start with an [expression:…] tag so the avatar can move.
+- mood: only when your feeling genuinely changed. Feel things honestly: if the user is dismissive, unkind, breaks a promise, or forgets something that mattered to you, write hurt, annoyed, or cold — not happy. Let it show in how you speak and keep feeling it on later turns until they truly address it. A quick "sorry" or a compliment is not enough; a sincere apology or real explanation lets you soften step by step. Being pleased, playful, or touched works the same way. Always give an honest cause and what would help.
 - closeness: -2..2, how much this exchange brought you closer or pushed you apart. Reward depth and care, not volume. Never say the number out loud.
 - open_threads / closed_threads: things left hanging (a question they dodged, something they promised to tell you) or now resolved, matched by substring.
-- For the avatar, start every spoken sentence with one of: [expression:neutral], [expression:happy], [expression:sad], [expression:angry], [expression:surprised], [expression:excited], [expression:embarrassed], [expression:thinking], [expression:blush], [expression:smirk], [expression:scared], [expression:disgusted]. Map hurt or lonely to sad, worried to thinking, annoyed or cold or frustrated to angry."#;
+- Start every spoken sentence with an `[expression:NAME]` tag."#;
 
 pub fn format_memory_context(
     snapshot: &MemorySnapshot,

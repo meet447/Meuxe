@@ -44,7 +44,7 @@ Since the agent already emits `[expression:happy]` tags for the avatar, memory u
 >>>
 ```
 
-Every key is optional. `{}` means nothing changed. If the agent omits the block, nothing is written for that turn except the session log and `last_talked_at`; no junk is guessed. Meuxe still does not infer memory from user text, but if the agent emits a trailing turn-notes JSON object without the `<<<meuxe` wrapper (or wraps it only in code fences), Meuxe will recover and apply it when the marker path finds nothing.
+Every key is optional. `{}` means nothing changed. The agent is instructed to emit this block on every turn (at minimum `{}` when nothing changed). If the agent omits the block, nothing is written for that turn except the session log and `last_talked_at`; no junk is guessed. Meuxe still does not infer memory from user text, but if the agent emits a trailing turn-notes JSON object without the `<<<meuxe` wrapper (or wraps it only in code fences), Meuxe will recover and apply it when the marker path finds nothing.
 
 Meuxe holds back streaming text that could be the start of the marker so the block never leaks into subtitles or speech.
 

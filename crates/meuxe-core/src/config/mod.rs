@@ -148,6 +148,25 @@ mod tests {
         assert_eq!(config.user.name, "");
         assert!(!config.onboarding_complete);
         assert!(config.llm_providers.is_empty());
+        assert_eq!(config.tts.provider, "tiktok");
+        assert_eq!(config.tts.voice, "en_us_001");
+        assert_eq!(config.tts.api_key, None);
+    }
+
+    #[test]
+    fn test_tts_config_defaults() {
+        let tts = TtsConfig::default();
+        assert_eq!(tts.provider, "tiktok");
+        assert_eq!(tts.voice, "en_us_001");
+        assert_eq!(tts.api_key, None);
+    }
+
+    #[test]
+    fn test_tts_config_deserialize_empty_applies_defaults() {
+        let tts: TtsConfig = serde_json::from_str("{}").unwrap();
+        assert_eq!(tts.provider, "tiktok");
+        assert_eq!(tts.voice, "en_us_001");
+        assert_eq!(tts.api_key, None);
     }
 
     #[test]

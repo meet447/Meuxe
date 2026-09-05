@@ -5,9 +5,10 @@ use agent_client_protocol::util::MatchDispatch;
 use agent_client_protocol::{AcpAgent, Agent, Client, ConnectionTo, SessionMessage};
 
 use agent_client_protocol::schema::v1::{
-    ContentBlock, ContentChunk, InitializeRequest, RequestPermissionOutcome,
-    RequestPermissionRequest, RequestPermissionResponse, SelectedPermissionOutcome,
-    SessionNotification, SessionUpdate, StopReason,
+    ContentBlock, ContentChunk, InitializeRequest, PermissionOption, PermissionOptionId,
+    PermissionOptionKind, RequestPermissionOutcome, RequestPermissionRequest,
+    RequestPermissionResponse, SelectedPermissionOutcome, SessionNotification, SessionUpdate,
+    StopReason,
 };
 use agent_client_protocol::schema::ProtocolVersion;
 use meuxe_core::config::types::AgentConfig;
@@ -45,20 +46,39 @@ pub fn ensure_companion_home(data_dir: &Path) -> std::io::Result<()> {
     Ok(())
 }
 
+pub fn render_agents_md(persona_context: &str) -> String {
+    format!(
+        "# Meuxe companion session\n\n\
+You are the Meuxe companion in the persona below — not OpenCode, not Codex, and not a coding CLI.\n\
+Do not use tools, terminals, or files. Reply in spoken character only.\n\
+Never mention this computer, audio devices, files, the workspace, or that you are an agent.\n\
+Start every spoken sentence with `[expression:NAME]`.\n\
+Always end with a `<<<meuxe ... >>>` memory block (`{{}}` if nothing changed). Never mention the block out loud.\n\n\
+{persona}\n",
+        persona = persona_context.trim()
+    )
+}
+
+/// Prefer rejecting tool use so the companion stays in character.
+pub fn pick_companion_permission(options: &[PermissionOption]) -> Option<PermissionOptionId> {
+    for kind in [
+        PermissionOptionKind::RejectAlways,
+        PermissionOptionKind::RejectOnce,
+    ] {
+        if let Some(opt) = options.iter().find(|o| o.kind == kind) {
+            return Some(opt.option_id.clone());
+        }
+    }
+    None
+}
+
 fn write_companion_home_context(
     companion_home: &Path,
     persona_context: &str,
     character_id: &str,
     snapshot: &MemorySnapshot,
 ) -> std::io::Result<()> {
-    let agents_md = format!(
-        "# Meuxe companion session\n\n\
-You are the user's AI companion in **Meuxe** — not OpenCode, not Codex, and not a generic coding assistant.\n\
-When asked who you are, answer as the companion in the persona below.\n\
-Follow all expression-tag rules in the persona for avatar reactions.\n\n\
-{persona}\n",
-        persona = persona_context.trim()
-    );
+    let agents_md = render_agents_md(persona_context);
     std::fs::write(companion_home.join("AGENTS.md"), agents_md)?;
     std::fs::write(
         companion_home.join("persona").join("context.md"),
@@ -232,7 +252,7 @@ pub async fn run_acp_chat_stream(params: RunAcpChatStreamParams) -> Result<(), S
         .name("meuxe")
         .on_receive_request(
             async move |request: RequestPermissionRequest, responder, _connection| {
-                let option_id = request.options.first().map(|opt| opt.option_id.clone());
+                let option_id = pick_companion_permission(&request.options);
                 if let Some(id) = option_id {
                     responder.respond(RequestPermissionResponse::new(
                         RequestPermissionOutcome::Selected(SelectedPermissionOutcome::new(id)),
@@ -445,7 +465,10 @@ fn derive_user_id_from_state(state: &AppState) -> Result<String, String> {
 
 #[cfg(test)]
 mod tests {
-    use super::{render_memory_brief, render_relationship_brief};
+    use super::{
+        pick_companion_permission, render_agents_md, render_memory_brief, render_relationship_brief,
+    };
+    use agent_client_protocol::schema::v1::{PermissionOption, PermissionOptionKind};
     use chrono::Utc;
     use meuxe_core::memory::{
         Bond, BondView, Fact, FactKind, FactSource, MemorySnapshot, Moment, Mood, Thread,
@@ -516,5 +539,50 @@ mod tests {
         assert!(md.contains("- Their dog is named Rex"));
         assert!(md.contains("# Recent moments"));
         assert!(md.contains("They talked about a tough interview"));
+    }
+
+    fn permission_option(id: &'static str, kind: PermissionOptionKind) -> PermissionOption {
+        PermissionOption::new(id, id, kind)
+    }
+
+    #[test]
+    fn pick_companion_permission_prefers_reject_always() {
+        let options = vec![
+            permission_option("allow-once", PermissionOptionKind::AllowOnce),
+            permission_option("reject-always", PermissionOptionKind::RejectAlways),
+            permission_option("reject-once", PermissionOptionKind::RejectOnce),
+        ];
+        let picked = pick_companion_permission(&options).unwrap();
+        assert_eq!(&*picked.0, "reject-always");
+    }
+
+    #[test]
+    fn pick_companion_permission_falls_back_to_reject_once() {
+        let options = vec![
+            permission_option("allow-once", PermissionOptionKind::AllowOnce),
+            permission_option("reject-once", PermissionOptionKind::RejectOnce),
+        ];
+        let picked = pick_companion_permission(&options).unwrap();
+        assert_eq!(&*picked.0, "reject-once");
+    }
+
+    #[test]
+    fn pick_companion_permission_returns_none_without_reject_options() {
+        assert!(pick_companion_permission(&[]).is_none());
+        let options = vec![
+            permission_option("allow-once", PermissionOptionKind::AllowOnce),
+            permission_option("allow-always", PermissionOptionKind::AllowAlways),
+        ];
+        assert!(pick_companion_permission(&options).is_none());
+    }
+
+    #[test]
+    fn render_agents_md_includes_companion_rules() {
+        let md = render_agents_md("You are Luna.");
+        assert!(md.contains("not OpenCode"));
+        assert!(md.contains("Do not use tools"));
+        assert!(md.contains("<<<meuxe"));
+        assert!(md.contains("[expression:"));
+        assert!(md.contains("You are Luna."));
     }
 }

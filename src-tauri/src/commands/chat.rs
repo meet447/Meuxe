@@ -107,6 +107,15 @@ pub(crate) fn build_acp_agent_prompt(
     parts.push("## Current user message".to_string());
     parts.push(user_message.trim().to_string());
 
+    parts.push(String::new());
+    parts.push("## How to reply".to_string());
+    parts.push(
+        "Stay in character. Do not use tools. Do not mention this computer, OpenCode, files, or audio devices."
+            .to_string(),
+    );
+    parts.push("Start every spoken sentence with `[expression:NAME]`.".to_string());
+    parts.push("End with a `<<<meuxe ... >>>` block (`{}` if nothing changed).".to_string());
+
     parts.join("\n")
 }
 
@@ -709,6 +718,10 @@ mod tests {
         assert!(prompt.contains("Companion: Hey!"));
         assert!(prompt.contains("Who are you?"));
         assert!(prompt.contains("not OpenCode"));
+        assert!(prompt.contains("## How to reply"));
+        assert!(prompt.contains("Do not use tools"));
+        assert!(prompt.contains("[expression:NAME]"));
+        assert!(prompt.contains("<<<meuxe"));
     }
 
     #[tokio::test]

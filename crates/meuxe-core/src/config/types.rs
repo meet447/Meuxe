@@ -69,14 +69,32 @@ pub struct LlmConfig {
     pub model: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+fn default_tts_provider() -> String {
+    "tiktok".to_string()
+}
+
+fn default_tts_voice() -> String {
+    "en_us_001".to_string()
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TtsConfig {
-    #[serde(default)]
+    #[serde(default = "default_tts_provider")]
     pub provider: String,
     #[serde(default)]
     pub api_key: Option<String>,
-    #[serde(default)]
+    #[serde(default = "default_tts_voice")]
     pub voice: String,
+}
+
+impl Default for TtsConfig {
+    fn default() -> Self {
+        Self {
+            provider: default_tts_provider(),
+            api_key: None,
+            voice: default_tts_voice(),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]

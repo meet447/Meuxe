@@ -489,7 +489,9 @@ export function Settings({
           )}
 
           {!SETTINGS_TTS_PRESETS[ttsProvider]?.needs_key && (
-            <Notice tone="success">The built-in voice works right away. No account or key needed.</Notice>
+            <Notice tone="success">
+              Meuxe TTS is the default — built in and free, with no account or API key needed.
+            </Notice>
           )}
 
           <Field label="Voice">
