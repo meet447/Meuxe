@@ -1,7 +1,7 @@
 import { useState, useRef, useCallback, useMemo } from "react";
 import { listen, UnlistenFn } from "@tauri-apps/api/event";
 import { sendChat } from "../api/tauri";
-import type { ChatTimelineItem, ToolCallStatus } from "../types";
+import type { ChatTimelineItem, MemorySnapshot, ToolCallStatus } from "../types";
 
 interface Message {
   role: "user" | "assistant";
@@ -24,7 +24,7 @@ interface AudioPayload {
 
 interface DonePayload {
   request_id: string;
-  state_update: unknown;
+  state_update: MemorySnapshot | null;
 }
 
 interface AudioFailedPayload {

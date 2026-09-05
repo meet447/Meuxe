@@ -73,7 +73,7 @@ const PAGE_META: Record<SettingsPage, { title: string; description: string }> = 
   },
   memory: {
     title: "Memory",
-    description: "What your companion remembers locally.",
+    description: "How your companion feels about you, and what they remember.",
   },
   profile: {
     title: "Your profile",

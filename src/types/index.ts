@@ -26,95 +26,72 @@ export type ChatTimelineItem =
   | { id: string; kind: "assistant"; text: string; expression?: string }
   | { id: string; kind: "tool"; call: ToolCallStatus };
 
-export interface MemoryRecord {
+export type MemoryFactKind =
+  | "identity"
+  | "people"
+  | "preference"
+  | "life"
+  | "work"
+  | "boundary"
+  | "other";
+
+export type MemoryFactSource = "agent" | "user" | "legacy";
+
+export interface MemoryFact {
   id: string;
-  ts: string;
-  character_id?: string;
-  type: "episodic" | "semantic" | "reflections" | string;
-  summary: string;
-  importance: number;
-  tags: string[];
-  source_kind?: string;
-  source_id?: string | null;
-  provenance?: string | null;
-  pinned?: boolean;
-  topic?: string | null;
-  metadata?: Record<string, unknown>;
+  text: string;
+  kind: MemoryFactKind;
+  created_at: string;
+  confirmed_at: string;
+  mentions: number;
+  source: MemoryFactSource;
 }
 
-export interface MemorySourceRecord {
+export interface MemoryMoment {
   id: string;
-  ts: string;
-  character_id: string;
-  source_kind: string;
-  title: string;
-  content_hash: string;
-  metadata?: Record<string, unknown>;
-}
-
-export interface TopicSummary {
-  topic: string;
-  count: number;
+  at: string;
   summary: string;
-  latest_at?: string | null;
+  feeling?: string | null;
+  weight: number;
 }
 
-export interface ComposioToolkitStatus {
-  slug: string;
+export interface CompanionMood {
   name: string;
-  connected: boolean;
-  status: string;
-  auth_config_id?: string | null;
-  connected_account_id?: string | null;
-  redirect_url?: string | null;
-  last_sync_at?: string | null;
+  intensity: number;
+  cause?: string | null;
+  wants?: string | null;
+  since: string;
 }
 
-export interface ComposioAuthorizeResult {
-  toolkit: string;
-  auth_config_id: string;
-  connected_account_id: string;
-  redirect_url: string;
-  status: string;
+export interface CompanionThread {
+  id: string;
+  text: string;
+  opened_at: string;
 }
 
-export interface RelationshipSnapshot {
-  character_id: string;
-  user_id: string;
-  mood: string;
-  trust: number;
-  affection: number;
-  energy: number;
-  relationship_summary: string;
+export type BondStage =
+  | "just met"
+  | "getting to know each other"
+  | "friends"
+  | "close"
+  | "inseparable";
+
+export interface CompanionBond {
+  closeness: number;
+  stage: BondStage;
+  mood: CompanionMood;
+  threads: CompanionThread[];
+  last_talked_at?: string | null;
+  seconds_since_last_talk?: number | null;
+  turns: number;
   updated_at: string;
 }
 
-export interface MemoryVaultOverview {
-  total_memories: number;
-  total_sources: number;
-  total_dreams: number;
-  semantic_count: number;
-  episodic_count: number;
-  reflection_count: number;
-  latest_memory_at?: string | null;
-  latest_dream_at?: string | null;
-  vault_path: string;
-  database_path: string;
-  relationship?: RelationshipSnapshot | null;
-  pinned_count?: number;
-  topic_count?: number;
-  latest_source_at?: string | null;
-}
-
-export interface DreamRun {
-  id: string;
-  character_id: string;
-  user_id: string;
-  status: string;
-  summary: string;
-  started_at: string;
-  finished_at?: string | null;
-  error?: string | null;
+export interface MemorySnapshot {
+  bond: CompanionBond;
+  facts: MemoryFact[];
+  moments: MemoryMoment[];
+  memory_dir: string;
 }
 
 export interface ModelMapping {
