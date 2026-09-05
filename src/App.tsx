@@ -13,7 +13,7 @@ import { Onboarding } from "./components/Onboarding";
 import { Settings } from "./components/Settings";
 import { MiniWidget } from "./components/MiniWidget";
 import { useChat, cleanCompanionDisplayText } from "./hooks/useChat";
-import { useAudioQueue } from "./hooks/useAudioQueue";
+import { unlockAudioPlayback, useAudioQueue } from "./hooks/useAudioQueue";
 import { useVoice } from "./hooks/useVoice";
 import { useWindow } from "./hooks/useWindow";
 import {
@@ -443,12 +443,23 @@ function App() {
   const handleSend = useCallback(
     async (text: string) => {
       if (!selectedCharId || !expressionsConfigured) return;
+      unlockAudioPlayback();
       const requestId = crypto.randomUUID();
       beginRequest(requestId);
       await send(selectedCharId, text, requestId);
     },
     [selectedCharId, expressionsConfigured, send, beginRequest]
   );
+
+  useEffect(() => {
+    const unlock = () => unlockAudioPlayback();
+    document.addEventListener("pointerdown", unlock, { once: true });
+    document.addEventListener("keydown", unlock, { once: true });
+    return () => {
+      document.removeEventListener("pointerdown", unlock);
+      document.removeEventListener("keydown", unlock);
+    };
+  }, []);
 
   useEffect(() => {
     if (!selectedCharId) return;

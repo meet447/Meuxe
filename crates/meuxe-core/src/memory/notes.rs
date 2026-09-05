@@ -179,9 +179,124 @@ fn strip_code_fences(text: &str) -> String {
         .to_string()
 }
 
+const TURN_NOTE_KEYS: &[&str] = &[
+    "remember",
+    "moment",
+    "mood",
+    "closeness",
+    "open_threads",
+    "closed_threads",
+];
+
+fn looks_like_turn_notes_json(json: &str) -> bool {
+    let value: serde_json::Value = match serde_json::from_str(json) {
+        Ok(v) => v,
+        Err(_) => return false,
+    };
+    let Some(obj) = value.as_object() else {
+        return false;
+    };
+    TURN_NOTE_KEYS.iter().any(|key| obj.contains_key(*key))
+}
+
+fn find_last_json_object(text: &str) -> Option<(usize, usize)> {
+    let mut end = None;
+    for (idx, ch) in text.char_indices().rev() {
+        if ch == '}' {
+            end = Some(idx);
+            break;
+        }
+    }
+    let end = end?;
+    let mut depth = 0;
+    let mut start = None;
+    for (idx, ch) in text[..=end].char_indices().rev() {
+        match ch {
+            '}' => depth += 1,
+            '{' => {
+                depth -= 1;
+                if depth == 0 {
+                    start = Some(idx);
+                    break;
+                }
+            }
+            _ => {}
+        }
+    }
+    Some((start?, end + 1))
+}
+
+fn strip_trailer_wrapper(text: &mut String, json_start: usize, json_end: usize) {
+    let before = &text[..json_start];
+    let after = &text[json_end..];
+
+    let mut visible = String::new();
+    visible.push_str(before.trim_end());
+
+    if let Some(marker_pos) = before.rfind(MARKER) {
+        visible.truncate(marker_pos);
+        strip_dangling_fence_suffix(&mut visible);
+    } else {
+        strip_dangling_fence_suffix(&mut visible);
+    }
+
+    let mut tail = after.trim_start();
+    if let Some(rest) = tail.strip_prefix(">>>") {
+        tail = rest.trim_start();
+    }
+    if !tail.is_empty() {
+        if !visible.is_empty() && !visible.ends_with('\n') {
+            visible.push('\n');
+        }
+        visible.push_str(tail);
+    }
+
+    *text = visible.trim_end().to_string();
+}
+
+/// Recover a turn-notes JSON object when the agent omitted the `<<<meuxe` wrapper.
+pub fn recover_turn_notes_from_reply(text: &str) -> Option<(String, String)> {
+    let (start, end) = find_last_json_object(text)?;
+    let json = &text[start..end];
+    if !looks_like_turn_notes_json(json) {
+        return None;
+    }
+    let mut visible = text.to_string();
+    strip_trailer_wrapper(&mut visible, start, end);
+    Some((visible, json.to_string()))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn recover_trailing_json_without_marker() {
+        let reply = r#"That sounds lovely!
+{ "remember": ["Rex is a corgi"], "mood": "happy" }"#;
+        let (visible, trailer) = recover_turn_notes_from_reply(reply).unwrap();
+        assert_eq!(visible, "That sounds lovely!");
+        let notes = parse_turn_notes(&trailer).unwrap();
+        assert_eq!(notes.remember, vec!["Rex is a corgi"]);
+        assert_eq!(notes.mood.unwrap().name, "happy");
+    }
+
+    #[test]
+    fn recover_does_not_strip_ordinary_braces() {
+        let reply = "I think {braces} in prose are fine.";
+        assert!(recover_turn_notes_from_reply(reply).is_none());
+    }
+
+    #[test]
+    fn recover_still_parses_meuxe_marker_path() {
+        let mut splitter = TrailerSplitter::new();
+        let visible = splitter.feed("Sure thing.\n<<<meuxe\n{\"remember\":[\"x\"]}\n>>>");
+        assert_eq!(visible, "Sure thing.");
+        let (rest, trailer) = splitter.finish();
+        assert_eq!(rest, "");
+        let notes = parse_turn_notes(trailer.as_deref().unwrap()).unwrap();
+        assert_eq!(notes.remember, vec!["x"]);
+    }
 
     #[test]
     fn trailer_split_across_chunks() {

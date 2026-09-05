@@ -5,6 +5,29 @@ import { useAudioAnalyser } from "./useAudioAnalyser";
 
 export type { SentenceTask } from "../audio/orderedAudioQueue";
 
+const SILENT_WAV =
+  "data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAESsAACJWAAACABAAZGF0YQAAAAA=";
+
+let audioUnlocked = false;
+
+/** Call from a user gesture so WebKit will play later TTS chunks. */
+export function unlockAudioPlayback() {
+  if (audioUnlocked || typeof Audio === "undefined") return;
+  const probe = new Audio(SILENT_WAV);
+  probe.muted = true;
+  const attempt = probe.play();
+  if (attempt) {
+    void attempt
+      .then(() => {
+        probe.pause();
+        audioUnlocked = true;
+      })
+      .catch(() => {
+        /* next gesture will retry */
+      });
+  }
+}
+
 function captionHoldMs(text: string): number {
   const words = text.trim().split(/\s+/).filter(Boolean).length;
   return Math.min(4000, Math.max(1400, words * 280));
@@ -92,18 +115,22 @@ export function useAudioQueue() {
         document.addEventListener("keydown", resumePlay, { once: true });
       };
 
-      audio.play().catch((error) => {
-        console.warn("[AudioQueue] Autoplay blocked, trying muted fallback:", error);
-        audio.muted = true;
-        audio.play().then(() => {
-          audio.currentTime = 0;
-          audio.muted = false;
-        }).catch((fallbackError) => {
-          console.warn("[AudioQueue] Muted autoplay fallback failed:", fallbackError);
-          audio.muted = false;
-          waitForInteraction();
+      const tryPlay = () =>
+        audio.play().catch((error) => {
+          console.warn("[AudioQueue] Autoplay blocked, trying muted fallback:", error);
+          unlockAudioPlayback();
+          audio.muted = true;
+          audio.play().then(() => {
+            audio.currentTime = 0;
+            audio.muted = false;
+          }).catch((fallbackError) => {
+            console.warn("[AudioQueue] Muted autoplay fallback failed:", fallbackError);
+            audio.muted = false;
+            waitForInteraction();
+          });
         });
-      });
+
+      tryPlay();
     });
   }, []);
 

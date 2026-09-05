@@ -30,5 +30,8 @@ chrono = { version = "0.4", features = ["serde"] }
 agent-client-protocol = "2"
 shell-words = "1.1.1"
 
+[target.'cfg(target_os = "linux")'.dependencies]
+webkit2gtk = { version = "2.0.2", default-features = false, features = ["v2_40"] }
+
 [dev-dependencies]
 tempfile = "3"

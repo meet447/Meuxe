@@ -83,6 +83,22 @@ fn load_whisper_model(data_dir: &Path) -> Option<Arc<WhisperContext>> {
     None
 }
 
+fn allow_webview_autoplay(app: &mut tauri::App) {
+    #[cfg(target_os = "linux")]
+    {
+        use tauri::Manager;
+        if let Some(window) = app.get_webview_window("main") {
+            let _ = window.with_webview(|webview| {
+                use webkit2gtk::{SettingsExt, WebViewExt};
+                if let Some(settings) = webview.inner().settings() {
+                    settings.set_media_playback_requires_user_gesture(false);
+                }
+            });
+        }
+    }
+    let _ = app;
+}
+
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
@@ -114,6 +130,8 @@ pub fn run() {
 
             // Setup system tray
             tray::setup_tray(app.handle()).expect("Failed to setup tray");
+
+            allow_webview_autoplay(app);
 
             Ok(())
         })

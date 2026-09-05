@@ -31,7 +31,7 @@ See `package.json` scripts and the CI workflow at `.github/workflows/ci.yml`.
 - **Frontend build:** `npm run build` (tsc + vite build)
 - **Rust format check:** `cargo fmt --all -- --check`
 - **Rust lint:** `cargo clippy --workspace --all-targets -- -D warnings`
-- **Rust tests:** `cargo test --workspace` (67 tests across meuxe-core and tauri crate)
+- **Rust tests:** `cargo test --workspace` (72 tests across meuxe-core and tauri crate)
 
 ### Rust build environment variables
 

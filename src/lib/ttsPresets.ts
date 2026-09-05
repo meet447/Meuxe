@@ -25,3 +25,4 @@ export const TTS_PRESETS_UI: Record<string, TtsPresetUi> = {
 };
 
 export const DEFAULT_TTS_PROVIDER = "tiktok";
+export const DEFAULT_TTS_VOICE = "en_us_001";

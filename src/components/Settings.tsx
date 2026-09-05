@@ -10,7 +10,7 @@ import {
   getVoices,
 } from "../api/tauri";
 import { ACP_AGENT_PRESET_IDS } from "../lib/agentPresets";
-import { DEFAULT_TTS_PROVIDER, TTS_PRESETS_UI } from "../lib/ttsPresets";
+import { DEFAULT_TTS_PROVIDER, DEFAULT_TTS_VOICE, TTS_PRESETS_UI } from "../lib/ttsPresets";
 import { AgentPresetCard } from "./agents/AgentPresetCard";
 import { AgentSetupPanel } from "./agents/AgentSetupPanel";
 import { AvatarViewportSettings } from "./settings/AvatarViewportSettings";
@@ -202,7 +202,7 @@ export function Settings({
   const [userAbout, setUserAbout] = useState("");
   const [ttsProvider, setTtsProvider] = useState(DEFAULT_TTS_PROVIDER);
   const [ttsApiKey, setTtsApiKey] = useState("");
-  const [ttsVoice, setTtsVoice] = useState("jp_001");
+  const [ttsVoice, setTtsVoice] = useState(DEFAULT_TTS_VOICE);
   const [agentPreset, setAgentPreset] = useState("opencode");
   const [agentProgram, setAgentProgram] = useState("");
   const [agentArgs, setAgentArgs] = useState("");
@@ -240,7 +240,7 @@ export function Settings({
         setUserAbout(cfg.user?.about || "");
         setTtsProvider(cfg.tts?.provider || DEFAULT_TTS_PROVIDER);
         setTtsApiKey("");
-        setTtsVoice(cfg.tts?.voice || "jp_001");
+        setTtsVoice(cfg.tts?.voice || DEFAULT_TTS_VOICE);
         setAgentPreset(cfg.agent?.preset || "opencode");
         setAgentProgram(cfg.agent?.program || "");
         setAgentArgs((cfg.agent?.args || []).join(" "));

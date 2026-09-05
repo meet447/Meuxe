@@ -340,10 +340,22 @@ pub async fn run_acp_chat_stream(params: RunAcpChatStreamParams) -> Result<(), S
                             }
                         }
 
-                        let (rest, trailer) = splitter.finish();
+                        let (rest, mut trailer) = splitter.finish();
                         if !rest.is_empty() {
                             accumulated.push_str(&rest);
                             tts_buffer.push_str(&rest);
+                        }
+
+                        if trailer.is_none() {
+                            if let Some((visible, recovered)) =
+                                meuxe_core::memory::recover_turn_notes_from_reply(&accumulated)
+                            {
+                                if let Some(pos) = tts_buffer.find(&recovered) {
+                                    tts_buffer.truncate(pos);
+                                }
+                                accumulated = visible;
+                                trailer = Some(recovered);
+                            }
                         }
 
                         if !accumulated.trim().is_empty() {
