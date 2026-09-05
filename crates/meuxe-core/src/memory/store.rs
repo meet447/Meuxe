@@ -523,13 +523,7 @@ fn apply_mood_decay(bond: &mut Bond, now: DateTime<Utc>) -> bool {
                 }
             }
         }
-        bond.mood = Mood {
-            name: "neutral".to_string(),
-            intensity: 0.0,
-            cause: None,
-            wants: None,
-            since: now,
-        };
+        bond.mood = neutral_mood(now);
         return true;
     }
 
@@ -540,6 +534,16 @@ fn apply_mood_decay(bond: &mut Bond, now: DateTime<Utc>) -> bool {
     }
 
     false
+}
+
+fn neutral_mood(now: DateTime<Utc>) -> Mood {
+    Mood {
+        name: "neutral".to_string(),
+        intensity: 0.0,
+        cause: None,
+        wants: None,
+        since: now,
+    }
 }
 
 fn apply_missed_you(bond: &mut Bond, now: DateTime<Utc>) -> bool {
@@ -596,6 +600,15 @@ fn apply_mood_note(mood: &mut Mood, note: &MoodNote, now: DateTime<Utc>) -> bool
     if current_negative && !proposed_negative {
         mood.intensity = (mood.intensity - NO_FORGIVENESS_DROP).max(0.0);
         mood.since = now;
+        if mood.intensity < MOOD_FADE_THRESHOLD {
+            // Thawed all the way: this was addressed, so no "never got closure" thread.
+            *mood = neutral_mood(now);
+        }
+        return true;
+    }
+
+    if is_neutral_mood(&note.name) {
+        *mood = neutral_mood(now);
         return true;
     }
 
@@ -699,7 +712,8 @@ fn enforce_fact_cap(facts: &mut Vec<Fact>) {
 }
 
 fn normalize_fact_text(text: &str) -> String {
-    let re = Regex::new(r"[^a-z0-9 ]+").unwrap();
+    static RE: std::sync::OnceLock<Regex> = std::sync::OnceLock::new();
+    let re = RE.get_or_init(|| Regex::new(r"[^a-z0-9 ]+").expect("invalid regex"));
     let lower = text.to_ascii_lowercase();
     let stripped = re.replace_all(&lower, " ");
     collapse_whitespace(&stripped)

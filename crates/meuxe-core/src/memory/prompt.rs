@@ -28,6 +28,14 @@ pub fn format_memory_context(
     user_message: &str,
 ) -> String {
     let mut out = String::new();
+    // Ages are relative to the real clock, not the bond's last write time.
+    let now = snapshot
+        .bond
+        .bond
+        .last_talked_at
+        .zip(snapshot.bond.seconds_since_last_talk)
+        .map(|(last, secs)| last + chrono::Duration::seconds(secs))
+        .unwrap_or_else(chrono::Utc::now);
 
     out.push_str("## How you feel right now\n");
     out.push_str(&format!(
@@ -48,7 +56,7 @@ pub fn format_memory_context(
         out.push_str(&format!(
             "The last thing you remember together: \"{}\" ({}).\n",
             last.summary,
-            relative_time_from_datetime(last.at, snapshot.bond.bond.updated_at)
+            relative_time_from_datetime(last.at, now)
         ));
     }
 
@@ -115,7 +123,7 @@ pub fn format_memory_context(
                 .unwrap_or_default();
             let line = format!(
                 "- {} — {}{}\n",
-                relative_time_from_datetime(moment.at, snapshot.bond.bond.updated_at),
+                relative_time_from_datetime(moment.at, now),
                 moment.summary,
                 feeling
             );
