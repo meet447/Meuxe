@@ -14,6 +14,9 @@
   <a href="https://v2.tauri.app/"><img alt="Built with Tauri 2" src="https://img.shields.io/badge/built%20with-Tauri%202-24C8DB.svg"></a>
 </p>
 
+> [!WARNING]
+> **Early development.** Reddit Copilot is actively changing. Expect rough edges, breaking config/API changes, and incomplete features. Feedback and issues are welcome — production use is at your own risk.
+
 <p align="center">
   <a href="docs/DIRECTION.md">Direction</a> · <a href="docs/ROADMAP.md">Roadmap</a> · <a href="docs/DESIGN.md">Design</a> · <a href="docs/acp-agents.md">Agents</a> · <a href="CONTRIBUTING.md">Contributing</a>
 </p>
