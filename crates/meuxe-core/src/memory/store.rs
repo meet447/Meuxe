@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::io::BufRead;
 use std::path::{Path, PathBuf};
-use std::sync::RwLock;
+use std::sync::{Mutex, PoisonError, RwLock};
 use uuid::Uuid;
 
 use crate::fs_util::write_atomic;
@@ -50,10 +50,18 @@ struct LegacyMemory {
     metadata: serde_json::Value,
 }
 
+#[derive(Debug, Clone)]
+struct CachedCompanion {
+    bond: Bond,
+    facts: Vec<Fact>,
+    moments: Vec<Moment>,
+}
+
 /// File-backed companion memory store.
 pub struct CompanionMemory {
     data_dir: PathBuf,
     _lock: RwLock<()>,
+    cache: Mutex<HashMap<(String, String), CachedCompanion>>,
 }
 
 impl CompanionMemory {
@@ -61,7 +69,18 @@ impl CompanionMemory {
         Self {
             data_dir: data_dir.to_path_buf(),
             _lock: RwLock::new(()),
+            cache: Mutex::new(HashMap::new()),
         }
+    }
+
+    pub fn invalidate(&self, character_id: &str, user_id: &str) {
+        let mut cache = self.cache.lock().unwrap_or_else(PoisonError::into_inner);
+        cache.remove(&(character_id.to_string(), user_id.to_string()));
+    }
+
+    pub fn invalidate_all(&self) {
+        let mut cache = self.cache.lock().unwrap_or_else(PoisonError::into_inner);
+        cache.clear();
     }
 
     pub fn snapshot(&self, character_id: &str, user_id: &str) -> Result<MemorySnapshot> {
@@ -76,10 +95,11 @@ impl CompanionMemory {
     ) -> Result<MemorySnapshot> {
         let _guard = self.lock_read()?;
         let dir = self.companion_dir(user_id, character_id)?;
-        let (mut bond, facts, moments) = self.load_or_import(&dir, character_id, user_id)?;
+        let (mut bond, facts, moments) = self.load_or_import(character_id, user_id, &dir)?;
         let changed = apply_time_rules(&mut bond, now);
         if changed {
             self.write_bond(&dir, &bond)?;
+            self.put_cache(character_id, user_id, &bond, &facts, &moments);
         }
         let snapshot_moments = cap_moments_newest_first(&moments, MOMENT_CAP);
         Ok(MemorySnapshot {
@@ -111,7 +131,7 @@ impl CompanionMemory {
         let _guard = self.lock_write()?;
         let dir = self.companion_dir(user_id, character_id)?;
         let (mut bond, mut facts, mut moments) =
-            self.load_or_import(&dir, character_id, user_id)?;
+            self.load_or_import(character_id, user_id, &dir)?;
 
         apply_time_rules(&mut bond, now);
 
@@ -174,6 +194,7 @@ impl CompanionMemory {
         bond.updated_at = now;
 
         self.persist_all(&dir, &bond, &facts, &moments)?;
+        self.put_cache(character_id, user_id, &bond, &facts, &moments);
 
         let snapshot_moments = cap_moments_newest_first(&moments, MOMENT_CAP);
         Ok(MemorySnapshot {
@@ -191,10 +212,11 @@ impl CompanionMemory {
         }
         let _guard = self.lock_write()?;
         let dir = self.companion_dir(user_id, character_id)?;
-        let (bond, mut facts, moments) = self.load_or_import(&dir, character_id, user_id)?;
+        let (bond, mut facts, moments) = self.load_or_import(character_id, user_id, &dir)?;
         let now = Utc::now();
         let fact = upsert_fact(&mut facts, trimmed, FactSource::User, now);
         self.persist_all(&dir, &bond, &facts, &moments)?;
+        self.put_cache(character_id, user_id, &bond, &facts, &moments);
         Ok(fact)
     }
 
@@ -211,7 +233,7 @@ impl CompanionMemory {
         }
         let _guard = self.lock_write()?;
         let dir = self.companion_dir(user_id, character_id)?;
-        let (bond, mut facts, moments) = self.load_or_import(&dir, character_id, user_id)?;
+        let (bond, mut facts, moments) = self.load_or_import(character_id, user_id, &dir)?;
         let fact = facts
             .iter_mut()
             .find(|f| f.id == fact_id)
@@ -221,32 +243,35 @@ impl CompanionMemory {
         fact.confirmed_at = Utc::now();
         let updated = fact.clone();
         self.persist_all(&dir, &bond, &facts, &moments)?;
+        self.put_cache(character_id, user_id, &bond, &facts, &moments);
         Ok(updated)
     }
 
     pub fn forget_fact(&self, character_id: &str, user_id: &str, fact_id: &str) -> Result<()> {
         let _guard = self.lock_write()?;
         let dir = self.companion_dir(user_id, character_id)?;
-        let (bond, mut facts, moments) = self.load_or_import(&dir, character_id, user_id)?;
+        let (bond, mut facts, moments) = self.load_or_import(character_id, user_id, &dir)?;
         let before = facts.len();
         facts.retain(|f| f.id != fact_id);
         if facts.len() == before {
             return Err(MeuxeError::Memory(format!("Fact not found: {fact_id}")));
         }
         self.persist_all(&dir, &bond, &facts, &moments)?;
+        self.put_cache(character_id, user_id, &bond, &facts, &moments);
         Ok(())
     }
 
     pub fn forget_moment(&self, character_id: &str, user_id: &str, moment_id: &str) -> Result<()> {
         let _guard = self.lock_write()?;
         let dir = self.companion_dir(user_id, character_id)?;
-        let (bond, facts, mut moments) = self.load_or_import(&dir, character_id, user_id)?;
+        let (bond, facts, mut moments) = self.load_or_import(character_id, user_id, &dir)?;
         let before = moments.len();
         moments.retain(|m| m.id != moment_id);
         if moments.len() == before {
             return Err(MeuxeError::Memory(format!("Moment not found: {moment_id}")));
         }
         self.persist_all(&dir, &bond, &facts, &moments)?;
+        self.put_cache(character_id, user_id, &bond, &facts, &moments);
         Ok(())
     }
 
@@ -260,8 +285,9 @@ impl CompanionMemory {
         // Empty profile prevents legacy re-import on next load.
         self.write_profile(&dir, &Profile::default())?;
         let bond = Bond::default();
-        self.write_bond(&dir, &bond)?;
         self.write_moments(&dir, &[])?;
+        self.write_bond(&dir, &bond)?;
+        self.put_cache(character_id, user_id, &bond, &[], &[]);
         Ok(())
     }
 
@@ -300,7 +326,48 @@ impl CompanionMemory {
             .map_err(|e| MeuxeError::Memory(format!("Lock poisoned: {e}")))
     }
 
+    fn put_cache(
+        &self,
+        character_id: &str,
+        user_id: &str,
+        bond: &Bond,
+        facts: &[Fact],
+        moments: &[Moment],
+    ) {
+        let mut cache = self.cache.lock().unwrap_or_else(PoisonError::into_inner);
+        cache.insert(
+            (character_id.to_string(), user_id.to_string()),
+            CachedCompanion {
+                bond: bond.clone(),
+                facts: facts.to_vec(),
+                moments: moments.to_vec(),
+            },
+        );
+    }
+
     fn load_or_import(
+        &self,
+        character_id: &str,
+        user_id: &str,
+        dir: &Path,
+    ) -> Result<(Bond, Vec<Fact>, Vec<Moment>)> {
+        {
+            let cache = self.cache.lock().unwrap_or_else(PoisonError::into_inner);
+            if let Some(cached) = cache.get(&(character_id.to_string(), user_id.to_string())) {
+                return Ok((
+                    cached.bond.clone(),
+                    cached.facts.clone(),
+                    cached.moments.clone(),
+                ));
+            }
+        }
+
+        let (bond, facts, moments) = self.load_or_import_from_disk(dir, character_id, user_id)?;
+        self.put_cache(character_id, user_id, &bond, &facts, &moments);
+        Ok((bond, facts, moments))
+    }
+
+    fn load_or_import_from_disk(
         &self,
         dir: &Path,
         character_id: &str,
@@ -1429,5 +1496,67 @@ mod tests {
         let context = crate::memory::format_memory_context(&last, "Meet", "how is rex");
         assert!(context.contains("Rex") || context.contains("rex"));
         assert!(!context.to_lowercase().contains("<<<meuxe"));
+    }
+
+    #[test]
+    fn cache_hit_avoids_disk_re_read() {
+        let (_tmp, store) = mem();
+        store
+            .add_fact("rika", "user1", "Their dog is named Rex")
+            .unwrap();
+        let snap1 = store.snapshot("rika", "user1").unwrap();
+        assert_eq!(snap1.facts.len(), 1);
+
+        let dir = Path::new(&snap1.memory_dir);
+        std::fs::remove_file(dir.join("bond.json")).unwrap();
+        std::fs::remove_file(dir.join("profile.json")).unwrap();
+        std::fs::remove_file(dir.join("moments.jsonl")).unwrap();
+
+        let snap2 = store.snapshot("rika", "user1").unwrap();
+        assert_eq!(snap2.facts.len(), 1);
+        assert_eq!(snap2.facts[0].text, "Their dog is named Rex");
+    }
+
+    #[test]
+    fn cache_write_through_updates_snapshot() {
+        let (_tmp, store) = mem();
+        store.add_fact("rika", "user1", "They like tea").unwrap();
+        store.add_fact("rika", "user1", "They have a cat").unwrap();
+        let snap = store.snapshot("rika", "user1").unwrap();
+        assert_eq!(snap.facts.len(), 2);
+    }
+
+    #[test]
+    fn cache_invalidate_forces_disk_re_read() {
+        let (_tmp, store) = mem();
+        store.add_fact("rika", "user1", "Original fact").unwrap();
+        let snap = store.snapshot("rika", "user1").unwrap();
+        let dir = Path::new(&snap.memory_dir);
+
+        std::fs::write(
+            dir.join("profile.json"),
+            r#"{"facts":[{"id":"f1","text":"Disk-only fact","kind":"other","created_at":"2026-01-01T00:00:00Z","confirmed_at":"2026-01-01T00:00:00Z","mentions":1,"source":"user"}]}"#,
+        )
+        .unwrap();
+
+        let cached = store.snapshot("rika", "user1").unwrap();
+        assert_eq!(cached.facts[0].text, "Original fact");
+
+        store.invalidate("rika", "user1");
+        let fresh = store.snapshot("rika", "user1").unwrap();
+        assert_eq!(fresh.facts.len(), 1);
+        assert_eq!(fresh.facts[0].text, "Disk-only fact");
+    }
+
+    #[test]
+    fn cache_invalidate_all_clears_every_entry() {
+        let (_tmp, store) = mem();
+        store.add_fact("rika", "user1", "Fact A").unwrap();
+        store.add_fact("luna", "user2", "Fact B").unwrap();
+        store.invalidate_all();
+
+        let snap = store.snapshot("rika", "user1").unwrap();
+        assert_eq!(snap.facts.len(), 1);
+        assert_eq!(snap.facts[0].text, "Fact A");
     }
 }
