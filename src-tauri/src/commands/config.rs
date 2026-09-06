@@ -17,7 +17,8 @@ pub fn config_save(state: State<Arc<AppState>>, config: AppConfig) -> Result<(),
 
 #[tauri::command]
 pub fn config_reset_all(state: State<Arc<AppState>>) -> Result<(), String> {
-    if let Ok(mut lock) = state.chat_cancel.lock() {
+    {
+        let mut lock = state.chat_cancel.lock().unwrap_or_else(|p| p.into_inner());
         if let Some(token) = lock.take() {
             token.cancel();
         }

@@ -16,6 +16,7 @@ use tauri::{AppHandle, Emitter};
 use tokio_util::sync::CancellationToken;
 
 use crate::commands::chat::ChatDoneEvent;
+use crate::commands::user::derive_user_id;
 use crate::AppState;
 
 pub struct RunAcpChatStreamParams {
@@ -225,7 +226,8 @@ pub async fn run_acp_chat_stream(params: RunAcpChatStreamParams) -> Result<(), S
     .map_err(|e| e.to_string())?;
 
     let agent = resolve_acp_agent(&agent_config, &state.data_dir).await?;
-    let user_id = derive_user_id_from_state(&state)?;
+    let config = state.config.load().map_err(|e| e.to_string())?;
+    let user_id = derive_user_id(&config);
 
     let app_emit = app.clone();
     let request_id_emit = request_id.clone();
@@ -286,16 +288,21 @@ pub async fn run_acp_chat_stream(params: RunAcpChatStreamParams) -> Result<(), S
                         let mut splitter = meuxe_core::memory::TrailerSplitter::new();
                         let mut sentence_index = 0u32;
                         let mut current_expression = "neutral".to_string();
+                        let mut cancelled = false;
 
                         session.send_prompt(&agent_prompt_send)?;
 
                         loop {
                             if cancel.is_cancelled() {
+                                cancelled = true;
                                 break;
                             }
 
                             let update = tokio::select! {
-                                () = cancel.cancelled() => break,
+                                () = cancel.cancelled() => {
+                                    cancelled = true;
+                                    break;
+                                }
                                 res = session.read_update() => res?,
                             };
 
@@ -330,7 +337,10 @@ pub async fn run_acp_chat_stream(params: RunAcpChatStreamParams) -> Result<(), S
                                                         );
                                                         let _ = app.emit(
                                                             "chat:text-chunk",
-                                                            serde_json::json!({ "text": visible }),
+                                                            serde_json::json!({
+                                                                "request_id": request_id,
+                                                                "text": visible
+                                                            }),
                                                         );
                                                     }
                                                 }
@@ -342,12 +352,20 @@ pub async fn run_acp_chat_stream(params: RunAcpChatStreamParams) -> Result<(), S
                                 }
                                 SessionMessage::StopReason(reason) => {
                                     if reason == StopReason::Cancelled {
-                                        return Ok(());
+                                        cancelled = true;
                                     }
                                     break;
                                 }
                                 _ => {}
                             }
+                        }
+
+                        if cancelled || cancel.is_cancelled() {
+                            let _ = app.emit(
+                                "chat:cancelled",
+                                serde_json::json!({ "request_id": request_id_done }),
+                            );
+                            return Ok(());
                         }
 
                         let (rest, trailer) = splitter.finish();
@@ -428,17 +446,6 @@ pub async fn run_acp_chat_stream(params: RunAcpChatStreamParams) -> Result<(), S
         .map_err(|e| e.to_string())?;
 
     Ok(())
-}
-
-fn derive_user_id_from_state(state: &AppState) -> Result<String, String> {
-    let config = state.config.load().map_err(|e| e.to_string())?;
-    if !config.user.id.trim().is_empty() {
-        return Ok(config.user.id.trim().to_string());
-    }
-    if !config.user.name.trim().is_empty() {
-        return Ok(meuxe_core::character::slugify(&config.user.name));
-    }
-    Ok("default-user".to_string())
 }
 
 #[cfg(test)]
