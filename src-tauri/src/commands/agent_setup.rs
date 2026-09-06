@@ -126,13 +126,8 @@ fn global_cli_search_dirs() -> Vec<PathBuf> {
     dirs
 }
 
-/// Find an executable on PATH and common global install locations.
-pub fn find_executable_on_path(program: &str) -> Option<PathBuf> {
-    let mut search_dirs: Vec<PathBuf> = global_cli_search_dirs();
-    if let Some(path_var) = std::env::var_os("PATH") {
-        search_dirs.extend(std::env::split_paths(&path_var));
-    }
-
+/// Find an executable in the given search directories.
+pub fn find_executable_in_dirs(program: &str, search_dirs: &[PathBuf]) -> Option<PathBuf> {
     for dir in search_dirs {
         for name in candidate_filenames(program) {
             let candidate = dir.join(&name);
@@ -142,6 +137,15 @@ pub fn find_executable_on_path(program: &str) -> Option<PathBuf> {
         }
     }
     None
+}
+
+/// Find an executable on PATH and common global install locations.
+pub fn find_executable_on_path(program: &str) -> Option<PathBuf> {
+    let mut search_dirs: Vec<PathBuf> = global_cli_search_dirs();
+    if let Some(path_var) = std::env::var_os("PATH") {
+        search_dirs.extend(std::env::split_paths(&path_var));
+    }
+    find_executable_in_dirs(program, &search_dirs)
 }
 
 pub fn resolve_system_bin(preset: &str) -> Option<PathBuf> {
@@ -157,8 +161,6 @@ pub struct AgentResolution {
 
 /// Global system install first, then Meuxe-managed fallback, then npx (Claude/Codex only).
 pub async fn resolve_agent(data_dir: &Path, preset: &str) -> AgentResolution {
-    let prerequisites = check_prerequisites().await;
-
     if let Some(system) = resolve_system_bin(preset) {
         return AgentResolution {
             source: AgentInstallSource::System,
@@ -174,6 +176,8 @@ pub async fn resolve_agent(data_dir: &Path, preset: &str) -> AgentResolution {
             };
         }
     }
+
+    let prerequisites = check_prerequisites().await;
 
     match preset {
         "claude" | "codex" if prerequisites.npx_available => AgentResolution {
@@ -220,17 +224,6 @@ fn trim_version(stdout: &[u8]) -> Option<String> {
     }
 }
 
-async fn command_ok(program: &str, args: &[&str]) -> bool {
-    AsyncCommand::new(program)
-        .args(args)
-        .stdout(Stdio::null())
-        .stderr(Stdio::null())
-        .status()
-        .await
-        .map(|s| s.success())
-        .unwrap_or(false)
-}
-
 async fn command_version(program: &str) -> Option<String> {
     let output = AsyncCommand::new(program)
         .arg("--version")
@@ -244,21 +237,11 @@ async fn command_version(program: &str) -> Option<String> {
 }
 
 pub async fn check_prerequisites() -> AcpPrerequisitesStatus {
-    let node_available = command_ok("node", &["--version"]).await;
-    let npx_available = command_ok("npx", &["--version"]).await;
-    let node_version = if node_available {
-        command_version("node").await
-    } else {
-        None
-    };
-    let npx_version = if npx_available {
-        command_version("npx").await
-    } else {
-        None
-    };
+    let node_version = command_version("node").await;
+    let npx_version = command_version("npx").await;
     AcpPrerequisitesStatus {
-        node_available,
-        npx_available,
+        node_available: node_version.is_some(),
+        npx_available: npx_version.is_some(),
         node_version,
         npx_version,
     }
@@ -425,25 +408,6 @@ pub async fn install_global_package(preset: &str) -> Result<(), String> {
     run_npm_global_install(package).await
 }
 
-/// If no system/managed/npx agent is available, run a global npm install once.
-pub async fn ensure_agent_installed_globally(data_dir: &Path, preset: &str) -> Result<(), String> {
-    if preset == "custom" {
-        return Ok(());
-    }
-    let resolution = resolve_agent(data_dir, preset).await;
-    if resolution.source != AgentInstallSource::None {
-        return Ok(());
-    }
-    install_global_package(preset).await?;
-    let after = resolve_agent(data_dir, preset).await;
-    if after.source == AgentInstallSource::None {
-        return Err(
-            "Global install finished but the agent CLI is still not on PATH. Restart the app or open a new terminal, then try again.".into(),
-        );
-    }
-    Ok(())
-}
-
 pub async fn install_preset(
     data_dir: &Path,
     preset: &str,
@@ -497,7 +461,7 @@ mod tests {
     use tempfile::TempDir;
 
     #[test]
-    fn find_executable_on_path_discovers_file() {
+    fn find_executable_in_dirs_discovers_file() {
         let tmp = TempDir::new().unwrap();
         let bin = tmp.path().join("meuxe-test-cli");
         fs::write(&bin, b"#!/bin/sh\n").unwrap();
@@ -507,11 +471,7 @@ mod tests {
             fs::set_permissions(&bin, fs::Permissions::from_mode(0o755)).unwrap();
         }
 
-        let original = std::env::var_os("PATH").unwrap();
-        let new_path = format!("{}:{}", tmp.path().display(), original.to_string_lossy());
-        std::env::set_var("PATH", new_path);
-
-        let found = find_executable_on_path("meuxe-test-cli");
+        let found = find_executable_in_dirs("meuxe-test-cli", &[tmp.path().to_path_buf()]);
         assert_eq!(found, Some(bin));
     }
 
@@ -532,17 +492,8 @@ mod tests {
             use std::os::unix::fs::PermissionsExt;
             fs::set_permissions(&system_bin, fs::Permissions::from_mode(0o755)).unwrap();
         }
-        let original = std::env::var_os("PATH").unwrap();
-        std::env::set_var(
-            "PATH",
-            format!(
-                "{}:{}",
-                system_tmp.path().display(),
-                original.to_string_lossy()
-            ),
-        );
 
-        let system = resolve_system_bin("opencode");
+        let system = find_executable_in_dirs("opencode", &[system_tmp.path().to_path_buf()]);
         assert!(system.is_some());
         assert_ne!(system.unwrap(), managed);
     }

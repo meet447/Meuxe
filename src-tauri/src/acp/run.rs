@@ -149,10 +149,25 @@ pub fn render_memory_brief(snapshot: &MemorySnapshot) -> String {
 pub async fn resolve_acp_agent(config: &AgentConfig, data_dir: &Path) -> Result<AcpAgent, String> {
     match config.preset.as_str() {
         "opencode" => {
+            let resolution =
+                crate::commands::agent_setup::resolve_agent(data_dir, "opencode").await;
+            if resolution.source == crate::commands::agent_setup::AgentInstallSource::None {
+                return Err(
+                    "Agent CLI for preset `opencode` is not installed. Open Settings → Agent and click Install."
+                        .into(),
+                );
+            }
             let args = crate::commands::agent_setup::resolve_opencode_argv(data_dir).await;
             AcpAgent::from_args(args).map_err(|e| e.to_string())
         }
         "claude" => {
+            let resolution = crate::commands::agent_setup::resolve_agent(data_dir, "claude").await;
+            if resolution.source == crate::commands::agent_setup::AgentInstallSource::None {
+                return Err(
+                    "Agent CLI for preset `claude` is not installed. Open Settings → Agent and click Install."
+                        .into(),
+                );
+            }
             if let Some(args) = crate::commands::agent_setup::resolve_claude_argv(data_dir).await {
                 AcpAgent::from_args(args).map_err(|e| e.to_string())
             } else {
@@ -160,6 +175,13 @@ pub async fn resolve_acp_agent(config: &AgentConfig, data_dir: &Path) -> Result<
             }
         }
         "codex" => {
+            let resolution = crate::commands::agent_setup::resolve_agent(data_dir, "codex").await;
+            if resolution.source == crate::commands::agent_setup::AgentInstallSource::None {
+                return Err(
+                    "Agent CLI for preset `codex` is not installed. Open Settings → Agent and click Install."
+                        .into(),
+                );
+            }
             if let Some(args) = crate::commands::agent_setup::resolve_codex_argv(data_dir).await {
                 AcpAgent::from_args(args).map_err(|e| e.to_string())
             } else {
@@ -201,15 +223,6 @@ pub async fn run_acp_chat_stream(params: RunAcpChatStreamParams) -> Result<(), S
         &memory_snapshot,
     )
     .map_err(|e| e.to_string())?;
-
-    if agent_config.preset != "custom" {
-        crate::commands::agent_setup::ensure_agent_installed_globally(
-            &state.data_dir,
-            &agent_config.preset,
-        )
-        .await
-        .map_err(|e| format!("Could not set up agent CLI: {e}"))?;
-    }
 
     let agent = resolve_acp_agent(&agent_config, &state.data_dir).await?;
     let user_id = derive_user_id_from_state(&state)?;
