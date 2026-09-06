@@ -68,6 +68,7 @@ pub(crate) fn build_acp_agent_prompt(
     persona_context: &str,
     messages: &[meuxe_core::llm::types::ChatMessage],
     user_message: &str,
+    include_history: bool,
 ) -> String {
     let mut parts = vec![
         "## Meuxe companion (required)".to_string(),
@@ -81,30 +82,32 @@ pub(crate) fn build_acp_agent_prompt(
         persona_context.trim().to_string(),
     ];
 
-    let mut history_lines: Vec<String> = Vec::new();
-    for msg in messages {
-        if msg.role == "system" || msg.role == "tool" {
-            continue;
+    if include_history {
+        let mut history_lines: Vec<String> = Vec::new();
+        for msg in messages {
+            if msg.role == "system" || msg.role == "tool" {
+                continue;
+            }
+            let content = msg.content_str().trim();
+            if content.is_empty() {
+                continue;
+            }
+            if msg.role == "user" && content == user_message.trim() {
+                continue;
+            }
+            let label = if msg.role == "user" {
+                "User"
+            } else {
+                "Companion"
+            };
+            history_lines.push(format!("{label}: {content}"));
         }
-        let content = msg.content_str().trim();
-        if content.is_empty() {
-            continue;
-        }
-        if msg.role == "user" && content == user_message.trim() {
-            continue;
-        }
-        let label = if msg.role == "user" {
-            "User"
-        } else {
-            "Companion"
-        };
-        history_lines.push(format!("{label}: {content}"));
-    }
 
-    if !history_lines.is_empty() {
-        parts.push(String::new());
-        parts.push("## Recent conversation".to_string());
-        parts.extend(history_lines);
+        if !history_lines.is_empty() {
+            parts.push(String::new());
+            parts.push("## Recent conversation".to_string());
+            parts.extend(history_lines);
+        }
     }
 
     parts.push(String::new());
@@ -571,7 +574,17 @@ async fn run_chat_stream(
     persona_context.push_str("\n\n## Memory notes (required)\n");
     persona_context.push_str(meuxe_core::memory::TURN_NOTES_INSTRUCTIONS);
 
-    let acp_prompt = build_acp_agent_prompt(&persona_context, &prompt_result.messages, &message);
+    let include_history = {
+        let acp = state.acp.lock().unwrap_or_else(|p| p.into_inner());
+        !acp.character_has_session(&character_id)
+    };
+
+    let acp_prompt = build_acp_agent_prompt(
+        &persona_context,
+        &prompt_result.messages,
+        &message,
+        include_history,
+    );
 
     crate::acp::run_acp_chat_stream(crate::acp::RunAcpChatStreamParams {
         app,
@@ -637,7 +650,7 @@ mod tests {
             meuxe_core::llm::types::ChatMessage::text("assistant", "Hey!"),
             meuxe_core::llm::types::ChatMessage::text("user", "Who are you?"),
         ];
-        let prompt = build_acp_agent_prompt("You are Luna.", &messages, "Who are you?");
+        let prompt = build_acp_agent_prompt("You are Luna.", &messages, "Who are you?", true);
         assert!(prompt.contains("You are Luna."));
         assert!(prompt.contains("User: Hi"));
         assert!(prompt.contains("Companion: Hey!"));

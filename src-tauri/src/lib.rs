@@ -10,7 +10,9 @@ use meuxe_core::memory::CompanionMemory;
 use meuxe_core::session::SessionStore;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
+
+use crate::acp::AcpConnectionManager;
 use tauri::Manager;
 use whisper_rs::{WhisperContext, WhisperContextParameters};
 
@@ -25,6 +27,7 @@ pub struct AppState {
     pub chat_cancel: std::sync::Mutex<Option<tokio_util::sync::CancellationToken>>,
     pub chat_permission_responders:
         std::sync::Mutex<HashMap<String, tokio::sync::oneshot::Sender<bool>>>,
+    pub acp: Mutex<AcpConnectionManager>,
 }
 
 // Broadcast an event to ALL windows (used by global shortcuts)
@@ -164,6 +167,7 @@ pub fn run() {
                 whisper_ctx,
                 chat_cancel: std::sync::Mutex::new(None),
                 chat_permission_responders: std::sync::Mutex::new(HashMap::new()),
+                acp: Mutex::new(AcpConnectionManager::default()),
             };
 
             app.manage(Arc::new(state));
@@ -211,6 +215,16 @@ pub fn run() {
             broadcast_event,
             resolve_asset_path,
         ])
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .build(tauri::generate_context!())
+        .expect("error while building tauri application")
+        .run(|app, event| {
+            if matches!(
+                event,
+                tauri::RunEvent::Exit | tauri::RunEvent::ExitRequested { .. }
+            ) {
+                if let Some(state) = app.try_state::<Arc<AppState>>() {
+                    acp::invalidate_acp(state.inner());
+                }
+            }
+        });
 }

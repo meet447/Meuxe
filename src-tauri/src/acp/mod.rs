@@ -3,7 +3,9 @@
 //! See `docs/DIRECTION.md` and `docs/ROADMAP.md`. Phase 2 will spawn the user's
 //! CLI agent (Claude Code, Codex, etc.) and bridge session events to the React UI.
 
+mod manager;
 mod run;
 mod tools;
 
+pub use manager::{invalidate_acp, invalidate_acp_if_agent_changed, AcpConnectionManager};
 pub use run::{ensure_companion_home, run_acp_chat_stream, RunAcpChatStreamParams};

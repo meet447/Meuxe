@@ -1,3 +1,5 @@
+use crate::acp::invalidate_acp;
+use crate::acp::invalidate_acp_if_agent_changed;
 use crate::AppState;
 use meuxe_core::config::types::AppConfig;
 use meuxe_core::reset;
@@ -12,6 +14,8 @@ pub fn config_get(state: State<Arc<AppState>>) -> Result<AppConfig, String> {
 
 #[tauri::command]
 pub fn config_save(state: State<Arc<AppState>>, config: AppConfig) -> Result<(), String> {
+    let previous = state.config.load().map_err(|e| e.to_string())?;
+    invalidate_acp_if_agent_changed(&state, &previous.agent, &config.agent);
     state.config.save(&config).map_err(|e| e.to_string())
 }
 
@@ -26,7 +30,9 @@ pub fn config_reset_all(state: State<Arc<AppState>>) -> Result<(), String> {
 
     reset::reset_app_data(&state.data_dir).map_err(|e| e.to_string())?;
     state.characters.clear_cache();
-    state.config.reset_to_default().map_err(|e| e.to_string())
+    state.config.reset_to_default().map_err(|e| e.to_string())?;
+    invalidate_acp(&state);
+    Ok(())
 }
 
 #[tauri::command]
