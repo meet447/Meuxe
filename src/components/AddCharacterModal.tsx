@@ -204,7 +204,13 @@ export function AddCharacterModal({
       onCreated(characterId);
     } catch (err) {
       console.error("Failed to create character:", err);
-      setError("Could not create the character. Please try again.");
+      const message =
+        typeof err === "string"
+          ? err
+          : err instanceof Error
+            ? err.message
+            : "Could not create the character. Please try again.";
+      setError(message);
     } finally {
       setSaving(false);
     }
