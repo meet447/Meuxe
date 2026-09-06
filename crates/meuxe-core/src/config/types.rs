@@ -30,6 +30,14 @@ pub struct AgentConfig {
     pub program: String,
     #[serde(default)]
     pub args: Vec<String>,
+    /// When true, tool permission prompts from the agent are approved automatically so the
+    /// companion can help without interruptions. When false, each request is shown in the UI.
+    #[serde(default = "default_true")]
+    pub auto_approve_tools: bool,
+}
+
+fn default_true() -> bool {
+    true
 }
 
 fn default_agent_preset() -> String {
@@ -42,6 +50,7 @@ impl Default for AgentConfig {
             preset: default_agent_preset(),
             program: String::new(),
             args: Vec::new(),
+            auto_approve_tools: true,
         }
     }
 }
@@ -69,14 +78,32 @@ pub struct LlmConfig {
     pub model: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+fn default_tts_provider() -> String {
+    "tiktok".to_string()
+}
+
+fn default_tts_voice() -> String {
+    "en_us_001".to_string()
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TtsConfig {
-    #[serde(default)]
+    #[serde(default = "default_tts_provider")]
     pub provider: String,
     #[serde(default)]
     pub api_key: Option<String>,
-    #[serde(default)]
+    #[serde(default = "default_tts_voice")]
     pub voice: String,
+}
+
+impl Default for TtsConfig {
+    fn default() -> Self {
+        Self {
+            provider: default_tts_provider(),
+            api_key: None,
+            voice: default_tts_voice(),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]

@@ -32,7 +32,7 @@ pub async fn generate(text: &str, voice: &str) -> Result<Vec<u8>> {
         return Err(MeuxeError::Tts("Empty text".into()));
     }
 
-    let voice = if voice.is_empty() { "jp_001" } else { voice };
+    let voice = if voice.is_empty() { "en_us_001" } else { voice };
 
     for (endpoint_index, endpoint) in ENDPOINTS.iter().enumerate() {
         match try_generate(text, voice, endpoint, endpoint_index).await {

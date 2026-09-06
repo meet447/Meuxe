@@ -7,11 +7,32 @@ import { VRMLoaderPlugin, VRM, VRMExpressionPresetName, VRMUtils } from "@pixiv/
 import { VRMAnimationLoaderPlugin, createVRMAnimationClip } from "@pixiv/three-vrm-animation";
 import { mixamoVRMRigMap } from "../utils/mixamoRigMap";
 import { resolveAssetUrl } from "../api/tauri";
+import { resolveVrmExpressionName } from "../utils/vrmExpressions";
 import type { AudioLevels } from "./useAudioAnalyser";
 import type { AnimationInfo } from "../types";
 
 function lerp(a: number, b: number, t: number): number {
   return a + (b - a) * t;
+}
+
+const EMOTION_PRESETS = [
+  VRMExpressionPresetName.Happy,
+  VRMExpressionPresetName.Angry,
+  VRMExpressionPresetName.Sad,
+  VRMExpressionPresetName.Relaxed,
+  VRMExpressionPresetName.Surprised,
+];
+
+function applyEmotion(vrm: VRM, expressionName: string) {
+  if (!vrm.expressionManager) return;
+  for (const preset of EMOTION_PRESETS) {
+    vrm.expressionManager.setValue(preset, 0);
+  }
+  // VRM 0 models often leave Neutral at 1; that blend washes out angry/sad.
+  vrm.expressionManager.setValue(VRMExpressionPresetName.Neutral, expressionName ? 0 : 1);
+  if (expressionName) {
+    vrm.expressionManager.setValue(expressionName, 1);
+  }
 }
 
 const ORBIT_ROTATE_SPEED = 0.005;
@@ -48,6 +69,7 @@ export function useVRM(canvasRef: React.RefObject<HTMLCanvasElement | null>) {
   const speakingRef = useRef(false);
   const speakStartRef = useRef(0);
   const headBaseRotationRef = useRef<{ x: number; y: number; z: number } | null>(null);
+  const currentEmotionRef = useRef("");
 
   // Debug cache
   const availableExpressionsRef = useRef<string[]>([]);
@@ -300,6 +322,10 @@ export function useVRM(canvasRef: React.RefObject<HTMLCanvasElement | null>) {
       // Update animation mixer
       mixerRef.current?.update(delta);
 
+      // VRMA clips often include expression tracks that zero the face every frame.
+      // Re-apply the current emotion after the mixer so the face actually sticks.
+      applyEmotion(vrm, currentEmotionRef.current);
+
       // Post-animation arm correction: bring arms down from T-pose
       // The animation delta may be near-zero for arms in breathing idle,
       // so we blend in a natural resting arm rotation
@@ -435,6 +461,7 @@ export function useVRM(canvasRef: React.RefObject<HTMLCanvasElement | null>) {
       currentActionRef.current = null;
       currentClipNameRef.current = "";
       headBaseRotationRef.current = null;
+      currentEmotionRef.current = "";
 
       // Create renderer once
       if (!rendererRef.current) {
@@ -617,29 +644,9 @@ export function useVRM(canvasRef: React.RefObject<HTMLCanvasElement | null>) {
     const vrm = vrmRef.current;
     if (!vrm?.expressionManager) return;
 
-    // Reset emotion expressions
-    const emotionPresets = [
-      VRMExpressionPresetName.Happy, VRMExpressionPresetName.Angry,
-      VRMExpressionPresetName.Sad, VRMExpressionPresetName.Relaxed,
-      VRMExpressionPresetName.Surprised,
-    ];
-    for (const preset of emotionPresets) {
-      vrm.expressionManager.setValue(preset, 0);
-    }
-
-    const nameMap: Record<string, string> = {
-      happy: VRMExpressionPresetName.Happy,
-      angry: VRMExpressionPresetName.Angry,
-      sad: VRMExpressionPresetName.Sad,
-      relaxed: VRMExpressionPresetName.Relaxed,
-      surprised: VRMExpressionPresetName.Surprised,
-      neutral: "",
-    };
-
-    const preset = nameMap[expressionName.toLowerCase()] || expressionName;
-    if (preset) {
-      vrm.expressionManager.setValue(preset, 1);
-    }
+    const preset = resolveVrmExpressionName(expressionName, availableExpressionsRef.current);
+    currentEmotionRef.current = preset;
+    applyEmotion(vrm, preset);
 
     // Try to play matching animation if available
     for (const k of clipsRef.current.keys()) {
@@ -649,7 +656,7 @@ export function useVRM(canvasRef: React.RefObject<HTMLCanvasElement | null>) {
       }
     }
 
-    console.log(`[VRM] Expression: "${expressionName}"`);
+    console.log(`[VRM] Expression: "${expressionName}"${preset && preset !== expressionName ? ` → "${preset}"` : ""}`);
   }, [playAnimation]);
 
   const startLipSync = useCallback((getAudioLevels?: () => AudioLevels) => {

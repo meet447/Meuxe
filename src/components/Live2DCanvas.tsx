@@ -37,6 +37,8 @@ export const Live2DCanvas = memo(function Live2DCanvas({
   const prevModelPath = useRef<string | null>(null);
   const prevMappingKey = useRef<string>("");
   const prevExpression = useRef<string>("");
+  const expressionRef = useRef(expression);
+  expressionRef.current = expression;
   const [modelLoading, setModelLoading] = useState(false);
   const dragOffset = { x: 0, y: 0 };
   const mappingKey = useMemo(() => JSON.stringify(modelMapping), [modelMapping]);
@@ -55,8 +57,12 @@ export const Live2DCanvas = memo(function Live2DCanvas({
     setModelLoading(true);
     loadModel(modelPath, modelMapping || undefined)
       .then(() => {
-        if (!cancelled) {
-          setViewport(zoom, framing, dragOffset.x, dragOffset.y);
+        if (cancelled) return;
+        setViewport(zoom, framing, dragOffset.x, dragOffset.y);
+        const expr = expressionRef.current;
+        if (expr) {
+          prevExpression.current = expr;
+          setExpression(expr);
         }
       })
       .finally(() => {
@@ -66,7 +72,7 @@ export const Live2DCanvas = memo(function Live2DCanvas({
     return () => {
       cancelled = true;
     };
-  }, [modelPath, mappingKey, modelMapping, loadModel, setViewport, zoom, framing]);
+  }, [modelPath, mappingKey, modelMapping, loadModel, setViewport, setExpression, zoom, framing]);
 
   useEffect(() => {
     if (expression && expression !== prevExpression.current) {

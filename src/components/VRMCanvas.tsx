@@ -46,6 +46,8 @@ export const VRMCanvas = memo(function VRMCanvas({
   } = useVRM(canvasRef);
   const prevModelPath = useRef<string | null>(null);
   const prevExpression = useRef<string>("");
+  const expressionRef = useRef(expression);
+  expressionRef.current = expression;
   const [modelLoading, setModelLoading] = useState(false);
 
   useEffect(() => {
@@ -60,8 +62,12 @@ export const VRMCanvas = memo(function VRMCanvas({
     setModelLoading(true);
     loadModel(modelPath, animations)
       .then(() => {
-        if (!cancelled) {
-          setViewport(zoom, framing);
+        if (cancelled) return;
+        setViewport(zoom, framing);
+        const expr = expressionRef.current;
+        if (expr) {
+          prevExpression.current = expr;
+          setExpression(expr);
         }
       })
       .finally(() => {
@@ -71,7 +77,7 @@ export const VRMCanvas = memo(function VRMCanvas({
     return () => {
       cancelled = true;
     };
-  }, [modelPath, animations, loadModel, setViewport, zoom, framing]);
+  }, [modelPath, animations, loadModel, setViewport, setExpression, zoom, framing]);
 
   useEffect(() => {
     if (expression && expression !== prevExpression.current) {

@@ -70,6 +70,13 @@ describe('tauri api utilities', () => {
       await tauriApi.saveConfig(mockConfig);
       expect(invoke).toHaveBeenCalledWith('config_save', { config: mockConfig });
     });
+
+    it('setActiveCharacter calls config_set_active_character', async () => {
+      await tauriApi.setActiveCharacter('aoi');
+      expect(invoke).toHaveBeenCalledWith('config_set_active_character', {
+        characterId: 'aoi',
+      });
+    });
   });
 
   describe('Character functions', () => {

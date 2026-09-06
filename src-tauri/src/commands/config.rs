@@ -20,6 +20,17 @@ pub fn config_save(state: State<Arc<AppState>>, config: AppConfig) -> Result<(),
 }
 
 #[tauri::command]
+pub fn config_set_active_character(
+    state: State<Arc<AppState>>,
+    character_id: String,
+) -> Result<(), String> {
+    state
+        .config
+        .set_active_character(&character_id)
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 pub fn config_reset_all(state: State<Arc<AppState>>) -> Result<(), String> {
     {
         let mut lock = state.chat_cancel.lock().unwrap_or_else(|p| p.into_inner());

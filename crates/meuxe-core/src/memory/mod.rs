@@ -3,7 +3,7 @@ mod prompt;
 mod store;
 mod types;
 
-pub use notes::{parse_turn_notes, TrailerSplitter};
+pub use notes::{parse_turn_notes, recover_turn_notes_from_reply, TrailerSplitter};
 pub use prompt::{format_memory_context, TURN_NOTES_INSTRUCTIONS};
 pub use store::CompanionMemory;
 pub use types::{

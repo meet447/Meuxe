@@ -10,7 +10,7 @@ import {
   getVoices,
 } from "../api/tauri";
 import { ACP_AGENT_PRESET_IDS } from "../lib/agentPresets";
-import { DEFAULT_TTS_PROVIDER, TTS_PRESETS_UI } from "../lib/ttsPresets";
+import { DEFAULT_TTS_PROVIDER, DEFAULT_TTS_VOICE, TTS_PRESETS_UI } from "../lib/ttsPresets";
 import { AgentPresetCard } from "./agents/AgentPresetCard";
 import { AgentSetupPanel } from "./agents/AgentSetupPanel";
 import { AvatarViewportSettings } from "./settings/AvatarViewportSettings";
@@ -199,10 +199,11 @@ export function Settings({
   const [userAbout, setUserAbout] = useState("");
   const [ttsProvider, setTtsProvider] = useState(DEFAULT_TTS_PROVIDER);
   const [ttsApiKey, setTtsApiKey] = useState("");
-  const [ttsVoice, setTtsVoice] = useState("jp_001");
+  const [ttsVoice, setTtsVoice] = useState(DEFAULT_TTS_VOICE);
   const [agentPreset, setAgentPreset] = useState("opencode");
   const [agentProgram, setAgentProgram] = useState("");
   const [agentArgs, setAgentArgs] = useState("");
+  const [autoApproveTools, setAutoApproveTools] = useState(true);
   const [confirmReset, setConfirmReset] = useState(false);
   const [resetting, setResetting] = useState(false);
   const [resetError, setResetError] = useState<string | null>(null);
@@ -237,10 +238,11 @@ export function Settings({
         setUserAbout(cfg.user?.about || "");
         setTtsProvider(cfg.tts?.provider || DEFAULT_TTS_PROVIDER);
         setTtsApiKey("");
-        setTtsVoice(cfg.tts?.voice || "jp_001");
+        setTtsVoice(cfg.tts?.voice || DEFAULT_TTS_VOICE);
         setAgentPreset(cfg.agent?.preset || "opencode");
         setAgentProgram(cfg.agent?.program || "");
         setAgentArgs((cfg.agent?.args || []).join(" "));
+        setAutoApproveTools(cfg.agent?.auto_approve_tools ?? true);
       })
       .catch((err) => console.error("Failed to load config:", err));
   }, []);
@@ -269,6 +271,7 @@ export function Settings({
         preset: agentPreset,
         program: agentProgram,
         args: agentArgs.trim() ? agentArgs.trim().split(/\s+/) : [],
+        auto_approve_tools: autoApproveTools,
       },
     };
     if (ttsApiKey && update.tts) {
@@ -442,6 +445,28 @@ export function Settings({
 
           {agentPreset !== "custom" && <AgentSetupPanel preset={presetId} />}
 
+          <Field
+            label="Tool permissions"
+            hint="Agents ask before reading files or running commands. Choose whether Meuxe answers for you."
+          >
+            <div className="grid gap-2 sm:grid-cols-2">
+              <ChoiceCard
+                compact
+                selected={autoApproveTools}
+                onClick={() => setAutoApproveTools(true)}
+                title="Allow automatically"
+                description="Smoother chats; the companion can help without interruptions."
+              />
+              <ChoiceCard
+                compact
+                selected={!autoApproveTools}
+                onClick={() => setAutoApproveTools(false)}
+                title="Ask me each time"
+                description="Every tool request shows an Allow / Deny prompt in the chat."
+              />
+            </div>
+          </Field>
+
           <Button variant="primary" loading={saving} onClick={handleSave}>
             Save agent
           </Button>
@@ -490,7 +515,9 @@ export function Settings({
           )}
 
           {!SETTINGS_TTS_PRESETS[ttsProvider]?.needs_key && (
-            <Notice tone="success">The built-in voice works right away. No account or key needed.</Notice>
+            <Notice tone="success">
+              Meuxe TTS is the default — built in and free, with no account or API key needed.
+            </Notice>
           )}
 
           <Field label="Voice">

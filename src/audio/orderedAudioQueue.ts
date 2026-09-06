@@ -14,7 +14,7 @@ interface QueueEntry {
 
 export type QueueDecision =
   | { kind: "wait" }
-  | { kind: "skip"; requestId: string; index: number }
+  | { kind: "skip"; requestId: string; index: number; task?: SentenceTask }
   | {
       kind: "play";
       requestId: string;
@@ -103,7 +103,12 @@ export class OrderedAudioQueue {
 
     const entry = this.entries.get(this.nextToPlay);
     if (entry?.status === "failed") {
-      return { kind: "skip", requestId: this.requestId, index: this.nextToPlay };
+      return {
+        kind: "skip",
+        requestId: this.requestId,
+        index: this.nextToPlay,
+        task: entry.task,
+      };
     }
     if (entry?.status === "ready" && entry.task && entry.audio !== undefined) {
       return {

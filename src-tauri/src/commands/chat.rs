@@ -114,6 +114,15 @@ pub(crate) fn build_acp_agent_prompt(
     parts.push("## Current user message".to_string());
     parts.push(user_message.trim().to_string());
 
+    parts.push(String::new());
+    parts.push("## How to reply".to_string());
+    parts.push(
+        "Stay in character. Use tools when they need help with their computer; do not wander the machine unless they asked. Never mention OpenCode, this workspace, or that you are an agent."
+            .to_string(),
+    );
+    parts.push("Start every spoken sentence with `[expression:NAME]`.".to_string());
+    parts.push("End with a `<<<meuxe ... >>>` block (`{}` if nothing changed).".to_string());
+
     parts.join("\n")
 }
 
@@ -240,6 +249,11 @@ fn find_sentence_boundary(text: &str, allow_end_boundary: bool) -> Option<usize>
             continue;
         }
 
+        // Don't split "Dr. Chen", "e.g. this", or "U.S. today".
+        if ch == '.' && looks_like_abbreviation(text, idx) {
+            continue;
+        }
+
         let mut end = idx + ch.len_utf8();
         while let Some(&(next_idx, next_ch)) = chars.peek() {
             if matches!(
@@ -263,6 +277,35 @@ fn find_sentence_boundary(text: &str, allow_end_boundary: bool) -> Option<usize>
     }
 
     None
+}
+
+fn looks_like_abbreviation(text: &str, dot_idx: usize) -> bool {
+    let before = &text[..dot_idx];
+    let word = before
+        .rsplit(|c: char| !c.is_ascii_alphabetic())
+        .next()
+        .unwrap_or("");
+    if word.is_empty() {
+        return false;
+    }
+    if word.len() == 1 {
+        return true;
+    }
+    matches!(
+        word.to_ascii_lowercase().as_str(),
+        "dr" | "mr"
+            | "mrs"
+            | "ms"
+            | "prof"
+            | "sr"
+            | "jr"
+            | "st"
+            | "vs"
+            | "etc"
+            | "inc"
+            | "ltd"
+            | "ave"
+    )
 }
 
 #[derive(Debug, PartialEq)]
@@ -615,6 +658,22 @@ mod tests {
     }
 
     #[test]
+    fn does_not_split_on_titles_or_initials() {
+        assert_eq!(
+            find_sentence_boundary("I talked to Dr. Chen yesterday. Next", false),
+            Some(31)
+        );
+        assert_eq!(
+            find_sentence_boundary("See Mr. Smith about it. Done", false),
+            Some(23)
+        );
+        assert_eq!(
+            find_sentence_boundary("We moved to the U.S. last year. Next", false),
+            Some(31)
+        );
+    }
+
+    #[test]
     fn waits_for_more_if_sentence_ends_at_buffer_end() {
         assert_eq!(find_sentence_boundary("Hello there.", false), None);
     }
@@ -642,6 +701,49 @@ mod tests {
     }
 
     #[test]
+    fn peel_expression_maps_companion_moods_to_global_faces() {
+        use super::peel_expression_prefix;
+        let mut current = "neutral".to_string();
+        let rest = peel_expression_prefix("[expression:hurt] That stung.", &mut current);
+        assert_eq!(current, "sad");
+        assert_eq!(rest, "That stung.");
+
+        let rest = peel_expression_prefix("[expression:worried] Are you okay?", &mut current);
+        assert_eq!(current, "thinking");
+        assert_eq!(rest, "Are you okay?");
+    }
+
+    #[test]
+    fn streamed_reply_hides_trailer_and_keeps_titles_together() {
+        use meuxe_core::memory::{parse_turn_notes, TrailerSplitter};
+
+        let chunks = [
+            "[expression:sad] I talked to Dr. Chen yesterday. ",
+            "[expression:thinking] Are you actually going to tell me",
+            " how it went?\n```json\n<<<meu",
+            "xe\n{\"remember\":[\"They saw Dr. Chen\"],\"mood\":\"hurt\"}\n>>>\n",
+        ];
+        let mut splitter = TrailerSplitter::new();
+        let mut visible = String::new();
+        for chunk in chunks {
+            visible.push_str(&splitter.feed(chunk));
+        }
+        let (rest, trailer) = splitter.finish();
+        visible.push_str(&rest);
+
+        assert!(!visible.contains("<<<meuxe"));
+        assert!(!visible.contains("remember"));
+        assert!(visible.contains("Dr. Chen"));
+        assert_eq!(
+            find_sentence_boundary(&visible, false).map(|i| &visible[..i]),
+            Some("[expression:sad] I talked to Dr. Chen yesterday.")
+        );
+        let notes = parse_turn_notes(&trailer.unwrap()).unwrap();
+        assert_eq!(notes.remember, vec!["They saw Dr. Chen"]);
+        assert_eq!(notes.mood.unwrap().name, "hurt");
+    }
+
+    #[test]
     fn build_acp_agent_prompt_includes_persona_and_user_message() {
         use super::build_acp_agent_prompt;
         let messages = vec![
@@ -656,6 +758,11 @@ mod tests {
         assert!(prompt.contains("Companion: Hey!"));
         assert!(prompt.contains("Who are you?"));
         assert!(prompt.contains("not OpenCode"));
+        assert!(prompt.contains("## How to reply"));
+        assert!(prompt.contains("Use tools when they need help"));
+        assert!(prompt.contains("Stay in character"));
+        assert!(prompt.contains("[expression:NAME]"));
+        assert!(prompt.contains("<<<meuxe"));
     }
 
     #[tokio::test]

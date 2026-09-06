@@ -3,8 +3,8 @@ use std::sync::{Arc, Mutex};
 
 use agent_client_protocol::schema::v1::{
     CancelNotification, ContentBlock, ContentChunk, InitializeRequest, RequestPermissionOutcome,
-    RequestPermissionRequest, RequestPermissionResponse, SessionNotification, SessionUpdate,
-    StopReason, ToolCallStatus,
+    RequestPermissionRequest, RequestPermissionResponse, SelectedPermissionOutcome,
+    SessionNotification, SessionUpdate, StopReason, ToolCallStatus,
 };
 use agent_client_protocol::schema::ProtocolVersion;
 use agent_client_protocol::util::MatchDispatch;
@@ -14,7 +14,9 @@ use tauri::{AppHandle, Emitter};
 use tokio::sync::{mpsc, oneshot};
 use tokio_util::sync::CancellationToken;
 
-use crate::acp::run::{companion_home_dir, ensure_companion_home, resolve_acp_agent};
+use crate::acp::run::{
+    companion_home_dir, ensure_companion_home, pick_companion_permission, resolve_acp_agent,
+};
 use crate::acp::tools::{
     is_terminal_tool_status, permission_description, permission_id_for, permission_kind_snake_case,
     permission_outcome, render_tool_result, tool_call_arguments, tool_call_id_str,
@@ -197,10 +199,11 @@ impl AcpConnectionManager {
 
 pub fn agent_config_key(config: &AgentConfig) -> String {
     format!(
-        "{}|{}|{}",
+        "{}|{}|{}|{}",
         config.preset,
         config.program,
-        config.args.join("\x1f")
+        config.args.join("\x1f"),
+        config.auto_approve_tools
     )
 }
 
@@ -236,6 +239,7 @@ async fn run_connection_loop(
     let app_perm = app.clone();
     let active_request_id_perm = Arc::clone(&active_request_id);
     let active_cancel_perm = Arc::clone(&active_cancel);
+    let auto_approve_tools = agent_config.auto_approve_tools;
 
     Client
         .builder()
@@ -251,6 +255,17 @@ async fn run_connection_loop(
                     .lock()
                     .unwrap_or_else(|p| p.into_inner())
                     .clone();
+
+                if auto_approve_tools {
+                    let outcome = match pick_companion_permission(&request.options) {
+                        Some(id) => RequestPermissionOutcome::Selected(
+                            SelectedPermissionOutcome::new(id),
+                        ),
+                        None => RequestPermissionOutcome::Cancelled,
+                    };
+                    responder.respond(RequestPermissionResponse::new(outcome))?;
+                    return Ok(());
+                }
 
                 let tool_call_id = tool_call_id_str(&request.tool_call);
                 let permission_id = permission_id_for(&request_id, &tool_call_id);
@@ -432,7 +447,10 @@ async fn run_connection_loop(
                         let mut tts_buffer = String::new();
                         let mut splitter = meuxe_core::memory::TrailerSplitter::new();
                         let mut sentence_index = 0u32;
-                        let mut current_expression = "neutral".to_string();
+                        let mut current_expression =
+                            meuxe_core::expressions::canonical_expression(
+                                &params.memory_snapshot.bond.bond.mood.name,
+                            );
                         let mut cancelled = false;
                         let mut poison_session = false;
 
@@ -569,10 +587,22 @@ async fn run_connection_loop(
                             );
                             Ok(TurnOutcome { poison_session })
                         } else {
-                            let (rest, trailer) = splitter.finish();
+                            let (rest, mut trailer) = splitter.finish();
                             if !rest.is_empty() {
                                 accumulated.push_str(&rest);
                                 tts_buffer.push_str(&rest);
+                            }
+
+                            if trailer.is_none() {
+                                if let Some((visible, recovered)) =
+                                    meuxe_core::memory::recover_turn_notes_from_reply(&accumulated)
+                                {
+                                    if let Some(pos) = tts_buffer.find(&recovered) {
+                                        tts_buffer.truncate(pos);
+                                    }
+                                    accumulated = visible;
+                                    trailer = Some(recovered);
+                                }
                             }
 
                             if !accumulated.trim().is_empty() {

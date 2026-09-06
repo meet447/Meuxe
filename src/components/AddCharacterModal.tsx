@@ -8,6 +8,7 @@ import {
 } from "../api/tauri";
 import { buildCompanionPersonalityDraft } from "../lib/companionCharacterDraft";
 import { COMPANION_VIBE_PACKS } from "../lib/companionVibes";
+import { DEFAULT_TTS_VOICE } from "../lib/ttsPresets";
 import type { AppConfig, ModelInfo } from "../types";
 import { CompanionAvatarPreview } from "./onboarding/CompanionAvatarPreview";
 import { ModelPicker } from "./onboarding/ModelPicker";
@@ -50,7 +51,7 @@ export function AddCharacterModal({
   const [models, setModels] = useState<ModelInfo[]>([]);
   const [userName, setUserName] = useState("");
   const [userAbout, setUserAbout] = useState("");
-  const [voice, setVoice] = useState("jp_001");
+  const [voice, setVoice] = useState(DEFAULT_TTS_VOICE);
   const [name, setName] = useState("");
   const [vibe, setVibe] = useState("Wise");
   const [relationshipStyle, setRelationshipStyle] = useState("Gentle");
@@ -71,7 +72,7 @@ export function AddCharacterModal({
       .then((cfg: AppConfig) => {
         setUserName(cfg.user?.name || "");
         setUserAbout(cfg.user?.about || "");
-        setVoice(cfg.tts?.voice || "jp_001");
+        setVoice(cfg.tts?.voice || DEFAULT_TTS_VOICE);
       })
       .catch((err) => {
         console.error("Failed to load config for character creation:", err);

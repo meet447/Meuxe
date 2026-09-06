@@ -27,11 +27,11 @@ The full desktop app (`npm run tauri dev`) requires a display. In a headless Clo
 
 See `package.json` scripts and the CI workflow at `.github/workflows/ci.yml`.
 
-- **Frontend tests:** `npm test` (Vitest, 61 tests)
+- **Frontend tests:** `npm test` (Vitest, 66 tests)
 - **Frontend build:** `npm run build` (tsc + vite build)
 - **Rust format check:** `cargo fmt --all -- --check`
 - **Rust lint:** `cargo clippy --workspace --all-targets -- -D warnings`
-- **Rust tests:** `cargo test --workspace` (79 tests across meuxe-core and tauri crate)
+- **Rust tests:** `cargo test --workspace` (100 tests across meuxe-core and tauri crate)
 
 ### Rust build environment variables
 

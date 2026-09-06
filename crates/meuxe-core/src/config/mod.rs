@@ -50,6 +50,13 @@ impl ConfigManager {
         Ok(config)
     }
 
+    /// Persist only the active companion. Other settings stay as they are on disk.
+    pub fn set_active_character(&self, character_id: &str) -> Result<()> {
+        let mut config = self.load()?;
+        config.active_character = character_id.to_string();
+        self.save_fresh(&config)
+    }
+
     pub fn save(&self, new_config: &AppConfig) -> Result<()> {
         let existing = self.load().ok();
 
@@ -141,6 +148,25 @@ mod tests {
         assert_eq!(config.user.name, "");
         assert!(!config.onboarding_complete);
         assert!(config.llm_providers.is_empty());
+        assert_eq!(config.tts.provider, "tiktok");
+        assert_eq!(config.tts.voice, "en_us_001");
+        assert_eq!(config.tts.api_key, None);
+    }
+
+    #[test]
+    fn test_tts_config_defaults() {
+        let tts = TtsConfig::default();
+        assert_eq!(tts.provider, "tiktok");
+        assert_eq!(tts.voice, "en_us_001");
+        assert_eq!(tts.api_key, None);
+    }
+
+    #[test]
+    fn test_tts_config_deserialize_empty_applies_defaults() {
+        let tts: TtsConfig = serde_json::from_str("{}").unwrap();
+        assert_eq!(tts.provider, "tiktok");
+        assert_eq!(tts.voice, "en_us_001");
+        assert_eq!(tts.api_key, None);
     }
 
     #[test]
@@ -177,6 +203,33 @@ mod tests {
         let loaded = mgr.load().unwrap();
         assert!(!loaded.onboarding_complete);
         assert_eq!(loaded.user.name, "Bob");
+    }
+
+    #[test]
+    fn set_active_character_preserves_tts_and_agent() {
+        let tmp = TempDir::new().unwrap();
+        let mgr = ConfigManager::new(tmp.path());
+
+        let mut config = AppConfig::default();
+        config.tts.provider = "elevenlabs".to_string();
+        config.tts.voice = "Rachel".to_string();
+        config.tts.api_key = Some("sk-voice-key-12345678".to_string());
+        config.agent.preset = "claude".to_string();
+        config.active_character = "luna".to_string();
+        config.onboarding_complete = true;
+        mgr.save_fresh(&config).unwrap();
+
+        mgr.set_active_character("aoi").unwrap();
+        let loaded = mgr.load().unwrap();
+        assert_eq!(loaded.active_character, "aoi");
+        assert_eq!(loaded.tts.provider, "elevenlabs");
+        assert_eq!(loaded.tts.voice, "Rachel");
+        assert_eq!(
+            loaded.tts.api_key,
+            Some("sk-voice-key-12345678".to_string())
+        );
+        assert_eq!(loaded.agent.preset, "claude");
+        assert!(loaded.onboarding_complete);
     }
 
     #[test]

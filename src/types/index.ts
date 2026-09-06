@@ -137,6 +137,8 @@ export interface AgentConfig {
   preset: string;
   program: string;
   args: string[];
+  /** Approve agent tool permissions automatically (default) or ask in the chat UI. */
+  auto_approve_tools?: boolean;
 }
 
 export interface LlmConfig {

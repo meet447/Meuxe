@@ -1,7 +1,7 @@
 use chrono::{DateTime, Duration, Utc};
 use regex::Regex;
 use serde::{Deserialize, Serialize};
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::io::BufRead;
 use std::path::{Path, PathBuf};
 use std::sync::RwLock;
@@ -661,11 +661,12 @@ fn apply_thread_notes(bond: &mut Bond, notes: &TurnNotes, now: DateTime<Utc>) {
             continue;
         }
         let needle = trimmed.to_ascii_lowercase();
-        if bond
-            .threads
-            .iter()
-            .any(|t| t.text.to_ascii_lowercase().contains(&needle))
-        {
+        if bond.threads.iter().any(|t| {
+            let existing = t.text.to_ascii_lowercase();
+            existing.contains(&needle)
+                || needle.contains(&existing)
+                || near_duplicate_tokens(&content_tokens(trimmed), &content_tokens(&t.text))
+        }) {
             continue;
         }
         bond.threads.push(Thread {
@@ -689,20 +690,58 @@ fn trim_threads(bond: &mut Bond) {
 
 fn upsert_fact(facts: &mut Vec<Fact>, text: &str, source: FactSource, now: DateTime<Utc>) -> Fact {
     let norm = normalize_fact_text(text);
-    let tokens = fact_tokens(text);
+    let tokens = content_tokens(text);
 
-    if let Some(existing) = facts.iter_mut().find(|f| {
-        let existing_norm = normalize_fact_text(&f.text);
-        if existing_norm == norm {
-            return true;
+    let matching: Vec<usize> = facts
+        .iter()
+        .enumerate()
+        .filter(|(_, f)| {
+            normalize_fact_text(&f.text) == norm
+                || near_duplicate_tokens(&tokens, &content_tokens(&f.text))
+        })
+        .map(|(i, _)| i)
+        .collect();
+
+    if let Some(&primary_idx) = matching.first() {
+        let mut best_text = facts[primary_idx].text.clone();
+        let mut best_token_count = token_count(&content_tokens(&best_text));
+        let mut total_mentions = 0_u32;
+
+        for &idx in &matching {
+            total_mentions = total_mentions.saturating_add(facts[idx].mentions);
+            let candidate = &facts[idx].text;
+            let candidate_tokens = token_count(&content_tokens(candidate));
+            if candidate_tokens > best_token_count
+                || (candidate_tokens == best_token_count && candidate.len() > best_text.len())
+            {
+                best_text = candidate.clone();
+                best_token_count = candidate_tokens;
+            }
         }
-        jaccard(&tokens, &fact_tokens(&f.text)) >= 0.8
-    }) {
-        existing.text = text.to_string();
-        existing.confirmed_at = now;
-        existing.mentions = existing.mentions.saturating_add(1);
-        existing.kind = infer_fact_kind(text);
-        return existing.clone();
+
+        let new_tokens = token_count(&content_tokens(text));
+        if new_tokens > best_token_count
+            || (new_tokens == best_token_count && text.len() > best_text.len())
+        {
+            best_text = text.to_string();
+        }
+
+        let primary_id = facts[primary_idx].id.clone();
+        facts[primary_idx].text = best_text.clone();
+        facts[primary_idx].kind = infer_fact_kind(&best_text);
+        facts[primary_idx].confirmed_at = now;
+        facts[primary_idx].mentions = total_mentions.saturating_add(1);
+
+        let merged_tokens = content_tokens(&best_text);
+        facts.retain(|f| {
+            f.id == primary_id || !near_duplicate_tokens(&merged_tokens, &content_tokens(&f.text))
+        });
+
+        return facts
+            .iter()
+            .find(|f| f.id == primary_id)
+            .cloned()
+            .expect("merged fact must exist");
     }
 
     let fact = Fact {
@@ -747,24 +786,80 @@ fn collapse_whitespace(text: &str) -> String {
     text.split_whitespace().collect::<Vec<_>>().join(" ")
 }
 
-fn fact_tokens(text: &str) -> HashSet<String> {
-    normalize_fact_text(text)
-        .split_whitespace()
-        .map(str::to_string)
-        .collect()
+const FACT_STOPWORDS: &[&str] = &[
+    "a", "an", "the", "is", "are", "was", "be", "of", "and", "who", "that", "their", "they",
+    "them", "has", "have", "had", "named", "called", "name", "user", "meet",
+];
+
+fn strip_leading_filler(text: &str) -> &str {
+    let mut rest = text.trim_start();
+    for prefix in ["the user ", "their "] {
+        if rest.starts_with(prefix) {
+            rest = &rest[prefix.len()..];
+        }
+    }
+    rest
 }
 
-fn jaccard(a: &HashSet<String>, b: &HashSet<String>) -> f64 {
+fn content_tokens(text: &str) -> HashMap<String, u32> {
+    let normalized = normalize_fact_text(strip_leading_filler(text));
+    let mut counts = HashMap::new();
+    for token in normalized.split_whitespace() {
+        if FACT_STOPWORDS.contains(&token) {
+            continue;
+        }
+        *counts.entry(token.to_string()).or_insert(0) += 1;
+    }
+    counts
+}
+
+fn token_count(tokens: &HashMap<String, u32>) -> u32 {
+    tokens.values().sum()
+}
+
+fn near_duplicate_tokens(a: &HashMap<String, u32>, b: &HashMap<String, u32>) -> bool {
+    if a.is_empty() && b.is_empty() {
+        return true;
+    }
+    let intersection = bag_intersection(a, b);
+    if intersection >= 2 {
+        let min_len = token_count(a).min(token_count(b));
+        if min_len > 0 && intersection as f64 / min_len as f64 >= 0.75 {
+            return true;
+        }
+    }
+    bag_jaccard(a, b) >= 0.55
+}
+
+fn bag_intersection(a: &HashMap<String, u32>, b: &HashMap<String, u32>) -> u32 {
+    a.iter()
+        .filter_map(|(token, count_a)| b.get(token).map(|count_b| (*count_a).min(*count_b)))
+        .sum()
+}
+
+fn bag_jaccard(a: &HashMap<String, u32>, b: &HashMap<String, u32>) -> f64 {
     if a.is_empty() && b.is_empty() {
         return 1.0;
     }
-    let intersection = a.intersection(b).count();
-    let union = a.union(b).count();
+    let intersection = bag_intersection(a, b);
+    let union = bag_union(a, b);
     if union == 0 {
         0.0
     } else {
         intersection as f64 / union as f64
     }
+}
+
+fn bag_union(a: &HashMap<String, u32>, b: &HashMap<String, u32>) -> u32 {
+    let keys: HashSet<&String> = a.keys().chain(b.keys()).collect();
+    keys.into_iter()
+        .map(|key| {
+            a.get(key)
+                .copied()
+                .unwrap_or(0)
+                .max(b.get(key).copied().unwrap_or(0))
+        })
+        .sum()
 }
 
 fn infer_fact_kind(text: &str) -> FactKind {
@@ -890,6 +985,50 @@ mod tests {
     }
 
     #[test]
+    fn near_duplicate_facts_merge_real_chat_rows() {
+        let (_tmp, store) = mem();
+        let rows = [
+            "has a dog named Rex",
+            "Rex is a corgi",
+            "Meet has a dog named Rex who is a corgi",
+            "has a job interview tomorrow with Dr. Chen",
+            "Meet has a job interview with Dr. Chen at 10am",
+        ];
+        for row in rows {
+            store
+                .apply_turn("rika", "user1", "", Some(notes_with_remember(row)))
+                .unwrap();
+        }
+        let snap = store.snapshot("rika", "user1").unwrap();
+        assert_eq!(snap.facts.len(), 2);
+        let combined = snap
+            .facts
+            .iter()
+            .map(|f| f.text.to_ascii_lowercase())
+            .collect::<Vec<_>>()
+            .join(" ");
+        assert!(combined.contains("rex") && combined.contains("corgi"));
+        assert!(combined.contains("chen") || combined.contains("interview"));
+    }
+
+    #[test]
+    fn near_duplicate_open_threads_merge() {
+        let (_tmp, store) = mem();
+        let notes1 = TurnNotes {
+            open_threads: vec!["what kind of job it is".into()],
+            ..Default::default()
+        };
+        let notes2 = TurnNotes {
+            open_threads: vec!["what kind of job is the interview for".into()],
+            ..Default::default()
+        };
+        store.apply_turn("rika", "user1", "", Some(notes1)).unwrap();
+        store.apply_turn("rika", "user1", "", Some(notes2)).unwrap();
+        let snap = store.snapshot("rika", "user1").unwrap();
+        assert_eq!(snap.bond.bond.threads.len(), 1);
+    }
+
+    #[test]
     fn near_duplicate_facts_merge() {
         let (_tmp, store) = mem();
         store
@@ -919,11 +1058,7 @@ mod tests {
         let (_tmp, store) = mem();
         for i in 0..305 {
             store
-                .add_fact(
-                    "rika",
-                    "user1",
-                    &format!("Unique fact number {i} about topic {i}"),
-                )
+                .add_fact("rika", "user1", &format!("Fact {i} topic {i} only"))
                 .unwrap();
         }
         let snap = store.snapshot("rika", "user1").unwrap();
@@ -1197,5 +1332,102 @@ mod tests {
             .filter(|l| !l.trim().is_empty())
             .count();
         assert_eq!(on_disk, MOMENT_DISK_CAP);
+    }
+
+    #[test]
+    fn long_conversation_holds_anger_until_a_real_apology() {
+        let (_tmp, store) = mem();
+        let t0 = Utc.with_ymd_and_hms(2026, 9, 5, 10, 0, 0).unwrap();
+
+        let turns: Vec<(&str, TurnNotes)> = vec![
+            (
+                "Hey, I'm Meet. My dog is named Rex and I just started a new job.",
+                TurnNotes {
+                    remember: vec![
+                        "Their name is Meet".into(),
+                        "Their dog is named Rex".into(),
+                        "They just started a new job".into(),
+                    ],
+                    moment: Some("They introduced themselves and Rex.".into()),
+                    mood: Some(MoodNote {
+                        name: "happy".into(),
+                        intensity: Some(0.4),
+                        cause: Some("they opened up".into()),
+                        wants: None,
+                    }),
+                    closeness: Some(1),
+                    ..Default::default()
+                },
+            ),
+            (
+                "I promised I'd tell you how the interview went. It was fine. anyway whatever",
+                TurnNotes {
+                    moment: Some("They brushed off a promise about the interview.".into()),
+                    mood: Some(MoodNote {
+                        name: "hurt".into(),
+                        intensity: Some(0.7),
+                        cause: Some("they brushed off something they promised to share".into()),
+                        wants: Some("a real conversation about how it went".into()),
+                    }),
+                    closeness: Some(-1),
+                    open_threads: vec!["Ask how the interview actually went".into()],
+                    ..Default::default()
+                },
+            ),
+            (
+                "lol you're being dramatic. thanks anyway you're great",
+                TurnNotes {
+                    moment: Some("They dismissed the feeling and complimented instead.".into()),
+                    mood: Some(MoodNote {
+                        name: "happy".into(),
+                        intensity: Some(0.8),
+                        cause: None,
+                        wants: None,
+                    }),
+                    closeness: Some(1),
+                    ..Default::default()
+                },
+            ),
+            (
+                "ok fine. I froze in the second round and I hate that I snapped at you.",
+                TurnNotes {
+                    remember: vec!["They froze in the second interview round".into()],
+                    moment: Some("They finally told the truth and owned snapping.".into()),
+                    mood: Some(MoodNote {
+                        name: "warm".into(),
+                        intensity: Some(0.45),
+                        cause: Some("they were honest".into()),
+                        wants: None,
+                    }),
+                    closeness: Some(2),
+                    closed_threads: vec!["interview".into()],
+                    ..Default::default()
+                },
+            ),
+        ];
+
+        let mut now = t0;
+        let mut last = store.snapshot_at("rika", "user1", now).unwrap();
+        for (message, notes) in turns {
+            last = store
+                .apply_turn_at("rika", "user1", message, Some(notes), now)
+                .unwrap();
+            now += Duration::minutes(3);
+        }
+
+        assert!(last
+            .facts
+            .iter()
+            .any(|f| f.text.to_lowercase().contains("rex")));
+        assert!(last
+            .facts
+            .iter()
+            .any(|f| f.text.to_lowercase().contains("froze")));
+        assert_eq!(last.bond.bond.turns, 4);
+        assert_eq!(last.bond.bond.mood.name, "warm");
+        assert!(last.bond.bond.threads.is_empty());
+        let context = crate::memory::format_memory_context(&last, "Meet", "how is rex");
+        assert!(context.contains("Rex") || context.contains("rex"));
+        assert!(!context.to_lowercase().contains("<<<meuxe"));
     }
 }

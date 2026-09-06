@@ -2400,6 +2400,7 @@ dependencies = [
  "tempfile",
  "tokio",
  "tokio-util",
+ "webkit2gtk",
  "whisper-rs",
 ]
 
