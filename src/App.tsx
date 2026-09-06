@@ -95,6 +95,12 @@ function devAvatarPreview(): "haru" | "utsuwa" | null {
   return null;
 }
 
+const SHORTCUT_TOGGLE = "CommandOrControl+Shift+E";
+const SHORTCUT_TEXT = "CommandOrControl+Shift+Space";
+const SHORTCUT_MIC = "CommandOrControl+Shift+M";
+// Serializes global-shortcut (un)registration across effect runs.
+let shortcutQueue: Promise<void> = Promise.resolve();
+
 function App() {
   const avatarPreview = useMemo(() => devAvatarPreview(), []);
   const { isMiniMode, miniCharacterId, toggleMini } = useWindow();
@@ -112,72 +118,45 @@ function App() {
 
   // Global shortcuts: registered once from main window, work in all modes
   // Actions are dispatched via Tauri events so both windows can respond
+  const toggleMiniRef = useRef(toggleMini);
+  toggleMiniRef.current = toggleMini;
   useEffect(() => {
     if (isMiniMode) return;
 
-    const TOGGLE = "CommandOrControl+Shift+E";
-    const TEXT = "CommandOrControl+Shift+Space";
-    const MIC = "CommandOrControl+Shift+M";
-    const registered: string[] = [];
     let cancelled = false;
+    const broadcast = (event: string) => invoke("broadcast_event", { event }).catch(() => {});
+    const handlers: Array<[string, () => void]> = [
+      [SHORTCUT_TOGGLE, () => toggleMiniRef.current(selectedCharIdRef.current || undefined)],
+      [SHORTCUT_TEXT, () => broadcast("shortcut:text")],
+      [SHORTCUT_MIC, () => broadcast("shortcut:mic")],
+    ];
 
-    const setup = async () => {
-      const broadcast = (event: string) => invoke("broadcast_event", { event }).catch(() => {});
-
-      try {
-        await register(TOGGLE, (event) => {
-          if (event.state === "Pressed") {
-            toggleMini(selectedCharIdRef.current || undefined);
-          }
-        });
-        if (cancelled) {
-          await unregister(TOGGLE).catch(() => {});
-          return;
+    // Register/unregister are async and must be serialized: a remount (StrictMode
+    // in dev, or a real one) would otherwise race a fresh register() against the
+    // previous effect's still-pending unregister() and fail with "already registered".
+    shortcutQueue = shortcutQueue.then(async () => {
+      if (cancelled) return;
+      for (const [combo, run] of handlers) {
+        try {
+          await unregister(combo).catch(() => {});
+          await register(combo, (event) => {
+            if (event.state === "Pressed") run();
+          });
+        } catch (err) {
+          console.error(`Failed to register shortcut ${combo}:`, err);
         }
-        registered.push(TOGGLE);
-      } catch (err) {
-        console.error("Failed to register toggle shortcut:", err);
       }
+    });
 
-      try {
-        await register(TEXT, (event) => {
-          if (event.state === "Pressed") {
-            broadcast("shortcut:text");
-          }
-        });
-        if (cancelled) {
-          await unregister(TEXT).catch(() => {});
-          return;
-        }
-        registered.push(TEXT);
-      } catch (err) {
-        console.error("Failed to register text shortcut:", err);
-      }
-
-      try {
-        await register(MIC, (event) => {
-          if (event.state === "Pressed") {
-            broadcast("shortcut:mic");
-          }
-        });
-        if (cancelled) {
-          await unregister(MIC).catch(() => {});
-          return;
-        }
-        registered.push(MIC);
-      } catch (err) {
-        console.error("Failed to register mic shortcut:", err);
-      }
-    };
-
-    void setup();
     return () => {
       cancelled = true;
-      for (const s of registered) {
-        unregister(s).catch(() => {});
-      }
+      shortcutQueue = shortcutQueue.then(async () => {
+        for (const [combo] of handlers) {
+          await unregister(combo).catch(() => {});
+        }
+      });
     };
-  }, [isMiniMode, toggleMini]);
+  }, [isMiniMode]);
 
   // Listen for shortcut events (both windows listen, only the active one acts)
   useEffect(() => {
