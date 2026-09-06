@@ -9,7 +9,7 @@ use serde::Serialize;
 use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::sync::{PoisonError, RwLock};
+use std::sync::{Mutex, PoisonError, RwLock};
 use std::time::SystemTime;
 
 struct CharacterBlueprintInput<'a> {
@@ -40,6 +40,7 @@ struct CachedCharacter {
 pub struct CharacterLoader {
     characters_dir: PathBuf,
     cache: RwLock<HashMap<String, CachedCharacter>>,
+    list_cache: Mutex<Option<Vec<CharacterSummary>>>,
 }
 
 impl CharacterLoader {
@@ -47,16 +48,48 @@ impl CharacterLoader {
         Self {
             characters_dir: data_dir.join("characters"),
             cache: RwLock::new(HashMap::new()),
+            list_cache: Mutex::new(None),
         }
     }
 
     pub fn clear_cache(&self) {
         let mut cache = self.cache.write().unwrap_or_else(PoisonError::into_inner);
         cache.clear();
+        self.invalidate_cache();
+    }
+
+    pub fn invalidate_cache(&self) {
+        let mut list_cache = self
+            .list_cache
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner);
+        *list_cache = None;
     }
 
     /// List all available characters (summary only).
     pub fn list_characters(&self) -> Result<Vec<CharacterSummary>> {
+        {
+            let list_cache = self
+                .list_cache
+                .lock()
+                .unwrap_or_else(PoisonError::into_inner);
+            if let Some(cached) = list_cache.as_ref() {
+                return Ok(cached.clone());
+            }
+        }
+
+        let summaries = self.list_characters_uncached()?;
+
+        let mut list_cache = self
+            .list_cache
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner);
+        *list_cache = Some(summaries.clone());
+
+        Ok(summaries)
+    }
+
+    fn list_characters_uncached(&self) -> Result<Vec<CharacterSummary>> {
         let sources = self.iter_character_sources()?;
         let mut summaries = Vec::new();
         for src in sources {
@@ -213,6 +246,8 @@ impl CharacterLoader {
         // examples/chat_examples.md
         let examples = build_examples_section(&blueprint);
         fs::write(char_dir.join("examples/chat_examples.md"), &examples)?;
+
+        self.invalidate_cache();
 
         Ok(id)
     }
@@ -1136,5 +1171,80 @@ mod tests {
             )
             .unwrap_err();
         assert!(err.to_string().contains("already exists"));
+    }
+
+    #[test]
+    fn test_list_characters_cache_hit() {
+        let tmp = TempDir::new().unwrap();
+        let loader = CharacterLoader::new(tmp.path());
+        loader
+            .create_character(
+                "Cache List",
+                "Personality",
+                "model1",
+                "en-US-1",
+                "Chill",
+                "Gentle",
+                "natural",
+                "User",
+                "About",
+            )
+            .unwrap();
+
+        let first = loader.list_characters().unwrap();
+        assert_eq!(first.len(), 1);
+        assert_eq!(first[0].name, "Cache List");
+
+        std::fs::remove_dir_all(tmp.path().join("characters/cache_list")).unwrap();
+
+        let cached = loader.list_characters().unwrap();
+        assert_eq!(cached.len(), 1);
+        assert_eq!(cached[0].name, "Cache List");
+    }
+
+    #[test]
+    fn test_list_characters_cache_invalidation() {
+        let tmp = TempDir::new().unwrap();
+        let loader = CharacterLoader::new(tmp.path());
+        loader
+            .create_character(
+                "First",
+                "Personality",
+                "model1",
+                "en-US-1",
+                "Chill",
+                "Gentle",
+                "natural",
+                "User",
+                "About",
+            )
+            .unwrap();
+
+        let first = loader.list_characters().unwrap();
+        assert_eq!(first.len(), 1);
+
+        loader
+            .create_character(
+                "Second",
+                "Personality",
+                "model2",
+                "en-US-2",
+                "Cheerful",
+                "Teasing",
+                "playful",
+                "User",
+                "About",
+            )
+            .unwrap();
+
+        let refreshed = loader.list_characters().unwrap();
+        assert_eq!(refreshed.len(), 2);
+        let names: Vec<_> = refreshed.iter().map(|c| c.name.as_str()).collect();
+        assert!(names.contains(&"First"));
+        assert!(names.contains(&"Second"));
+
+        loader.invalidate_cache();
+        let after_external = loader.list_characters().unwrap();
+        assert_eq!(after_external.len(), 2);
     }
 }
