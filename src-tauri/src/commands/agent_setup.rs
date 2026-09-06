@@ -12,7 +12,6 @@ const NPM_INSTALL_TIMEOUT: Duration = Duration::from_secs(300);
 #[serde(rename_all = "snake_case")]
 pub enum AgentInstallSource {
     System,
-    Managed,
     Npx,
     None,
 }
@@ -29,7 +28,7 @@ pub struct AcpPrerequisitesStatus {
 pub struct AgentPresetSetupStatus {
     pub preset: String,
     pub ready: bool,
-    /// Meuxe app-data npm prefix install exists.
+    /// Legacy field kept for frontend compatibility; always false (installs are global now).
     pub managed_install: bool,
     /// A CLI was found on the user/system PATH (or standard global locations).
     pub system_path: bool,
@@ -43,29 +42,6 @@ pub struct AgentPresetSetupStatus {
 pub struct AgentSetupStatusResponse {
     pub prerequisites: AcpPrerequisitesStatus,
     pub agent: AgentPresetSetupStatus,
-}
-
-pub fn managed_npm_prefix(data_dir: &Path) -> PathBuf {
-    data_dir.join("agents/npm")
-}
-
-pub fn managed_npm_bin_dir(data_dir: &Path) -> PathBuf {
-    managed_npm_prefix(data_dir).join("bin")
-}
-
-pub fn managed_npm_modules_bin_dir(data_dir: &Path) -> PathBuf {
-    managed_npm_prefix(data_dir)
-        .join("node_modules")
-        .join(".bin")
-}
-
-/// Resolves a CLI shim from our managed npm prefix (`bin/` for global installs, or legacy `node_modules/.bin/`).
-pub fn resolve_managed_bin(data_dir: &Path, name: &str) -> Option<PathBuf> {
-    let candidates = [
-        managed_npm_bin_dir(data_dir).join(name),
-        managed_npm_modules_bin_dir(data_dir).join(name),
-    ];
-    candidates.into_iter().find(|p| is_executable_file(p))
 }
 
 /// Program name on PATH for each preset (system / global install).
@@ -159,22 +135,13 @@ pub struct AgentResolution {
     pub executable: Option<PathBuf>,
 }
 
-/// Global system install first, then Meuxe-managed fallback, then npx (Claude/Codex only).
-pub async fn resolve_agent(data_dir: &Path, preset: &str) -> AgentResolution {
+/// Global system install first, then npx (Claude/Codex only).
+pub async fn resolve_agent(_data_dir: &Path, preset: &str) -> AgentResolution {
     if let Some(system) = resolve_system_bin(preset) {
         return AgentResolution {
             source: AgentInstallSource::System,
             executable: Some(system),
         };
-    }
-
-    if let Some(name) = preset_system_binary_name(preset) {
-        if let Some(managed) = resolve_managed_bin(data_dir, name) {
-            return AgentResolution {
-                source: AgentInstallSource::Managed,
-                executable: Some(managed),
-            };
-        }
     }
 
     let prerequisites = check_prerequisites().await;
@@ -191,7 +158,7 @@ pub async fn resolve_agent(data_dir: &Path, preset: &str) -> AgentResolution {
     }
 }
 
-/// argv for spawning the agent (system → managed → bare name on PATH).
+/// argv for spawning the agent (system install or bare name on PATH).
 pub async fn resolve_opencode_argv(data_dir: &Path) -> Vec<String> {
     let resolution = resolve_agent(data_dir, "opencode").await;
     match resolution.executable {
@@ -248,7 +215,6 @@ pub async fn check_prerequisites() -> AcpPrerequisitesStatus {
 }
 
 fn status_from_resolution(preset: &str, resolution: AgentResolution) -> AgentPresetSetupStatus {
-    let managed_install = resolution.source == AgentInstallSource::Managed;
     let system_path = resolution.source == AgentInstallSource::System;
     let ready = resolution.source != AgentInstallSource::None;
     let system_command = resolution
@@ -264,9 +230,6 @@ fn status_from_resolution(preset: &str, resolution: AgentResolution) -> AgentPre
                     "Using OpenCode on your system: {}",
                     system_command.clone().unwrap_or_else(|| "opencode".into())
                 ),
-                AgentInstallSource::Managed => {
-                    "Using agent from Meuxe app folder (legacy local install).".into()
-                }
                 AgentInstallSource::None => {
                     "Install OpenCode globally (e.g. npm i -g opencode-ai) or use Install in settings.".into()
                 }
@@ -281,9 +244,6 @@ fn status_from_resolution(preset: &str, resolution: AgentResolution) -> AgentPre
                     "Using Claude ACP adapter on your system: {}",
                     system_command.clone().unwrap_or_default()
                 ),
-                AgentInstallSource::Managed => {
-                    "Using Claude ACP adapter from Meuxe app folder (legacy local install).".into()
-                }
                 AgentInstallSource::Npx => {
                     "No global adapter found — will run via npx on chat (install globally for a fixed version).".into()
                 }
@@ -300,9 +260,6 @@ fn status_from_resolution(preset: &str, resolution: AgentResolution) -> AgentPre
                     "Using Codex ACP adapter on your system: {}",
                     system_command.clone().unwrap_or_default()
                 ),
-                AgentInstallSource::Managed => {
-                    "Using Codex ACP adapter from Meuxe app folder (legacy local install).".into()
-                }
                 AgentInstallSource::Npx => {
                     "No global adapter found — will run via npx on chat (install globally for a fixed version).".into()
                 }
@@ -318,7 +275,7 @@ fn status_from_resolution(preset: &str, resolution: AgentResolution) -> AgentPre
     AgentPresetSetupStatus {
         preset: preset.to_string(),
         ready,
-        managed_install,
+        managed_install: false,
         system_path,
         needs_node,
         detail,
@@ -476,25 +433,17 @@ mod tests {
     }
 
     #[test]
-    fn resolution_prefers_system_over_managed() {
+    fn resolve_system_bin_finds_executable_in_search_dirs() {
         let tmp = TempDir::new().unwrap();
-        let data_dir = tmp.path().join("data");
-        let managed_bin = managed_npm_bin_dir(&data_dir);
-        fs::create_dir_all(&managed_bin).unwrap();
-        let managed = managed_bin.join("opencode");
-        fs::write(&managed, b"").unwrap();
-
-        let system_tmp = TempDir::new().unwrap();
-        let system_bin = system_tmp.path().join("opencode");
-        fs::write(&system_bin, b"#!/bin/sh\n").unwrap();
+        let bin = tmp.path().join("opencode");
+        fs::write(&bin, b"#!/bin/sh\n").unwrap();
         #[cfg(unix)]
         {
             use std::os::unix::fs::PermissionsExt;
-            fs::set_permissions(&system_bin, fs::Permissions::from_mode(0o755)).unwrap();
+            fs::set_permissions(&bin, fs::Permissions::from_mode(0o755)).unwrap();
         }
 
-        let system = find_executable_in_dirs("opencode", &[system_tmp.path().to_path_buf()]);
-        assert!(system.is_some());
-        assert_ne!(system.unwrap(), managed);
+        let found = find_executable_in_dirs("opencode", &[tmp.path().to_path_buf()]);
+        assert!(found.is_some());
     }
 }
