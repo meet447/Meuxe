@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, useCallback, memo } from "react";
 import type { RefObject } from "react";
-import { Pill, SendIcon, Spinner } from "../ui";
+import { SendIcon, Spinner } from "../ui";
 import { MicButton } from "../MicButton";
 
 type Props = {
@@ -12,7 +12,6 @@ type Props = {
   listening: boolean;
   onMicToggle: () => void;
   inputRef: RefObject<HTMLInputElement | null>;
-  statusLabel?: string | null;
   caption?: string | null;
   captionSpeaker?: string;
 };
@@ -26,7 +25,6 @@ export const FloatingChatInput = memo(function FloatingChatInput({
   listening,
   onMicToggle,
   inputRef,
-  statusLabel,
   caption,
   captionSpeaker,
 }: Props) {
@@ -68,11 +66,6 @@ export const FloatingChatInput = memo(function FloatingChatInput({
           )}
           <p className="text-[15px] leading-snug text-ink">{caption}</p>
         </div>
-      )}
-      {statusLabel && (
-        <Pill tone="honey" dot pulse>
-          {statusLabel}
-        </Pill>
       )}
       <form
         onSubmit={handleSubmit}

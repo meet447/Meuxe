@@ -706,30 +706,13 @@ export function useVRM(canvasRef: React.RefObject<HTMLCanvasElement | null>) {
     // Handled by the animation system: no manual bone manipulation needed
   }, []);
 
-  const triggerMotion = useCallback((_group: string, _index?: number) => {}, []);
-
-  const getDebug = useCallback(() => ({
-    modelLoaded: !!vrmRef.current,
-    currentEmotion: "",
-    expressionId: "",
-    motionPlaying: currentClipNameRef.current,
-    lipSyncActive: lipSyncActiveRef.current,
-    mouthValue: Math.round(mouthValueRef.current * 100) / 100,
-    mappingEmotions: [],
-    availableExpressions: availableExpressionsRef.current,
-    availableMotionGroups: availableMotionGroupsRef.current,
-    lastError: lastErrorRef.current,
-  }), []);
-
   return {
     loadModel,
     setExpression,
     startLipSync,
     stopLipSync,
-    triggerMotion,
     setViewport,
     setTypingReaction,
-    getDebug,
     handlePointerDown,
     handlePointerMove,
     handlePointerUp: endPointerDrag,

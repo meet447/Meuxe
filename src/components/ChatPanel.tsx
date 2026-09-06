@@ -23,8 +23,6 @@ interface Props {
   onTypingChange: (isTyping: boolean) => void;
   listening: boolean;
   onMicToggle: () => void;
-  ttsLoading?: boolean;
-  speaking?: boolean;
   onToolConfirm?: (permissionId: string, approved: boolean) => void;
   onCancel?: () => void;
   inputRef?: React.RefObject<HTMLInputElement | null>;
@@ -304,8 +302,6 @@ function timelineItemToMessage(item: ChatTimelineItem): ChatMessage | null {
   return { role: "assistant", text: item.text, expression: item.expression };
 }
 
-export const ChatInputBar = ChatInput;
-
 export function ChatPanel({
   timeline,
   loading,
@@ -315,8 +311,6 @@ export function ChatPanel({
   onTypingChange,
   listening,
   onMicToggle,
-  ttsLoading = false,
-  speaking = false,
   onToolConfirm,
   onCancel,
   inputRef: externalInputRef,
@@ -349,7 +343,7 @@ export function ChatPanel({
     };
   }, [streamingText]);
 
-  const isProcessing = loading || ttsLoading;
+  const isProcessing = loading;
 
   // ⚡ Bolt: Wrap O(N) array operations on the timeline in useMemo to prevent
   // traversing the entire history on every single streaming text update.
@@ -445,33 +439,8 @@ export function ChatPanel({
           </div>
         )}
 
-        {/* Voice generating indicator */}
-        {ttsLoading && !loading && (
-          <div className="flex justify-start">
-            <div
-              className={`max-w-[88%] rounded-card rounded-tl-[10px] px-4 py-3 ${
-                dark ? "bg-white/10 shadow-soft" : "bg-surface-2 shadow-soft"
-              }`}
-            >
-              <Pill tone="accent" dot pulse>
-                Speaking…
-              </Pill>
-            </div>
-          </div>
-        )}
-
         <div ref={messagesEndRef} className="h-6" />
       </div>
-
-      {/* Status Bar */}
-      {(speaking || ttsLoading) && !hideInput && (
-        <div className="flex items-center gap-2 px-4 py-1.5">
-          <Pill tone="accent" dot pulse>
-            {speaking ? "Speaking" : "Generating voice"}
-          </Pill>
-          <span className="text-xs text-ink-3">{characterName}</span>
-        </div>
-      )}
 
       {!hideInput && (
         <ChatInput

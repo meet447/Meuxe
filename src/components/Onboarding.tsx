@@ -39,18 +39,7 @@ import {
   VibeGlyph,
 } from "./ui";
 
-interface Voice {
-  id: string;
-  name: string;
-}
-
-interface Model {
-  id: string;
-  type: string;
-  model_file: string;
-  path: string;
-  animations?: { name: string; path: string }[];
-}
+import type { ModelInfo, Voice } from "../types";
 
 interface FormData {
   user: { name: string; about: string };
@@ -79,7 +68,7 @@ const FEATURE_TILES = [
 export function Onboarding({ onComplete }: { onComplete: () => void }) {
   const [step, setStep] = useState(0);
   const [voices, setVoices] = useState<Voice[]>([]);
-  const [models, setModels] = useState<Model[]>([]);
+  const [models, setModels] = useState<ModelInfo[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -107,7 +96,7 @@ export function Onboarding({ onComplete }: { onComplete: () => void }) {
   useEffect(() => {
     listModels()
       .then((data) => {
-        const list = data as Model[];
+        const list = data as ModelInfo[];
         setModels(list);
         if (list.length > 0 && !list.some((m) => m.id === form.companion.model_id)) {
           setForm((prev) => ({

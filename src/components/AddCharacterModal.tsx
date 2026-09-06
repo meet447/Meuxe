@@ -8,7 +8,7 @@ import {
 } from "../api/tauri";
 import { buildCompanionPersonalityDraft } from "../lib/companionCharacterDraft";
 import { COMPANION_VIBE_PACKS } from "../lib/companionVibes";
-import type { ModelInfo } from "../types";
+import type { AppConfig, ModelInfo } from "../types";
 import { CompanionAvatarPreview } from "./onboarding/CompanionAvatarPreview";
 import { ModelPicker } from "./onboarding/ModelPicker";
 import {
@@ -68,7 +68,7 @@ export function AddCharacterModal({
     if (!open) return;
 
     getConfig()
-      .then((cfg: any) => {
+      .then((cfg: AppConfig) => {
         setUserName(cfg.user?.name || "");
         setUserAbout(cfg.user?.about || "");
         setVoice(cfg.tts?.voice || "jp_001");

@@ -666,15 +666,6 @@ export function useLive2D(canvasRef: React.RefObject<HTMLCanvasElement | null>) 
   // ========================================
   // OTHER CONTROLS
   // ========================================
-  const triggerMotion = useCallback((group: string, index?: number) => {
-    const model = modelRef.current;
-    if (!model) return;
-    try {
-      if (index !== undefined) model.motion(group, index, 3);
-      else model.motion(group);
-    } catch {}
-  }, []);
-
   const setViewport = useCallback((zoom: number, framing: "full" | "half", offsetX: number = 0, offsetY: number = 0) => {
     viewportRef.current = { zoom, framing, offsetX, offsetY };
     applyModelLayout();
@@ -717,18 +708,12 @@ export function useLive2D(canvasRef: React.RefObject<HTMLCanvasElement | null>) 
     }
   }, []);
 
-  const getDebug = useCallback((): DebugInfo => {
-    return { ...debugRef.current };
-  }, []);
-
   return {
     loadModel,
     setExpression,
     startLipSync,
     stopLipSync,
-    triggerMotion,
     setViewport,
     setTypingReaction,
-    getDebug,
   };
 }

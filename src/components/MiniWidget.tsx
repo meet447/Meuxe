@@ -3,7 +3,8 @@ import type { FormEvent, PointerEvent as ReactPointerEvent, ReactNode } from "re
 import { getCurrentWindow, LogicalSize } from "@tauri-apps/api/window";
 import { useWindow } from "../hooks/useWindow";
 import { MicButton } from "./MicButton";
-import type { ToolCallStatus } from "./ToolCallBubble";
+import { MiniToolPills } from "./MiniToolPill";
+import type { ToolCallStatus } from "../types";
 import {
   Button,
   ExpandIcon,
@@ -201,6 +202,9 @@ export function MiniWidget({
           </Pill>
         </div>
       )}
+
+      {/* Running tool pills */}
+      <MiniToolPills toolCalls={toolCalls} />
 
       {/* Spoken sentence subtitle */}
       {caption && !pendingTool && (

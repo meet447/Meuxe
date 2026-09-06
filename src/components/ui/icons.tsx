@@ -38,10 +38,6 @@ export const ChatIcon = make(
   "M4 6.5A2.5 2.5 0 0 1 6.5 4h11A2.5 2.5 0 0 1 20 6.5v8a2.5 2.5 0 0 1-2.5 2.5H10l-4.5 3.5V17H6.5A2.5 2.5 0 0 1 4 14.5z",
   "ChatIcon",
 );
-export const HistoryIcon = make(
-  ["M3.5 12a8.5 8.5 0 1 0 2.5-6", "M3.5 4v4h4", "M12 8v4l2.5 2.5"],
-  "HistoryIcon",
-);
 export const MiniIcon = make(
   [
     "M4 9V6.5A2.5 2.5 0 0 1 6.5 4H9",
@@ -71,7 +67,6 @@ export const CloseIcon = make(["M6 6l12 12", "M18 6L6 18"], "CloseIcon");
 export const BackIcon = make("M14 6l-6 6 6 6", "BackIcon");
 export const ChevronRightIcon = make("M10 6l6 6-6 6", "ChevronRightIcon");
 export const ChevronDownIcon = make("M6 10l6 6 6-6", "ChevronDownIcon");
-export const ChevronUpIcon = make("M6 14l6-6 6 6", "ChevronUpIcon");
 export const ArrowRightIcon = make(["M5 12h14", "M13 6l6 6-6 6"], "ArrowRightIcon");
 export const SendIcon = make(["M12 19V5", "M6 11l6-6 6 6"], "SendIcon");
 export const MicIcon = make(
@@ -86,7 +81,6 @@ export const MicIcon = make(
 export const PlusIcon = make(["M12 5v14", "M5 12h14"], "PlusIcon");
 export const MinusIcon = make("M5 12h14", "MinusIcon");
 export const CheckIcon = make("M5 12.5l4.5 4.5L19 7", "CheckIcon");
-export const MoreIcon = make(["M6 12h.01", "M12 12h.01", "M18 12h.01"], "MoreIcon");
 export const ExternalIcon = make(
   ["M14 4h6v6", "M20 4l-9 9", "M18 14v4.5A1.5 1.5 0 0 1 16.5 20h-11A1.5 1.5 0 0 1 4 18.5v-11A1.5 1.5 0 0 1 5.5 6H10"],
   "ExternalIcon",
@@ -122,10 +116,6 @@ export const SparkIcon = make(
   ["M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z", "M19 16l.7 2 2 .7-2 .7-.7 2-.7-2-2-.7 2-.7z"],
   "SparkIcon",
 );
-export const KeyboardIcon = make(
-  ["M3 8.5A2.5 2.5 0 0 1 5.5 6h13A2.5 2.5 0 0 1 21 8.5v7a2.5 2.5 0 0 1-2.5 2.5h-13A2.5 2.5 0 0 1 3 15.5z", "M7 10h.01", "M11 10h.01", "M15 10h.01", "M17 10h.01", "M8 14h8"],
-  "KeyboardIcon",
-);
 export const LockIcon = make(
   ["M6 11V8.5a6 6 0 0 1 12 0V11", "M5 11h14v7.5a2.5 2.5 0 0 1-2.5 2.5h-9A2.5 2.5 0 0 1 5 18.5z"],
   "LockIcon",
@@ -138,9 +128,6 @@ export const TrashIcon = make(
   ["M5 7h14", "M9 7V5.5A1.5 1.5 0 0 1 10.5 4h3A1.5 1.5 0 0 1 15 5.5V7", "M7 7l.8 11.2A2 2 0 0 0 9.8 20h4.4a2 2 0 0 0 2-1.8L17 7", "M10 11v5", "M14 11v5"],
   "TrashIcon",
 );
-export const PinIcon = make(["M12 17v4", "M8 17h8l-1-6 2-2V8a5 5 0 0 0-10 0v1l2 2z"], "PinIcon");
-export const RefreshIcon = make(["M20 12a8 8 0 1 1-2.3-5.7", "M20 4v4.5h-4.5"], "RefreshIcon");
-export const DownloadIcon = make(["M12 4v11", "M7 10l5 5 5-5", "M5 20h14"], "DownloadIcon");
 export const UploadIcon = make(["M12 15V4", "M7 9l5-5 5 5", "M5 20h14"], "UploadIcon");
 export const WandIcon = make(
   ["M15 4l5 5L7.5 21.5 2.5 16.5z", "M14 5l5 5", "M5 3v2", "M4 4h2", "M19 15v2", "M18 16h2"],

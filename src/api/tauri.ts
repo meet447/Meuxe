@@ -1,5 +1,5 @@
 import { invoke, convertFileSrc } from "@tauri-apps/api/core";
-import type { MemoryFact, MemorySnapshot } from "../types";
+import type { AppConfig, MemoryFact, MemorySnapshot, ModelInfo } from "../types";
 
 // Asset paths: in the Tauri app, resolve to convertFileSrc URLs via the backend.
 // In browser-only dev (npm run dev), fall back to Vite /static/ middleware.
@@ -29,11 +29,11 @@ export async function resolveAssetUrl(relativePath: string): Promise<string> {
 }
 
 // Config
-export async function getConfig() {
-  return invoke("config_get");
+export async function getConfig(): Promise<AppConfig> {
+  return invoke<AppConfig>("config_get");
 }
 
-export async function saveConfig(config: unknown) {
+export async function saveConfig(config: Partial<AppConfig>) {
   return invoke("config_save", { config });
 }
 
@@ -77,10 +77,6 @@ export async function listCharacters() {
   return invoke<unknown[]>("characters_list");
 }
 
-export async function getCharacter(id: string) {
-  return invoke<unknown>("characters_get", { id });
-}
-
 export async function createCharacter(data: {
   name: string;
   personality: string;
@@ -107,7 +103,7 @@ export async function createCharacter(data: {
 
 // Models
 export async function listModels() {
-  return invoke<any[]>("models_list");
+  return invoke<ModelInfo[]>("models_list");
 }
 
 export async function importLive2DModel() {

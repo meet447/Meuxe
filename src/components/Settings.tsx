@@ -41,11 +41,7 @@ import {
   UserIcon,
   cn,
 } from "./ui";
-
-interface Voice {
-  id: string;
-  name: string;
-}
+import type { AppConfig, Voice } from "../types";
 
 type SettingsPage = "profile" | "llm" | "tts" | "privacy" | "expressions" | "memory" | "avatar";
 
@@ -189,7 +185,7 @@ export function Settings({
   onAvatarBackgroundChange?: (bg: string) => void;
 }) {
   const [page, setPage] = useState<SettingsPage>("llm");
-  const [config, setConfig] = useState<any>(null);
+  const [config, setConfig] = useState<AppConfig | null>(null);
   const [voices, setVoices] = useState<Voice[]>([]);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -213,15 +209,15 @@ export function Settings({
   const [resettingOnboarding, setResettingOnboarding] = useState(false);
   const [onboardingResetError, setOnboardingResetError] = useState<string | null>(null);
 
-  const deriveConfigured = (cfg: any) => {
+  const deriveConfigured = (cfg: AppConfig) => {
     const ttsConfigured: Record<string, { configured: boolean; voice: string }> = {};
 
-    if (cfg?.tts_providers) {
-      for (const [id, prov] of Object.entries(cfg.tts_providers as Record<string, any>)) {
-        ttsConfigured[id] = { configured: true, voice: (prov as any).voice || "" };
+    if (cfg.tts_providers) {
+      for (const [id, prov] of Object.entries(cfg.tts_providers)) {
+        ttsConfigured[id] = { configured: true, voice: prov.voice || "" };
       }
     }
-    if (cfg?.tts?.provider) {
+    if (cfg.tts?.provider) {
       ttsConfigured[cfg.tts.provider] = {
         configured: true,
         voice: cfg.tts.voice || "",
@@ -233,7 +229,7 @@ export function Settings({
 
   useEffect(() => {
     getConfig()
-      .then((cfg: any) => {
+      .then((cfg) => {
         setConfig(cfg);
         deriveConfigured(cfg);
 
@@ -266,7 +262,7 @@ export function Settings({
   const handleSave = async () => {
     setSaving(true);
     setSaveError(null);
-    const update: any = {
+    const update: Partial<AppConfig> = {
       user: { name: userName, about: userAbout },
       tts: { provider: ttsProvider, voice: ttsVoice },
       agent: {
@@ -275,11 +271,13 @@ export function Settings({
         args: agentArgs.trim() ? agentArgs.trim().split(/\s+/) : [],
       },
     };
-    if (ttsApiKey) update.tts.api_key = ttsApiKey;
+    if (ttsApiKey && update.tts) {
+      update.tts = { ...update.tts, api_key: ttsApiKey };
+    }
     try {
       await saveConfig(update);
 
-      const freshConfig: any = await getConfig();
+      const freshConfig = await getConfig();
       setConfig(freshConfig);
       deriveConfigured(freshConfig);
       setSaved(true);

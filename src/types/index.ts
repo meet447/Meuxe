@@ -126,3 +126,50 @@ export interface Voice {
   id: string;
   name: string;
 }
+
+export interface UserConfig {
+  id?: string;
+  name: string;
+  about: string;
+}
+
+export interface AgentConfig {
+  preset: string;
+  program: string;
+  args: string[];
+}
+
+export interface LlmConfig {
+  provider: string;
+  base_url?: string;
+  api_key?: string | null;
+  model?: string;
+}
+
+export interface TtsConfig {
+  provider: string;
+  api_key?: string | null;
+  voice: string;
+}
+
+export interface LlmProviderConfig {
+  base_url?: string;
+  api_key?: string | null;
+  model?: string;
+}
+
+export interface TtsProviderConfig {
+  api_key?: string | null;
+  voice?: string;
+}
+
+export interface AppConfig {
+  user?: UserConfig;
+  llm?: LlmConfig;
+  tts?: TtsConfig;
+  llm_providers?: Record<string, LlmProviderConfig>;
+  tts_providers?: Record<string, TtsProviderConfig>;
+  active_character?: string;
+  onboarding_complete?: boolean;
+  agent?: AgentConfig;
+}

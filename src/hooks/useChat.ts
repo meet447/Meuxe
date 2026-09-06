@@ -82,19 +82,6 @@ export function cleanCompanionDisplayText(text: string) {
   return cleanExpressionTags(text).trim();
 }
 
-function timelineToMessages(items: ChatTimelineItem[]): Message[] {
-  return items.flatMap((item) => {
-    if (item.kind === "tool") return [];
-    return [
-      {
-        role: item.kind,
-        content: item.text,
-        expression: item.kind === "assistant" ? item.expression : undefined,
-      },
-    ];
-  });
-}
-
 function messagesToTimeline(messages: Message[]): ChatTimelineItem[] {
   return messages.map((message, index) => {
     if (message.role === "user") {
@@ -148,8 +135,6 @@ export function useChat() {
     streamingDirtyRef.current = false;
     setStreamingText(cleanExpressionTags(displayTextRef.current));
   }, []);
-
-  const messages = useMemo(() => timelineToMessages(timeline), [timeline]);
 
   const toolCalls = useMemo(
     () =>
@@ -441,7 +426,6 @@ export function useChat() {
   }, []);
 
   return {
-    messages,
     setMessages,
     timeline,
     streamingText,

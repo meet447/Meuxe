@@ -22,13 +22,6 @@ import {
   type IconProps,
 } from "./ui";
 
-interface ConfirmRequest {
-  requestId: string;
-  toolName: string;
-  arguments: Record<string, unknown>;
-  description: string;
-}
-
 type IconComponent = ComponentType<IconProps>;
 
 const TOOL_META: Record<string, { icon: IconComponent; label: string }> = {
@@ -200,5 +193,4 @@ function ToolCallLabel({
   );
 }
 
-export type { ConfirmRequest };
 export type { ToolCallStatus } from "../types";

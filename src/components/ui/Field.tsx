@@ -12,10 +12,10 @@ import { cn } from "./cn";
 import { ChevronDownIcon } from "./icons";
 
 /* Shared control skin: sunken warm well that lifts to a raised surface on focus. */
-export const controlClass =
+const controlClass =
   "w-full rounded-field bg-well/70 px-4 py-3 text-[15px] text-ink placeholder:text-ink-4 shadow-inset outline-none transition-all duration-150 hover:bg-well focus:bg-surface-2 focus:shadow-none focus:ring-3 focus:ring-accent-200 disabled:opacity-50";
 
-export function Label({
+function Label({
   children,
   hint,
   optional,
@@ -59,7 +59,7 @@ export function Hint({ children, className }: { children: ReactNode; className?:
   return <p className={cn("mt-1.5 text-xs leading-relaxed text-ink-3", className)}>{children}</p>;
 }
 
-export function FieldError({ children, className }: { children: ReactNode; className?: string }) {
+function FieldError({ children, className }: { children: ReactNode; className?: string }) {
   if (!children) return null;
   return <p className={cn("mt-1.5 text-xs font-medium text-clay-700", className)}>{children}</p>;
 }
