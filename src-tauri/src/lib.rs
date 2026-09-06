@@ -39,21 +39,73 @@ fn get_data_dir(state: tauri::State<Arc<AppState>>) -> String {
 
 // Command to resolve a relative asset path to a convertFileSrc-compatible URL
 #[tauri::command]
-fn resolve_asset_path(state: tauri::State<Arc<AppState>>, path: String) -> Result<String, String> {
+fn resolve_asset_path(
+    app: tauri::AppHandle,
+    state: tauri::State<Arc<AppState>>,
+    path: String,
+) -> Result<String, String> {
     let clean = path.trim_start_matches('/');
-    let candidates = [
-        state.data_dir.join(clean),
-        PathBuf::from(clean),
-        PathBuf::from("..").join(clean),
-    ];
+    if clean.is_empty() {
+        return Err("Asset path is empty".into());
+    }
+    if Path::new(clean).is_absolute() {
+        return Err(format!("Absolute asset paths are not allowed: {clean}"));
+    }
+    if Path::new(clean)
+        .components()
+        .any(|c| c == std::path::Component::ParentDir)
+    {
+        return Err(format!("Asset path must not contain '..': {clean}"));
+    }
 
-    for full_path in candidates {
-        if full_path.exists() && full_path.is_file() {
-            return Ok(full_path.to_string_lossy().to_string());
+    let mut roots: Vec<PathBuf> = vec![state.data_dir.clone()];
+    if let Ok(resource_dir) = app.path().resource_dir() {
+        roots.push(resource_dir);
+    }
+
+    for root in &roots {
+        if let Some(resolved) = resolve_under_root(root, clean) {
+            return Ok(resolved.to_string_lossy().to_string());
+        }
+    }
+
+    if cfg!(debug_assertions) {
+        let dev_candidates = [PathBuf::from(clean), PathBuf::from("..").join(clean)];
+        for candidate in dev_candidates {
+            if candidate.is_file() {
+                let resolved = candidate.canonicalize().unwrap_or(candidate);
+                return Ok(resolved.to_string_lossy().to_string());
+            }
         }
     }
 
     Err(format!("Asset not found: {clean}"))
+}
+
+fn resolve_under_root(root: &Path, relative: &str) -> Option<PathBuf> {
+    let rel = Path::new(relative);
+    if rel.is_absolute() {
+        return None;
+    }
+    if rel
+        .components()
+        .any(|c| c == std::path::Component::ParentDir)
+    {
+        return None;
+    }
+
+    let candidate = root.join(rel);
+    if !candidate.is_file() {
+        return None;
+    }
+
+    let canonical_root = root.canonicalize().ok()?;
+    let canonical_file = candidate.canonicalize().ok()?;
+    if canonical_file.starts_with(&canonical_root) {
+        Some(canonical_file)
+    } else {
+        None
+    }
 }
 
 fn load_whisper_model(data_dir: &Path) -> Option<Arc<WhisperContext>> {

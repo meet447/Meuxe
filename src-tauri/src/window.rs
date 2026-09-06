@@ -70,6 +70,12 @@ pub fn window_toggle_mini(
     } else {
         hide_main_window(&app);
         create_mini_widget(&app, selected_character_id.as_deref())?;
+        let _ = app.emit(
+            "app:mode-changed",
+            ModeChangedEvent {
+                mode: "mini".to_string(),
+            },
+        );
     }
     Ok(())
 }
@@ -85,22 +91,4 @@ pub fn window_expand(app: AppHandle) -> Result<(), String> {
         },
     );
     Ok(())
-}
-
-#[allow(dead_code)]
-pub fn cycle_window_state(app: &AppHandle) {
-    let main_visible = app
-        .get_webview_window("main")
-        .map(|w| w.is_visible().unwrap_or(false))
-        .unwrap_or(false);
-    let mini_exists = app.get_webview_window("mini").is_some();
-
-    if main_visible {
-        hide_main_window(app);
-        let _ = create_mini_widget(app, None);
-    } else if mini_exists {
-        close_mini_widget(app);
-    } else {
-        show_main_window(app);
-    }
 }
