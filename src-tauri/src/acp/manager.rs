@@ -31,25 +31,42 @@ pub async fn dispatch_turn(
     let app = params.app.clone();
     let agent_config = params.agent_config.clone();
 
-    let turn_tx = {
-        let mut acp = state.acp.lock().unwrap_or_else(|p| p.into_inner());
-        acp.ensure_connection(app, Arc::clone(&state), &agent_config)?;
-        acp.turn_tx
-            .clone()
-            .ok_or_else(|| "ACP connection is not available".to_string())?
-    };
-
     let (result_tx, result_rx) = oneshot::channel();
-    let job = TurnJob { params, result_tx };
+    let mut job = Some(TurnJob { params, result_tx });
 
-    turn_tx
-        .send(job)
-        .await
-        .map_err(|_| "ACP connection closed; retry your message".to_string())?;
+    // The connection task can die between turns (agent crash, CLI removed). A
+    // closed channel means we must respawn, so allow one retry.
+    for attempt in 0..2 {
+        let turn_tx = {
+            let mut acp = state.acp.lock().unwrap_or_else(|p| p.into_inner());
+            acp.ensure_connection(app.clone(), Arc::clone(&state), &agent_config)?;
+            acp.turn_tx
+                .clone()
+                .ok_or_else(|| "ACP connection is not available".to_string())?
+        };
 
-    result_rx
-        .await
-        .map_err(|_| "ACP turn dropped before completion".to_string())?
+        match turn_tx
+            .send(job.take().expect("job is present until sent"))
+            .await
+        {
+            Ok(()) => break,
+            Err(mpsc::error::SendError(returned)) => {
+                invalidate_acp(&state);
+                if attempt == 1 {
+                    return Err(
+                        "The agent connection closed before your message was sent. Try again."
+                            .to_string(),
+                    );
+                }
+                job = Some(returned);
+            }
+        }
+    }
+
+    result_rx.await.map_err(|_| {
+        "The agent connection ended unexpectedly. Send your message again to restart it."
+            .to_string()
+    })?
 }
 
 pub(crate) struct TurnJob {
@@ -88,16 +105,31 @@ impl AcpConnectionManager {
         }
     }
 
-    pub fn character_has_session(&self, character_id: &str) -> bool {
-        self.session_characters
-            .lock()
-            .unwrap_or_else(|p| p.into_inner())
-            .contains(character_id)
+    /// True only if the live connection matches `agent_config` and already holds a
+    /// session for this character, i.e. the agent still has the conversation context.
+    pub fn has_live_session(&self, character_id: &str, agent_config: &AgentConfig) -> bool {
+        let connection_live = self.turn_tx.as_ref().is_some_and(|tx| !tx.is_closed());
+        connection_live
+            && self.agent_key.as_deref() == Some(agent_config_key(agent_config).as_str())
+            && self
+                .session_characters
+                .lock()
+                .unwrap_or_else(|p| p.into_inner())
+                .contains(character_id)
     }
 
     pub fn invalidate(&mut self) {
         if let Some(tx) = self.shutdown_tx.take() {
             let _ = tx.send(());
+        }
+        // Break out of an in-flight turn so the loop observes the shutdown promptly.
+        if let Some(cancel) = self
+            .active_cancel
+            .lock()
+            .unwrap_or_else(|p| p.into_inner())
+            .as_ref()
+        {
+            cancel.cancel();
         }
         self.turn_tx = None;
         self.agent_key = None;
@@ -114,7 +146,8 @@ impl AcpConnectionManager {
         agent_config: &AgentConfig,
     ) -> Result<(), String> {
         let agent_key = agent_config_key(agent_config);
-        if self.turn_tx.is_none() || self.agent_key.as_deref() != Some(&agent_key) {
+        let connection_dead = self.turn_tx.as_ref().is_none_or(|tx| tx.is_closed());
+        if connection_dead || self.agent_key.as_deref() != Some(&agent_key) {
             self.start_connection(app, state, agent_config)?;
         }
         Ok(())
@@ -187,7 +220,17 @@ async fn run_connection_loop(
     active_request_id: Arc<Mutex<Option<String>>>,
     active_cancel: Arc<Mutex<Option<CancellationToken>>>,
 ) -> Result<(), String> {
-    let agent = resolve_acp_agent(&agent_config, &data_dir).await?;
+    let agent = match resolve_acp_agent(&agent_config, &data_dir).await {
+        Ok(agent) => agent,
+        Err(err) => {
+            // Reply to whatever is already queued so the user sees the real cause.
+            turn_rx.close();
+            while let Ok(job) = turn_rx.try_recv() {
+                let _ = job.result_tx.send(Err(err.clone()));
+            }
+            return Err(err);
+        }
+    };
     let companion_home = companion_home_dir(&data_dir);
     let state_perm = Arc::clone(&state);
     let app_perm = app.clone();

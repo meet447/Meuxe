@@ -79,7 +79,7 @@ fn resolve_asset_path(
         let dev_candidates = [PathBuf::from(clean), PathBuf::from("..").join(clean)];
         for candidate in dev_candidates {
             if candidate.is_file() {
-                let resolved = candidate.canonicalize().unwrap_or(candidate);
+                let resolved = std::path::absolute(&candidate).unwrap_or(candidate);
                 return Ok(resolved.to_string_lossy().to_string());
             }
         }
@@ -107,8 +107,10 @@ fn resolve_under_root(root: &Path, relative: &str) -> Option<PathBuf> {
 
     let canonical_root = root.canonicalize().ok()?;
     let canonical_file = candidate.canonicalize().ok()?;
+    // Canonical paths are only for the containment check; return the plain join so
+    // Windows callers don't get a `\\?\` UNC prefix that breaks asset-scope matching.
     if canonical_file.starts_with(&canonical_root) {
-        Some(canonical_file)
+        Some(candidate)
     } else {
         None
     }

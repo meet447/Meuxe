@@ -576,7 +576,7 @@ async fn run_chat_stream(
 
     let include_history = {
         let acp = state.acp.lock().unwrap_or_else(|p| p.into_inner());
-        !acp.character_has_session(&character_id)
+        !acp.has_live_session(&character_id, &config.agent)
     };
 
     let acp_prompt = build_acp_agent_prompt(
