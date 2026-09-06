@@ -1,4 +1,3 @@
-pub mod expressions;
 pub mod types;
 
 pub use types::*;
@@ -436,10 +435,15 @@ fn load_from_markdown(id: &str, path: &Path) -> Result<Character> {
     })
 }
 
+fn md_frontmatter_regex() -> &'static Regex {
+    static RE: std::sync::OnceLock<Regex> = std::sync::OnceLock::new();
+    RE.get_or_init(|| Regex::new(r"(?s)^---\s*\n(.*?)\n---\s*\n(.*)").expect("invalid regex"))
+}
+
 /// Parse YAML frontmatter from a markdown string.
 /// Returns (frontmatter_yaml, body).
 pub fn parse_md_frontmatter(input: &str) -> Result<(String, String)> {
-    let re = Regex::new(r"(?s)^---\s*\n(.*?)\n---\s*\n(.*)").unwrap();
+    let re = md_frontmatter_regex();
     let caps = re.captures(input).ok_or_else(|| {
         MeuxeError::InvalidConfig("Missing YAML frontmatter in markdown file".to_string())
     })?;

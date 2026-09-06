@@ -14,14 +14,10 @@ pub enum MeuxeError {
     CharacterNotFound(String),
     #[error("Invalid config: {0}")]
     InvalidConfig(String),
-    #[error("LLM error: {0}")]
-    Llm(String),
     #[error("TTS error: {0}")]
     Tts(String),
     #[error("Memory error: {0}")]
     Memory(String),
-    #[error("Tool error: {0}")]
-    Tool(String),
 }
 
 pub type Result<T> = std::result::Result<T, MeuxeError>;
