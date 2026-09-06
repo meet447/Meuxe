@@ -2,7 +2,7 @@ import type { AgentSetupStatusResponse } from "../../api/tauri";
 import { ACP_AGENT_PRESET_IDS, type AcpAgentPresetId } from "../../lib/agentPresets";
 import { AgentPresetCard } from "../agents/AgentPresetCard";
 import { AgentSetupPanel } from "../agents/AgentSetupPanel";
-import { ChoiceCard, Field, Input, SectionTitle } from "../ui";
+import { ChoiceCard, Field, Input } from "../ui";
 
 export interface AgentSectionValue {
   preset: AcpAgentPresetId;

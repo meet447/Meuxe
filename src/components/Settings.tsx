@@ -32,6 +32,7 @@ import {
   SectionTitle,
   ShieldIcon,
   SparkIcon,
+  SpeakerIcon,
   Surface,
   Textarea,
   UserIcon,

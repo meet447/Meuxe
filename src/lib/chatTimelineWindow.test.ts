@@ -20,7 +20,7 @@ describe("sliceWindow", () => {
     expect(result.hiddenCount).toBe(15);
     expect(result.visible).toHaveLength(60);
     expect(result.visible[0]).toBe(16);
-    expect(result.visible.at(-1)).toBe(75);
+    expect(result.visible[result.visible.length - 1]).toBe(75);
   });
 });
 
