@@ -29,7 +29,6 @@ pub struct AgentPresetSetupStatus {
     pub preset: String,
     pub ready: bool,
     /// Legacy field kept for frontend compatibility; always false (installs are global now).
-    pub managed_install: bool,
     /// A CLI was found on the user/system PATH (or standard global locations).
     pub system_path: bool,
     pub needs_node: bool,
@@ -275,7 +274,6 @@ fn status_from_resolution(preset: &str, resolution: AgentResolution) -> AgentPre
     AgentPresetSetupStatus {
         preset: preset.to_string(),
         ready,
-        managed_install: false,
         system_path,
         needs_node,
         detail,
@@ -293,7 +291,6 @@ pub async fn check_preset(data_dir: &Path, preset: &str) -> AgentPresetSetupStat
         "custom" => AgentPresetSetupStatus {
             preset: preset.to_string(),
             ready: true,
-            managed_install: false,
             system_path: false,
             needs_node: false,
             detail: "You will provide the agent command.".into(),
@@ -303,7 +300,6 @@ pub async fn check_preset(data_dir: &Path, preset: &str) -> AgentPresetSetupStat
         other => AgentPresetSetupStatus {
             preset: other.to_string(),
             ready: false,
-            managed_install: false,
             system_path: false,
             needs_node: false,
             detail: format!("Unknown preset: {other}"),

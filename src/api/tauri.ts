@@ -59,11 +59,10 @@ export interface AgentSetupStatusResponse {
   agent: {
     preset: string;
     ready: boolean;
-    managed_install: boolean;
     system_path: boolean;
     needs_node: boolean;
     detail: string;
-    install_source: "system" | "managed" | "npx" | "none";
+    install_source: "system" | "npx" | "none";
     system_command: string | null;
   };
 }

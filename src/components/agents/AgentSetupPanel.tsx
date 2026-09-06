@@ -74,7 +74,6 @@ export function AgentSetupPanel({
   const title = ACP_AGENT_PRESETS[preset].title;
   const agent = status?.agent;
   const usingSystem = agent?.install_source === "system";
-  const usingManaged = agent?.install_source === "managed";
   const usingNpx = agent?.install_source === "npx";
 
   return (
@@ -91,7 +90,6 @@ export function AgentSetupPanel({
           <div className="flex flex-wrap gap-2">
             <StatusPill ok={agent.ready} label={agent.ready ? `${title} ready` : `${title} needed`} />
             {usingSystem && <StatusPill ok label="System PATH" />}
-            {usingManaged && <StatusPill ok label="Meuxe fallback" />}
             {usingNpx && <StatusPill ok label="On demand" />}
             <StatusPill ok={status.prerequisites.node_available} label="Node.js" />
             {status.prerequisites.node_version && (
