@@ -109,6 +109,10 @@ impl ConfigManager {
             }
         }
 
+        if !merged.user.name.is_empty() && merged.user.id.is_empty() {
+            merged.user.id = crate::character::slugify(&merged.user.name);
+        }
+
         let json = serde_json::to_string_pretty(&merged)?;
         write_atomic(&self.config_path, &json)
     }
@@ -262,5 +266,40 @@ mod tests {
             masked.llm_providers["openai"].api_key,
             Some("sk-p...alue".to_string())
         );
+    }
+
+    #[test]
+    fn test_first_save_assigns_stable_user_id() {
+        let tmp = TempDir::new().unwrap();
+        let mgr = ConfigManager::new(tmp.path());
+
+        let mut config = AppConfig::default();
+        config.user.name = "Alice Nova".to_string();
+        config.onboarding_complete = true;
+        mgr.save(&config).unwrap();
+
+        let loaded = mgr.load().unwrap();
+        assert_eq!(loaded.user.id, "alice_nova");
+        assert_eq!(loaded.user.name, "Alice Nova");
+    }
+
+    #[test]
+    fn test_rename_keeps_original_user_id() {
+        let tmp = TempDir::new().unwrap();
+        let mgr = ConfigManager::new(tmp.path());
+
+        let mut config = AppConfig::default();
+        config.user.name = "Alice Nova".to_string();
+        mgr.save(&config).unwrap();
+        let original_id = mgr.load().unwrap().user.id;
+        assert_eq!(original_id, "alice_nova");
+
+        config.user.name = "Bob Smith".to_string();
+        mgr.save(&config).unwrap();
+
+        let loaded = mgr.load().unwrap();
+        assert_eq!(loaded.user.name, "Bob Smith");
+        assert_eq!(loaded.user.id, original_id);
+        assert_eq!(loaded.user.id, "alice_nova");
     }
 }
