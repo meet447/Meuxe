@@ -1,17 +1,15 @@
-import { useState, useRef, useEffect, useCallback, memo, useMemo } from "react";
+import { useState, useRef, useEffect, memo, useMemo } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import type { ChatTimelineItem } from "../types";
 import { openExternalUrl } from "../lib/openExternal";
-import { MicButton } from "./MicButton";
 import { ToolCallBubble } from "./ToolCallBubble";
+import { ChatComposer } from "./chat/ChatComposer";
 import {
   AsciiAccent,
   Dots,
   Mascot,
   Pill,
-  SendIcon,
-  Spinner,
 } from "./ui";
 
 interface Props {
@@ -25,7 +23,7 @@ interface Props {
   onMicToggle: () => void;
   onToolConfirm?: (permissionId: string, approved: boolean) => void;
   onCancel?: () => void;
-  inputRef?: React.RefObject<HTMLInputElement | null>;
+  inputRef?: React.RefObject<HTMLTextAreaElement | null>;
   /** Timeline only: for sidebar layout with external input bar */
   hideInput?: boolean;
   appearance?: "light" | "dark";
@@ -195,12 +193,11 @@ const MessageBubble = memo(function MessageBubble({
 });
 
 // Extracted to isolate frequent state updates (text input) from the main chat list.
-// This prevents O(N) re-renders of all MessageBubble and ToolCallBubble components on every keystroke.
 const ChatInput = memo(function ChatInput({
   isProcessing,
   isStreaming,
   onSend,
-  onCancel,
+  onStop,
   onTypingChange,
   listening,
   onMicToggle,
@@ -210,86 +207,30 @@ const ChatInput = memo(function ChatInput({
   isProcessing: boolean;
   isStreaming?: boolean;
   onSend: (text: string) => void;
-  onCancel?: () => void;
+  onStop?: () => void;
   onTypingChange: (isTyping: boolean) => void;
   listening: boolean;
   onMicToggle: () => void;
-  inputRef: React.RefObject<HTMLInputElement | null>;
+  inputRef: React.RefObject<HTMLTextAreaElement | null>;
   floating?: boolean;
 }) {
   const [input, setInput] = useState("");
-  const typingTimeoutRef = useRef<number | null>(null);
-
-  useEffect(() => {
-    return () => {
-      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
-    };
-  }, []);
-
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setInput(e.target.value);
-    onTypingChange(true);
-    if (typingTimeoutRef.current) {
-      clearTimeout(typingTimeoutRef.current);
-    }
-    typingTimeoutRef.current = window.setTimeout(() => {
-      onTypingChange(false);
-    }, 1500);
-  };
-
-  const handleSubmit = useCallback(
-    (e: React.FormEvent) => {
-      e.preventDefault();
-      if (!input.trim() || isProcessing) return;
-      onTypingChange(false);
-      if (typingTimeoutRef.current) {
-        clearTimeout(typingTimeoutRef.current);
-      }
-      onSend(input.trim());
-      setInput("");
-      inputRef.current?.focus();
-    },
-    [input, isProcessing, onSend, onTypingChange, inputRef],
-  );
 
   return (
     <div className={floating ? "w-full" : "w-full bg-transparent pb-2 pt-1"}>
-      <form
-        onSubmit={handleSubmit}
-        className={`flex items-center gap-1 rounded-full bg-surface-2 p-1.5 ${
-          floating ? "shadow-float" : "shadow-soft"
-        } ${floating ? "px-1" : "mx-4"}`}
-      >
-        <MicButton listening={listening} onToggle={onMicToggle} variant="stage" />
-        <input
-          ref={inputRef}
-          type="text"
-          value={input}
-          onChange={handleInputChange}
-          placeholder="Say something..."
-          className="companion-chat-input min-w-0 flex-1 bg-transparent px-2 py-2.5 text-[15px] text-ink outline-none placeholder:text-ink-4 disabled:opacity-50"
-          disabled={isProcessing}
-        />
-        <button
-          type={isStreaming && onCancel ? "button" : "submit"}
-          onClick={isStreaming && onCancel ? onCancel : undefined}
-          disabled={isStreaming ? false : isProcessing || !input.trim()}
-          className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full transition ${
-            isStreaming && onCancel
-              ? "bg-clay-500 text-white hover:bg-clay-600"
-              : "bg-ink text-white hover:bg-ink-2 disabled:opacity-30"
-          }`}
-          title={isStreaming && onCancel ? "Stop" : "Send"}
-        >
-          {isStreaming && onCancel ? (
-            <span className="block h-3 w-3 rounded-[2px] bg-white" />
-          ) : isProcessing ? (
-            <Spinner />
-          ) : (
-            <SendIcon className="h-4 w-4" strokeWidth={2} />
-          )}
-        </button>
-      </form>
+      <ChatComposer
+        value={input}
+        onChange={setInput}
+        onSend={onSend}
+        onStop={onStop}
+        isStreaming={!!isStreaming}
+        disabled={isProcessing}
+        onTypingChange={onTypingChange}
+        inputRef={inputRef}
+        voice={{ isRecording: listening, onToggle: onMicToggle }}
+        placeholder="Say something..."
+        className={floating ? "shadow-float" : `shadow-soft ${floating ? "" : "mx-4"}`}
+      />
     </div>
   );
 });
@@ -319,7 +260,7 @@ export function ChatPanel({
 }: Props) {
   const dark = appearance === "dark";
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const internalInputRef = useRef<HTMLInputElement>(null);
+  const internalInputRef = useRef<HTMLTextAreaElement>(null);
   const inputRef = externalInputRef || internalInputRef;
   const scrollRafRef = useRef<number | null>(null);
 
@@ -447,11 +388,11 @@ export function ChatPanel({
           isProcessing={isProcessing}
           isStreaming={loading}
           onSend={onSend}
-          onCancel={onCancel}
+          onStop={onCancel}
           onTypingChange={onTypingChange}
           listening={listening}
           onMicToggle={onMicToggle}
-          inputRef={inputRef as React.RefObject<HTMLInputElement | null>}
+          inputRef={inputRef as React.RefObject<HTMLTextAreaElement | null>}
         />
       )}
     </div>
