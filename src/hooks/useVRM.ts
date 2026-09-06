@@ -66,6 +66,8 @@ export function useVRM(canvasRef: React.RefObject<HTMLCanvasElement | null>) {
   const clockRef = useRef<THREE.Clock | null>(null);
   const animFrameRef = useRef<number>(0);
   const animatingRef = useRef(false);
+  const loopGenerationRef = useRef(0);
+  const loadGenerationRef = useRef(0);
   const viewportRef = useRef({
     zoom: 1,
     framing: "full" as "full" | "half",
@@ -108,6 +110,7 @@ export function useVRM(canvasRef: React.RefObject<HTMLCanvasElement | null>) {
   const lastErrorRef = useRef("");
 
   const disposeSceneResources = useCallback(() => {
+    loopGenerationRef.current += 1;
     animatingRef.current = false;
     if (animFrameRef.current) {
       cancelAnimationFrame(animFrameRef.current);
@@ -313,7 +316,11 @@ export function useVRM(canvasRef: React.RefObject<HTMLCanvasElement | null>) {
   );
 
   const startAnimationLoop = useCallback(() => {
-    if (animatingRef.current) return;
+    if (animFrameRef.current) {
+      cancelAnimationFrame(animFrameRef.current);
+      animFrameRef.current = 0;
+    }
+    const generation = ++loopGenerationRef.current;
     animatingRef.current = true;
 
     const TARGET_FPS = 30;
@@ -321,7 +328,7 @@ export function useVRM(canvasRef: React.RefObject<HTMLCanvasElement | null>) {
     let lastFrameTime = 0;
 
     const tick = (timestamp: number) => {
-      if (!animatingRef.current) return;
+      if (!animatingRef.current || loopGenerationRef.current !== generation) return;
 
       const elapsed = timestamp - lastFrameTime;
       if (elapsed < FRAME_INTERVAL) {
@@ -451,7 +458,10 @@ export function useVRM(canvasRef: React.RefObject<HTMLCanvasElement | null>) {
     async (modelPath: string, animations?: AnimationInfo[]) => {
       if (!canvasRef.current) return;
 
-      // Stop animation
+      const generation = ++loadGenerationRef.current;
+
+      // Stop animation (invalidate any in-flight RAF loop)
+      loopGenerationRef.current += 1;
       animatingRef.current = false;
       if (animFrameRef.current) {
         cancelAnimationFrame(animFrameRef.current);
@@ -535,6 +545,13 @@ export function useVRM(canvasRef: React.RefObject<HTMLCanvasElement | null>) {
         const gltf = await gltfLoader.loadAsync(cacheBust);
         const vrm = gltf.userData.vrm as VRM;
 
+        if (generation !== loadGenerationRef.current) {
+          if (vrm) {
+            VRMUtils.deepDispose(vrm.scene);
+          }
+          return;
+        }
+
         if (!vrm || !sceneRef.current || !rendererRef.current) {
           console.error("[VRM] Failed to load: scene or renderer destroyed");
           return;
@@ -593,6 +610,13 @@ export function useVRM(canvasRef: React.RefObject<HTMLCanvasElement | null>) {
           if (!currentActionRef.current && clipsRef.current.size > 0) {
             playAnimation(clipsRef.current.keys().next().value!);
           }
+        }
+
+        if (generation !== loadGenerationRef.current) {
+          VRMUtils.deepDispose(vrm.scene);
+          vrm.scene.removeFromParent();
+          vrmRef.current = null;
+          return;
         }
 
         clockRef.current = new THREE.Clock();

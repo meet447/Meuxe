@@ -88,7 +88,10 @@ export function useVoice() {
   }, []);
 
   const stopPcmCapture = useCallback(() => {
-    pcmScriptNodeRef.current?.disconnect();
+    if (pcmScriptNodeRef.current) {
+      pcmScriptNodeRef.current.onaudioprocess = null;
+      pcmScriptNodeRef.current.disconnect();
+    }
     pcmSourceRef.current?.disconnect();
     pcmGainNodeRef.current?.disconnect();
     pcmContextRef.current?.close().catch(() => {});
@@ -98,6 +101,7 @@ export function useVoice() {
     pcmGainNodeRef.current = null;
     pcmContextRef.current = null;
     pcmStreamRef.current = null;
+    pcmChunksRef.current = [];
   }, []);
 
   const stopListening = useCallback(() => {
@@ -106,17 +110,21 @@ export function useVoice() {
       return;
     }
     recognitionRef.current?.stop();
+    recognitionRef.current = null;
     stopMediaTracks();
     stopPcmCapture();
+    mediaRecorderRef.current = null;
     setListening(false);
   }, [stopMediaTracks, stopPcmCapture]);
 
   useEffect(() => {
     return () => {
       recognitionRef.current?.stop();
+      recognitionRef.current = null;
       if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
         mediaRecorderRef.current.stop();
       }
+      mediaRecorderRef.current = null;
       stopMediaTracks();
       stopPcmCapture();
       setListening(false);

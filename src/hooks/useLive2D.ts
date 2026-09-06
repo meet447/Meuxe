@@ -92,6 +92,7 @@ export function useLive2D(canvasRef: React.RefObject<HTMLCanvasElement | null>) 
   const audioLevelsGetterRef = useRef<(() => AudioLevels) | null>(null);
   const typingReactionRef = useRef<(() => void) | null>(null);
   const mouseCleanupRef = useRef<(() => void) | null>(null);
+  const loadGenerationRef = useRef(0);
   const viewportRef = useRef({
     zoom: 1,
     framing: "full" as "full" | "half",
@@ -370,6 +371,8 @@ export function useLive2D(canvasRef: React.RefObject<HTMLCanvasElement | null>) 
     async (modelPath: string, mapping?: ModelMapping) => {
       if (!canvasRef.current) return;
 
+      const generation = ++loadGenerationRef.current;
+
       if (mapping) {
         mappingRef.current = mapping;
         debugRef.current.mappingEmotions = [];
@@ -428,6 +431,11 @@ export function useLive2D(canvasRef: React.RefObject<HTMLCanvasElement | null>) 
         const model = await Live2DModel.from(cacheBust, {
           motionPreload: "IDLE" as any,
         });
+
+        if (generation !== loadGenerationRef.current) {
+          model.destroy();
+          return;
+        }
 
         modelRef.current = model;
 
