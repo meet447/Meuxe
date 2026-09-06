@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback, memo, useMemo } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import type { ChatMessage, ChatTimelineItem } from "../types";
+import type { ChatTimelineItem } from "../types";
 import { openExternalUrl } from "../lib/openExternal";
 import { MicButton } from "./MicButton";
 import { ToolCallBubble } from "./ToolCallBubble";
@@ -294,12 +294,12 @@ const ChatInput = memo(function ChatInput({
   );
 });
 
-function timelineItemToMessage(item: ChatTimelineItem): ChatMessage | null {
+function timelineItemToBubble(item: ChatTimelineItem) {
   if (item.kind === "tool") return null;
   if (item.kind === "user") {
-    return { role: "user", text: item.text };
+    return { role: "user" as const, text: item.text };
   }
-  return { role: "assistant", text: item.text, expression: item.expression };
+  return { role: "assistant" as const, text: item.text, expression: item.expression };
 }
 
 export function ChatPanel({
@@ -366,14 +366,14 @@ export function ChatPanel({
         );
       }
 
-      const msg = timelineItemToMessage(item);
-      if (!msg) return null;
+      const bubble = timelineItemToBubble(item);
+      if (!bubble) return null;
       return (
         <MessageBubble
           key={item.id}
-          role={msg.role}
-          text={msg.text}
-          expression={msg.expression}
+          role={bubble.role}
+          text={bubble.text}
+          expression={bubble.expression}
           characterName={characterName}
           dark={dark}
         />

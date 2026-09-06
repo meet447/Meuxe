@@ -27,6 +27,7 @@ import {
   clearChat,
   resolveAssetUrl,
 } from "./api/tauri";
+import { sessionMessagesToChat } from "./lib/sessionHistory";
 import type { Character, ModelInfo } from "./types";
 
 const Live2DCanvas = lazy(() =>
@@ -249,20 +250,9 @@ function App() {
     async (characterId: string) => {
       const generation = ++historyGenerationRef.current;
       try {
-        const history = (await getChatHistory(characterId)) as Array<{
-          role: "user" | "assistant";
-          content?: string;
-          text?: string;
-          expression?: string;
-        }>;
+        const history = await getChatHistory(characterId);
         if (generation !== historyGenerationRef.current) return;
-        setMessages(
-          history.map((m) => ({
-            role: m.role,
-            content: m.content ?? m.text ?? "",
-            expression: m.expression,
-          }))
-        );
+        setMessages(sessionMessagesToChat(history));
       } catch (err) {
         console.error("History load error:", err);
       }
@@ -534,20 +524,9 @@ function App() {
     setMessages([]);
     void (async () => {
       try {
-        const history = (await getChatHistory(selectedCharId)) as Array<{
-          role: "user" | "assistant";
-          content?: string;
-          text?: string;
-          expression?: string;
-        }>;
+        const history = await getChatHistory(selectedCharId);
         if (generation !== historyGenerationRef.current) return;
-        setMessages(
-          history.map((m) => ({
-            role: m.role,
-            content: m.content ?? m.text ?? "",
-            expression: m.expression,
-          }))
-        );
+        setMessages(sessionMessagesToChat(history));
       } catch (err) {
         console.error("History load error:", err);
       }

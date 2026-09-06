@@ -7,11 +7,16 @@ export interface Character {
   source_type?: "markdown" | "directory";
 }
 
-export interface ChatMessage {
-  role: "user" | "assistant";
-  text: string;
-  expression?: string;
+/** Wire shape returned by `chat_history` (matches Rust `SessionMessage`). */
+export interface SessionMessage {
+  ts: string;
+  role: "user" | "assistant" | "system";
+  content: string;
+  metadata?: unknown;
 }
+
+/** @deprecated Use SessionMessage for persisted history; timeline items use ChatTimelineItem. */
+export type ChatMessage = SessionMessage;
 
 export interface ToolCallStatus {
   requestId: string;

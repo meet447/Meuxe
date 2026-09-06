@@ -1,5 +1,5 @@
 import { invoke, convertFileSrc } from "@tauri-apps/api/core";
-import type { AppConfig, MemoryFact, MemorySnapshot, ModelInfo } from "../types";
+import type { AppConfig, MemoryFact, MemorySnapshot, ModelInfo, SessionMessage } from "../types";
 
 // Asset paths: in the Tauri app, resolve to convertFileSrc URLs via the backend.
 // In browser-only dev (npm run dev), fall back to Vite /static/ middleware.
@@ -132,7 +132,7 @@ export async function confirmToolCall(permissionId: string, approved: boolean) {
 }
 
 export async function getChatHistory(characterId: string) {
-  return invoke<unknown[]>("chat_history", { characterId });
+  return invoke<SessionMessage[]>("chat_history", { characterId });
 }
 
 export async function clearChat(characterId: string) {
