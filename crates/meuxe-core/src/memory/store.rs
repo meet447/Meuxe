@@ -19,6 +19,9 @@ use super::types::{
 const FACT_CAP: usize = 300;
 const THREAD_CAP: usize = 8;
 const MOMENT_CAP: usize = 50;
+/// Moments kept on disk. Larger than the snapshot cap so long-running
+/// companions keep their "remember when" history until consolidation exists.
+const MOMENT_DISK_CAP: usize = 1000;
 const CLOSENESS_BASELINE: f64 = 0.002;
 const CLOSENESS_STEP: f64 = 0.015;
 const CLOSENESS_DRIFT_PER_DAY: f64 = 0.005;
@@ -458,7 +461,7 @@ impl CompanionMemory {
 
     fn write_moments(&self, dir: &Path, moments: &[Moment]) -> Result<()> {
         let path = dir.join("moments.jsonl");
-        let capped = cap_moments_newest_first(moments, MOMENT_CAP);
+        let capped = cap_moments_newest_first(moments, MOMENT_DISK_CAP);
         let mut body = String::new();
         for moment in &capped {
             body.push_str(&serde_json::to_string(moment)?);
@@ -1173,7 +1176,7 @@ mod tests {
     fn moment_cap_persisted_on_disk() {
         let (_tmp, store) = mem();
         let t0 = Utc.with_ymd_and_hms(2026, 1, 1, 0, 0, 0).unwrap();
-        for i in 0..55 {
+        for i in 0..(MOMENT_DISK_CAP + 5) {
             store
                 .apply_turn_at(
                     "rika",
@@ -1183,7 +1186,7 @@ mod tests {
                         moment: Some(format!("Moment number {i}")),
                         ..Default::default()
                     }),
-                    t0 + chrono::Duration::minutes(i),
+                    t0 + chrono::Duration::minutes(i as i64),
                 )
                 .unwrap();
         }
@@ -1193,6 +1196,6 @@ mod tests {
             .lines()
             .filter(|l| !l.trim().is_empty())
             .count();
-        assert_eq!(on_disk, MOMENT_CAP);
+        assert_eq!(on_disk, MOMENT_DISK_CAP);
     }
 }
