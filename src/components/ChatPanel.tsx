@@ -327,10 +327,27 @@ export function ChatPanel({
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const internalInputRef = useRef<HTMLInputElement>(null);
   const inputRef = externalInputRef || internalInputRef;
+  const scrollRafRef = useRef<number | null>(null);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [timeline, streamingText]);
+  }, [timeline]);
+
+  useEffect(() => {
+    if (!streamingText) return;
+    if (scrollRafRef.current !== null) {
+      cancelAnimationFrame(scrollRafRef.current);
+    }
+    scrollRafRef.current = requestAnimationFrame(() => {
+      scrollRafRef.current = null;
+      messagesEndRef.current?.scrollIntoView({ behavior: "instant" });
+    });
+    return () => {
+      if (scrollRafRef.current !== null) {
+        cancelAnimationFrame(scrollRafRef.current);
+      }
+    };
+  }, [streamingText]);
 
   const isProcessing = loading || ttsLoading;
 
@@ -403,8 +420,8 @@ export function ChatPanel({
                 </span>
                 <Dots size="sm" />
               </div>
-              <div className="text-[14px] leading-relaxed">
-                <MarkdownContent content={streamingText} />
+              <div className="text-[14px] leading-relaxed whitespace-pre-wrap break-words">
+                {streamingText}
               </div>
             </div>
           </div>

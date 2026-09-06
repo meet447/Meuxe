@@ -126,6 +126,28 @@ export function useChat() {
   const onErrorRef = useRef<((requestId: string) => void) | null>(null);
   const unlistenersRef = useRef<UnlistenFn[]>([]);
   const audioUnlistenersRef = useRef<UnlistenFn[]>([]);
+  const streamingRafRef = useRef<number | null>(null);
+  const streamingDirtyRef = useRef(false);
+
+  const scheduleStreamingTextUpdate = useCallback(() => {
+    streamingDirtyRef.current = true;
+    if (streamingRafRef.current !== null) return;
+    streamingRafRef.current = requestAnimationFrame(() => {
+      streamingRafRef.current = null;
+      if (!streamingDirtyRef.current) return;
+      streamingDirtyRef.current = false;
+      setStreamingText(cleanExpressionTags(displayTextRef.current));
+    });
+  }, []);
+
+  const flushStreamingText = useCallback(() => {
+    if (streamingRafRef.current !== null) {
+      cancelAnimationFrame(streamingRafRef.current);
+      streamingRafRef.current = null;
+    }
+    streamingDirtyRef.current = false;
+    setStreamingText(cleanExpressionTags(displayTextRef.current));
+  }, []);
 
   const messages = useMemo(() => timelineToMessages(timeline), [timeline]);
 
@@ -153,6 +175,11 @@ export function useChat() {
   const commitStreamingSegment = useCallback(() => {
     const text = cleanExpressionTags(displayTextRef.current).trim();
     displayTextRef.current = "";
+    if (streamingRafRef.current !== null) {
+      cancelAnimationFrame(streamingRafRef.current);
+      streamingRafRef.current = null;
+    }
+    streamingDirtyRef.current = false;
     setStreamingText("");
 
     if (!text) return;
@@ -248,6 +275,7 @@ export function useChat() {
 
       const handleCancelled = (payload: CancelledPayload) => {
         if (payload.request_id !== requestId) return;
+        flushStreamingText();
         commitStreamingSegment();
         setIsStreaming(false);
         activeRequestIdRef.current = null;
@@ -256,6 +284,7 @@ export function useChat() {
 
       const handleDone = (payload: DonePayload) => {
         if (payload.request_id !== requestId) return;
+        flushStreamingText();
         commitStreamingSegment();
         setIsStreaming(false);
         activeRequestIdRef.current = null;
@@ -267,6 +296,7 @@ export function useChat() {
         if (payload.request_id !== requestId) return;
         console.error("Chat error:", payload.message);
         onErrorRef.current?.(requestId);
+        flushStreamingText();
         commitStreamingSegment();
         setIsStreaming(false);
         activeRequestIdRef.current = null;
@@ -288,7 +318,7 @@ export function useChat() {
         listen<TextChunkPayload>("chat:text-chunk", (event) => {
           if (event.payload.request_id !== requestId) return;
           displayTextRef.current += event.payload.text;
-          setStreamingText(cleanExpressionTags(displayTextRef.current));
+          scheduleStreamingTextUpdate();
         }),
         listen<SentencePayload>("chat:sentence", (event) => {
           if (event.payload.request_id !== requestId) return;
@@ -372,11 +402,14 @@ export function useChat() {
 
       await sendChat(characterId, message, requestId);
     },
-    [isStreaming, commitStreamingSegment, upsertToolCall, tearDownListeners],
+    [isStreaming, commitStreamingSegment, upsertToolCall, tearDownListeners, scheduleStreamingTextUpdate, flushStreamingText],
   );
 
   useEffect(() => {
     return () => {
+      if (streamingRafRef.current !== null) {
+        cancelAnimationFrame(streamingRafRef.current);
+      }
       tearDownListeners();
     };
   }, [tearDownListeners]);

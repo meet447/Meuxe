@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef, useMemo, lazy, Suspense } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo, lazy, Suspense, memo } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { register, unregister } from "@tauri-apps/plugin-global-shortcut";
@@ -34,6 +34,56 @@ const Live2DCanvas = lazy(() =>
 const VRMCanvas = lazy(() =>
   import("./components/VRMCanvas").then((m) => ({ default: m.VRMCanvas }))
 );
+
+type AvatarStageProps = {
+  modelType: "vrm" | "live2d";
+  selectedCharId: string;
+  modelPath: string | null;
+  canvasProps: {
+    modelPath: string | null;
+    expression: string;
+    speaking: boolean;
+    userTyping: boolean;
+    uiMode: "full" | "mini";
+    background: string;
+    zoom: number;
+    framing: "full" | "half";
+    onZoomChange: (zoom: number) => void;
+    onBackgroundChange: (bg: string) => void;
+    onFramingChange: (framing: "full" | "half") => void;
+    getAudioLevels: () => { volume: number; mouthOpen: number; mouthForm: number };
+  };
+  animations?: import("./types").AnimationInfo[];
+  modelMapping: import("./types").ModelMapping | null;
+};
+
+const AvatarStage = memo(function AvatarStage({
+  modelType,
+  selectedCharId,
+  canvasProps,
+  animations,
+  modelMapping,
+}: AvatarStageProps) {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex h-full w-full items-center justify-center text-sm text-ink-3">
+          Loading model...
+        </div>
+      }
+    >
+      {modelType === "vrm" ? (
+        <VRMCanvas key={`vrm-${selectedCharId}`} {...canvasProps} animations={animations} />
+      ) : (
+        <Live2DCanvas
+          key={`l2d-${selectedCharId}`}
+          {...canvasProps}
+          modelMapping={modelMapping}
+        />
+      )}
+    </Suspense>
+  );
+});
 
 
 function App() {
@@ -515,29 +565,16 @@ function App() {
     [modelPath, currentExpression, speaking, userTyping, isMiniMode, background, zoom, framing, getAudioLevels]
   );
 
-  const avatarCanvas = useMemo(() => (
-    <Suspense
-      fallback={
-        <div className="flex h-full w-full items-center justify-center text-sm text-ink-3">
-          Loading model...
-        </div>
-      }
-    >
-      {modelType === "vrm" ? (
-        <VRMCanvas
-          key={`vrm-${selectedCharId}`}
-          {...canvasProps}
-          animations={selectedModel?.animations}
-        />
-      ) : (
-        <Live2DCanvas
-          key={`l2d-${selectedCharId}`}
-          {...canvasProps}
-          modelMapping={modelMapping}
-        />
-      )}
-    </Suspense>
-  ), [modelType, selectedCharId, canvasProps, selectedModel?.animations, modelMapping]);
+  const avatarCanvas = (
+    <AvatarStage
+      modelType={modelType}
+      selectedCharId={selectedCharId}
+      modelPath={modelPath}
+      canvasProps={canvasProps}
+      animations={selectedModel?.animations}
+      modelMapping={modelMapping}
+    />
+  );
 
   const charName = selectedChar?.name || "Companion";
 
