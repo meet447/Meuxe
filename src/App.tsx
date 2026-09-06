@@ -13,11 +13,12 @@ import { Onboarding } from "./components/Onboarding";
 import { Settings } from "./components/Settings";
 import { MiniWidget } from "./components/MiniWidget";
 import { useChat, cleanCompanionDisplayText } from "./hooks/useChat";
-import { useAudioQueue } from "./hooks/useAudioQueue";
+import { unlockAudioPlayback, useAudioQueue } from "./hooks/useAudioQueue";
 import { useVoice } from "./hooks/useVoice";
 import { useWindow } from "./hooks/useWindow";
 import {
   getConfig,
+  setActiveCharacter,
   listCharacters,
   listModels,
   getExpressions,
@@ -36,7 +37,15 @@ const VRMCanvas = lazy(() =>
 );
 
 
+function devAvatarPreview(): "haru" | "utsuwa" | null {
+  if (!import.meta.env.DEV) return null;
+  const value = new URLSearchParams(window.location.search).get("avatar");
+  if (value === "haru" || value === "utsuwa") return value;
+  return null;
+}
+
 function App() {
+  const avatarPreview = useMemo(() => devAvatarPreview(), []);
   const { isMiniMode, miniCharacterId, toggleMini } = useWindow();
 
   // Refs for global shortcut callbacks (so they always see latest state)
@@ -265,6 +274,32 @@ function App() {
   ]);
 
   useEffect(() => {
+    if (avatarPreview) {
+      setOnboardingComplete(true);
+      setExpressionsConfigured(true);
+      const expr = new URLSearchParams(window.location.search).get("expr") || "happy";
+      const mapped =
+        avatarPreview === "haru"
+          ? ({
+              happy: "F05",
+              angry: "F02",
+              sad: "F03",
+              surprised: "F06",
+              thinking: "F08",
+              embarrassed: "F07",
+              blush: "F07",
+              smirk: "F04",
+              excited: "F05",
+              scared: "F06",
+              disgusted: "F02",
+              neutral: "F01",
+            }[expr] ?? expr)
+          : expr;
+      setCurrentExpression(mapped);
+    }
+  }, [avatarPreview]);
+
+  useEffect(() => {
     refreshCharacters();
     listModels()
       .then((data) => setModels(data as ModelInfo[]))
@@ -288,9 +323,9 @@ function App() {
       })
       .catch((err) => {
         console.error("[App] config load error:", err);
-        setOnboardingComplete(false);
+        setOnboardingComplete(avatarPreview ? true : false);
       });
-  }, [miniCharacterId]);
+  }, [miniCharacterId, avatarPreview]);
 
   const selectedChar = useMemo(
     () => characters.find((c) => c.id === selectedCharId),
@@ -299,9 +334,31 @@ function App() {
   selectedCharRef.current = selectedChar;
 
   const selectedModel = useMemo(() => {
+    if (avatarPreview === "haru") {
+      return {
+        id: "haru",
+        type: "live2d" as const,
+        model_file: "Haru.model3.json",
+        path: "models/live2d/haru/Haru.model3.json",
+        mapping: null,
+      };
+    }
+    if (avatarPreview === "utsuwa") {
+      return {
+        id: "utsuwa",
+        type: "vrm" as const,
+        model_file: "utsuwa.vrm",
+        path: "models/vrm/utsuwa/utsuwa.vrm",
+        mapping: null,
+        animations: [
+          { name: "idle", path: "models/vrm/utsuwa/animations/idle.vrma" },
+          { name: "talking", path: "models/vrm/utsuwa/animations/talking.vrma" },
+        ],
+      };
+    }
     if (!selectedChar?.live2d_model) return null;
     return models.find((m) => m.id === selectedChar.live2d_model) ?? null;
-  }, [selectedChar, models]);
+  }, [avatarPreview, selectedChar, models]);
 
   const [resolvedModelPath, setResolvedModelPath] = useState<string | null>(null);
 
@@ -387,12 +444,23 @@ function App() {
   const handleSend = useCallback(
     async (text: string) => {
       if (!selectedCharId || !expressionsConfigured) return;
+      unlockAudioPlayback();
       const requestId = crypto.randomUUID();
       beginRequest(requestId);
       await send(selectedCharId, text, requestId);
     },
     [selectedCharId, expressionsConfigured, send, beginRequest]
   );
+
+  useEffect(() => {
+    const unlock = () => unlockAudioPlayback();
+    document.addEventListener("pointerdown", unlock, { once: true });
+    document.addEventListener("keydown", unlock, { once: true });
+    return () => {
+      document.removeEventListener("pointerdown", unlock);
+      document.removeEventListener("keydown", unlock);
+    };
+  }, []);
 
   useEffect(() => {
     if (!selectedCharId) return;
@@ -437,6 +505,7 @@ function App() {
       clearQueue();
       setCurrentExpression("neutral");
       setZoom(1.1);
+      setActiveCharacter(id).catch(console.error);
     },
     [setMessages, clearQueue]
   );
@@ -455,6 +524,7 @@ function App() {
       setCurrentExpression("neutral");
       setZoom(1.1);
       setSettingsOpen(false);
+      setActiveCharacter(characterId).catch(console.error);
     },
     [refreshCharacters, setMessages, clearQueue]
   );
@@ -506,11 +576,11 @@ function App() {
   const charName = selectedChar?.name || "Companion";
 
   const spokenCaption = useMemo(() => {
-    if (speaking && speakingSentence?.trim()) {
+    if (speakingSentence?.trim()) {
       return cleanCompanionDisplayText(speakingSentence);
     }
     return null;
-  }, [speaking, speakingSentence]);
+  }, [speakingSentence]);
 
   // Mini mode: render just the avatar in MiniWidget
   if (isMiniMode) {
@@ -637,6 +707,9 @@ function App() {
                 <Pill tone={companionStatus.tone} dot pulse>
                   {companionStatus.label}
                 </Pill>
+              )}
+              {avatarPreview && (
+                <Pill tone="honey">{currentExpression}</Pill>
               )}
             </div>
 

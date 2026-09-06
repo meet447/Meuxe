@@ -10,7 +10,7 @@ export const TTS_PRESETS_UI: Record<string, TtsPresetUi> = {
   tiktok: {
     name: "Meuxe TTS",
     needs_key: false,
-    hint: "Built into Meuxe, no key needed",
+    hint: "Built into Meuxe — free, no API key needed",
   },
   elevenlabs: {
     name: "ElevenLabs",
@@ -25,3 +25,4 @@ export const TTS_PRESETS_UI: Record<string, TtsPresetUi> = {
 };
 
 export const DEFAULT_TTS_PROVIDER = "tiktok";
+export const DEFAULT_TTS_VOICE = "en_us_001";

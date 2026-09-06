@@ -11,3 +11,4 @@ pub mod session;
 pub mod tts;
 
 pub use error::{MeuxeError, Result};
+pub use expressions::canonical_expression;

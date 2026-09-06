@@ -33,7 +33,12 @@ describe("OrderedAudioQueue", () => {
     queue.addAudio("r1", 2, "a2");
 
     queue.advance("r1", 0);
-    expect(queue.peekNext()).toEqual({ kind: "skip", requestId: "r1", index: 1 });
+    expect(queue.peekNext()).toEqual({
+      kind: "skip",
+      requestId: "r1",
+      index: 1,
+      task: task(1),
+    });
     queue.advance("r1", 1);
     expect(queue.peekNext()).toMatchObject({ kind: "play", index: 2 });
   });

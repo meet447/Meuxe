@@ -36,6 +36,8 @@ export const Live2DCanvas = memo(function Live2DCanvas({
     useLive2D(canvasRef);
   const prevModelPath = useRef<string | null>(null);
   const prevExpression = useRef<string>("");
+  const expressionRef = useRef(expression);
+  expressionRef.current = expression;
   const [modelLoading, setModelLoading] = useState(false);
   const dragOffset = { x: 0, y: 0 };
 
@@ -45,6 +47,11 @@ export const Live2DCanvas = memo(function Live2DCanvas({
       setModelLoading(true);
       loadModel(modelPath, modelMapping || undefined).then(() => {
         setViewport(zoom, framing, dragOffset.x, dragOffset.y);
+        const expr = expressionRef.current;
+        if (expr) {
+          prevExpression.current = expr;
+          setExpression(expr);
+        }
       }).finally(() => setModelLoading(false));
     }
     // Intentionally disabling lint rule - loading state is necessary for model loading UX

@@ -506,12 +506,16 @@ export function useLive2D(canvasRef: React.RefObject<HTMLCanvasElement | null>) 
       breathSpeedRef.current = 0.03; // Normal
     }
 
-    // Set the expression
+    // Set the expression (match the model's registered name, not just the requested string)
+    const available = debugRef.current.availableExpressions;
+    const resolved =
+      available.find((item) => item.toLowerCase() === expressionName.toLowerCase()) ??
+      expressionName;
     try {
-      model.expression(expressionName);
-      console.log(`[Live2D] Expression: "${expressionName}"`);
+      model.expression(resolved);
+      console.log(`[Live2D] Expression: "${resolved}"`);
     } catch (e) {
-      debugRef.current.lastError = `Expression "${expressionName}" failed: ${e}`;
+      debugRef.current.lastError = `Expression "${resolved}" failed: ${e}`;
       try { model.expression(0); } catch {}
     }
 

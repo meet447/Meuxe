@@ -46,6 +46,8 @@ export const VRMCanvas = memo(function VRMCanvas({
   } = useVRM(canvasRef);
   const prevModelPath = useRef<string | null>(null);
   const prevExpression = useRef<string>("");
+  const expressionRef = useRef(expression);
+  expressionRef.current = expression;
   const [modelLoading, setModelLoading] = useState(false);
 
   useEffect(() => {
@@ -54,6 +56,11 @@ export const VRMCanvas = memo(function VRMCanvas({
       setModelLoading(true);
       loadModel(modelPath, animations).then(() => {
         setViewport(zoom, framing);
+        const expr = expressionRef.current;
+        if (expr) {
+          prevExpression.current = expr;
+          setExpression(expr);
+        }
       }).finally(() => setModelLoading(false));
     }
     // Intentionally disabling lint rule - loading state is necessary for model loading UX
