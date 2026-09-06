@@ -9,9 +9,9 @@ import {
 import { buildCompanionPersonalityDraft } from "../lib/companionCharacterDraft";
 import { COMPANION_VIBE_PACKS } from "../lib/companionVibes";
 import { DEFAULT_TTS_VOICE } from "../lib/ttsPresets";
-import type { ModelInfo } from "../types";
+import type { AppConfig, ModelInfo } from "../types";
 import { CompanionAvatarPreview } from "./onboarding/CompanionAvatarPreview";
-import { ModelPicker } from "./onboarding/ModelPicker";
+import { ModelPicker } from "./settings/ModelPicker";
 import {
   Button,
   ChevronDownIcon,
@@ -69,7 +69,7 @@ export function AddCharacterModal({
     if (!open) return;
 
     getConfig()
-      .then((cfg: any) => {
+      .then((cfg: AppConfig) => {
         setUserName(cfg.user?.name || "");
         setUserAbout(cfg.user?.about || "");
         setVoice(cfg.tts?.voice || DEFAULT_TTS_VOICE);
@@ -204,7 +204,13 @@ export function AddCharacterModal({
       onCreated(characterId);
     } catch (err) {
       console.error("Failed to create character:", err);
-      setError("Could not create the character. Please try again.");
+      const message =
+        typeof err === "string"
+          ? err
+          : err instanceof Error
+            ? err.message
+            : "Could not create the character. Please try again.";
+      setError(message);
     } finally {
       setSaving(false);
     }

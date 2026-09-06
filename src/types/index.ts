@@ -7,16 +7,24 @@ export interface Character {
   source_type?: "markdown" | "directory";
 }
 
-export interface ChatMessage {
-  role: "user" | "assistant";
-  text: string;
-  expression?: string;
+/** Wire shape returned by `chat_history` (matches Rust `SessionMessage`). */
+export interface SessionMessage {
+  ts: string;
+  role: "user" | "assistant" | "system";
+  content: string;
+  metadata?: unknown;
 }
+
+/** @deprecated Use SessionMessage for persisted history; timeline items use ChatTimelineItem. */
+export type ChatMessage = SessionMessage;
 
 export interface ToolCallStatus {
   requestId: string;
+  toolCallId: string;
+  permissionId?: string;
   toolName: string;
   arguments: Record<string, unknown>;
+  description?: string;
   status: "running" | "completed" | "failed" | "awaiting_confirmation";
   result?: string;
 }
@@ -122,4 +130,53 @@ export interface ModelInfo {
 export interface Voice {
   id: string;
   name: string;
+}
+
+export interface UserConfig {
+  id?: string;
+  name: string;
+  about: string;
+}
+
+export interface AgentConfig {
+  preset: string;
+  program: string;
+  args: string[];
+  /** Approve agent tool permissions automatically (default) or ask in the chat UI. */
+  auto_approve_tools?: boolean;
+}
+
+export interface LlmConfig {
+  provider: string;
+  base_url?: string;
+  api_key?: string | null;
+  model?: string;
+}
+
+export interface TtsConfig {
+  provider: string;
+  api_key?: string | null;
+  voice: string;
+}
+
+export interface LlmProviderConfig {
+  base_url?: string;
+  api_key?: string | null;
+  model?: string;
+}
+
+export interface TtsProviderConfig {
+  api_key?: string | null;
+  voice?: string;
+}
+
+export interface AppConfig {
+  user?: UserConfig;
+  llm?: LlmConfig;
+  tts?: TtsConfig;
+  llm_providers?: Record<string, LlmProviderConfig>;
+  tts_providers?: Record<string, TtsProviderConfig>;
+  active_character?: string;
+  onboarding_complete?: boolean;
+  agent?: AgentConfig;
 }

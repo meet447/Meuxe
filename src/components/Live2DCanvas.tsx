@@ -1,4 +1,4 @@
-import { useRef, useEffect, useState, memo } from "react";
+import { useRef, useEffect, useState, memo, useMemo } from "react";
 import { useLive2D } from "../hooks/useLive2D";
 import type { ModelMapping } from "../types";
 import { LoadingOverlay } from "./LoadingOverlay";
@@ -31,32 +31,57 @@ export const Live2DCanvas = memo(function Live2DCanvas({
   framing,
   getAudioLevels,
 }: Props) {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const hostRef = useRef<HTMLDivElement>(null);
   const { loadModel, setExpression, startLipSync, stopLipSync, setViewport, setTypingReaction } =
-    useLive2D(canvasRef);
+    useLive2D(hostRef);
   const prevModelPath = useRef<string | null>(null);
+  const prevMappingKey = useRef<string>("");
+
+  // The hook disposes its renderer on unmount; forget what was loaded so a remount
+  // (including React StrictMode's simulated one in dev) loads the model again.
+  useEffect(() => {
+    return () => {
+      prevModelPath.current = null;
+      prevMappingKey.current = "";
+    };
+  }, []);
   const prevExpression = useRef<string>("");
   const expressionRef = useRef(expression);
   expressionRef.current = expression;
   const [modelLoading, setModelLoading] = useState(false);
   const dragOffset = { x: 0, y: 0 };
+  const mappingKey = useMemo(() => JSON.stringify(modelMapping), [modelMapping]);
 
   useEffect(() => {
-    if (modelPath && modelPath !== prevModelPath.current) {
-      prevModelPath.current = modelPath;
-      setModelLoading(true);
-      loadModel(modelPath, modelMapping || undefined).then(() => {
+    if (!modelPath) return;
+
+    const pathChanged = modelPath !== prevModelPath.current;
+    const mappingChanged = mappingKey !== prevMappingKey.current;
+    if (!pathChanged && !mappingChanged) return;
+
+    prevModelPath.current = modelPath;
+    prevMappingKey.current = mappingKey;
+
+    let cancelled = false;
+    setModelLoading(true);
+    loadModel(modelPath, modelMapping || undefined)
+      .then(() => {
+        if (cancelled) return;
         setViewport(zoom, framing, dragOffset.x, dragOffset.y);
         const expr = expressionRef.current;
         if (expr) {
           prevExpression.current = expr;
           setExpression(expr);
         }
-      }).finally(() => setModelLoading(false));
-    }
-    // Intentionally disabling lint rule - loading state is necessary for model loading UX
-    // eslint-disable-next-line react-hooks/set-state-in-effect, react-hooks/set-state-syntax-use-give-error-message
-  }, [modelPath, modelMapping, loadModel]);
+      })
+      .finally(() => {
+        if (!cancelled) setModelLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [modelPath, mappingKey, modelMapping, loadModel, setViewport, setExpression, zoom, framing]);
 
   useEffect(() => {
     if (expression && expression !== prevExpression.current) {
@@ -107,10 +132,10 @@ export const Live2DCanvas = memo(function Live2DCanvas({
           <p className="text-lg text-ink-3">No Live2D model loaded</p>
         </div>
       )}
-      <canvas
-        ref={canvasRef}
-        className="w-full h-full cursor-default"
-        style={{ display: modelPath ? "block" : "none", touchAction: "none" }}
+      <div
+        ref={hostRef}
+        className="h-full w-full"
+        style={{ display: modelPath ? "block" : "none" }}
       />
     </div>
   );

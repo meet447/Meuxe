@@ -1,16 +1,15 @@
 import { useEffect, useRef, useState } from "react";
-import type { FormEvent, PointerEvent as ReactPointerEvent, ReactNode } from "react";
+import type { PointerEvent as ReactPointerEvent, ReactNode } from "react";
 import { getCurrentWindow, LogicalSize } from "@tauri-apps/api/window";
 import { useWindow } from "../hooks/useWindow";
-import { MicButton } from "./MicButton";
-import type { ToolCallStatus } from "./ToolCallBubble";
+import { ChatComposer } from "./chat/ChatComposer";
+import { MiniToolPills } from "./MiniToolPill";
+import type { ToolCallStatus } from "../types";
 import {
   Button,
   ExpandIcon,
   IconButton,
   Pill,
-  SendIcon,
-  Spinner,
   Surface,
 } from "./ui";
 
@@ -25,7 +24,8 @@ interface MiniWidgetProps {
   toolCalls: ToolCallStatus[];
   onSend: (text: string) => void;
   onMicToggle: () => void;
-  onToolConfirm: (requestId: string, approved: boolean) => void;
+  onToolConfirm: (permissionId: string, approved: boolean) => void;
+  onCancel?: () => void;
   pendingConfirmation: boolean;
   openComposerTrigger?: number; // increment to open composer from outside
 }
@@ -49,6 +49,7 @@ export function MiniWidget({
   onSend,
   onMicToggle,
   onToolConfirm,
+  onCancel,
   pendingConfirmation,
   openComposerTrigger = 0,
 }: MiniWidgetProps) {
@@ -63,7 +64,7 @@ export function MiniWidget({
   const [sizePresetIndex, setSizePresetIndex] = useState(1);
   const [bottomDockHover, setBottomDockHover] = useState(false);
   const [inputFocused, setInputFocused] = useState(false);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
 
   // Sync preset with actual window size on mount
   useEffect(() => {
@@ -131,10 +132,7 @@ export function MiniWidget({
     void applyWindowPreset((sizePresetIndex + 1) % MINI_WINDOW_PRESETS.length);
   };
 
-  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    const text = input.trim();
-    if (!text || isStreaming) return;
+  const handleSubmit = (text: string) => {
     onSend(text);
     setInput("");
   };
@@ -200,6 +198,9 @@ export function MiniWidget({
         </div>
       )}
 
+      {/* Running tool pills */}
+      <MiniToolPills toolCalls={toolCalls} />
+
       {/* Spoken sentence subtitle */}
       {caption && !pendingTool && (
         <div className="pointer-events-none absolute bottom-[4.75rem] left-3 right-3 z-10">
@@ -232,7 +233,7 @@ export function MiniWidget({
                 size="sm"
                 variant="primary"
                 className="flex-1"
-                onClick={() => onToolConfirm(pendingTool.requestId, true)}
+                onClick={() => onToolConfirm(pendingTool.permissionId!, true)}
               >
                 Allow
               </Button>
@@ -240,7 +241,7 @@ export function MiniWidget({
                 size="sm"
                 variant="secondary"
                 className="flex-1"
-                onClick={() => onToolConfirm(pendingTool.requestId, false)}
+                onClick={() => onToolConfirm(pendingTool.permissionId!, false)}
               >
                 Deny
               </Button>
@@ -279,38 +280,24 @@ export function MiniWidget({
             </IconButton>
           </div>
 
-          <form
-            onSubmit={handleSubmit}
-            className="pointer-events-auto flex items-center gap-1 rounded-full bg-surface-2 p-1.5 shadow-float"
-          >
-            <MicButton listening={listening} onToggle={onMicToggle} variant="stage" />
-            <input
-              ref={inputRef}
-              type="text"
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onFocus={() => {
-                focusInput();
-                setInputFocused(true);
-              }}
-              onBlur={() => setInputFocused(false)}
-              placeholder="Type a message..."
-              className="companion-chat-input min-w-0 flex-1 bg-transparent px-2 py-2.5 text-[15px] text-ink outline-none placeholder:text-ink-4 disabled:opacity-50"
-              disabled={isStreaming}
-            />
-            <button
-              type="submit"
-              disabled={!input.trim() || isStreaming}
-              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-ink text-white transition hover:bg-ink-2 disabled:opacity-30"
-              title="Send"
-            >
-              {isStreaming ? (
-                <Spinner />
-              ) : (
-                <SendIcon className="h-4 w-4" strokeWidth={2} />
-              )}
-            </button>
-          </form>
+          <ChatComposer
+            value={input}
+            onChange={setInput}
+            onSend={handleSubmit}
+            onStop={onCancel}
+            isStreaming={isStreaming}
+            disabled={isStreaming}
+            placeholder="Type a message..."
+            compact
+            inputRef={inputRef}
+            voice={{ isRecording: listening, onToggle: onMicToggle }}
+            onFocus={() => {
+              focusInput();
+              setInputFocused(true);
+            }}
+            onBlur={() => setInputFocused(false)}
+            className="pointer-events-auto shadow-float"
+          />
         </div>
       </div>
     </div>

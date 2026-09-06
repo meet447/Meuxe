@@ -8,8 +8,11 @@ use meuxe_core::config::ConfigManager;
 use meuxe_core::expressions::ExpressionManager;
 use meuxe_core::memory::CompanionMemory;
 use meuxe_core::session::SessionStore;
+use std::collections::HashMap;
 use std::path::{Path, PathBuf};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
+
+use crate::acp::AcpConnectionManager;
 use tauri::Manager;
 use whisper_rs::{WhisperContext, WhisperContextParameters};
 
@@ -22,6 +25,9 @@ pub struct AppState {
     pub expressions: ExpressionManager,
     pub whisper_ctx: Option<Arc<WhisperContext>>,
     pub chat_cancel: std::sync::Mutex<Option<tokio_util::sync::CancellationToken>>,
+    pub chat_permission_responders:
+        std::sync::Mutex<HashMap<String, tokio::sync::oneshot::Sender<bool>>>,
+    pub acp: Mutex<AcpConnectionManager>,
 }
 
 // Broadcast an event to ALL windows (used by global shortcuts)
@@ -39,21 +45,75 @@ fn get_data_dir(state: tauri::State<Arc<AppState>>) -> String {
 
 // Command to resolve a relative asset path to a convertFileSrc-compatible URL
 #[tauri::command]
-fn resolve_asset_path(state: tauri::State<Arc<AppState>>, path: String) -> Result<String, String> {
+fn resolve_asset_path(
+    app: tauri::AppHandle,
+    state: tauri::State<Arc<AppState>>,
+    path: String,
+) -> Result<String, String> {
     let clean = path.trim_start_matches('/');
-    let candidates = [
-        state.data_dir.join(clean),
-        PathBuf::from(clean),
-        PathBuf::from("..").join(clean),
-    ];
+    if clean.is_empty() {
+        return Err("Asset path is empty".into());
+    }
+    if Path::new(clean).is_absolute() {
+        return Err(format!("Absolute asset paths are not allowed: {clean}"));
+    }
+    if Path::new(clean)
+        .components()
+        .any(|c| c == std::path::Component::ParentDir)
+    {
+        return Err(format!("Asset path must not contain '..': {clean}"));
+    }
 
-    for full_path in candidates {
-        if full_path.exists() && full_path.is_file() {
-            return Ok(full_path.to_string_lossy().to_string());
+    let mut roots: Vec<PathBuf> = vec![state.data_dir.clone()];
+    if let Ok(resource_dir) = app.path().resource_dir() {
+        roots.push(resource_dir);
+    }
+
+    for root in &roots {
+        if let Some(resolved) = resolve_under_root(root, clean) {
+            return Ok(resolved.to_string_lossy().to_string());
+        }
+    }
+
+    if cfg!(debug_assertions) {
+        let dev_candidates = [PathBuf::from(clean), PathBuf::from("..").join(clean)];
+        for candidate in dev_candidates {
+            if candidate.is_file() {
+                let resolved = std::path::absolute(&candidate).unwrap_or(candidate);
+                return Ok(resolved.to_string_lossy().to_string());
+            }
         }
     }
 
     Err(format!("Asset not found: {clean}"))
+}
+
+fn resolve_under_root(root: &Path, relative: &str) -> Option<PathBuf> {
+    let rel = Path::new(relative);
+    if rel.is_absolute() {
+        return None;
+    }
+    if rel
+        .components()
+        .any(|c| c == std::path::Component::ParentDir)
+    {
+        return None;
+    }
+
+    let candidate = root.join(rel);
+    if !candidate.is_file() {
+        return None;
+    }
+
+    let canonical_root = root.canonicalize().ok()?;
+    let canonical_file = candidate.canonicalize().ok()?;
+    // Canonical paths are only for the containment check; return the plain join so
+    // Windows callers don't get a `\\?\` UNC prefix that breaks asset-scope matching.
+    if canonical_file.starts_with(&canonical_root) {
+        Some(candidate)
+    } else {
+        None
+    }
 }
 
 fn load_whisper_model(data_dir: &Path) -> Option<Arc<WhisperContext>> {
@@ -124,6 +184,8 @@ pub fn run() {
                 expressions: ExpressionManager::new(&data_dir),
                 whisper_ctx,
                 chat_cancel: std::sync::Mutex::new(None),
+                chat_permission_responders: std::sync::Mutex::new(HashMap::new()),
+                acp: Mutex::new(AcpConnectionManager::default()),
             };
 
             app.manage(Arc::new(state));
@@ -148,6 +210,8 @@ pub fn run() {
             commands::characters::models_import_live2d_dialog,
             commands::characters::models_import_vrm_dialog,
             commands::chat::chat_send,
+            commands::chat::chat_cancel,
+            commands::chat::chat_tool_confirm,
             commands::chat::chat_history,
             commands::chat::chat_clear,
             commands::agent_setup::agent_setup_status,
@@ -172,6 +236,16 @@ pub fn run() {
             broadcast_event,
             resolve_asset_path,
         ])
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .build(tauri::generate_context!())
+        .expect("error while building tauri application")
+        .run(|app, event| {
+            if matches!(
+                event,
+                tauri::RunEvent::Exit | tauri::RunEvent::ExitRequested { .. }
+            ) {
+                if let Some(state) = app.try_state::<Arc<AppState>>() {
+                    acp::invalidate_acp(state.inner());
+                }
+            }
+        });
 }

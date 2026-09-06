@@ -1,17 +1,13 @@
+use crate::commands::require_id;
+use crate::commands::user::derive_user_id;
 use crate::AppState;
 use meuxe_core::memory::{Fact, MemorySnapshot};
 use std::sync::Arc;
 use tauri::State;
 
-fn get_user_id(state: &AppState) -> String {
-    let config = state.config.load().unwrap_or_default();
-    if !config.user.id.is_empty() {
-        config.user.id
-    } else if config.user.name.is_empty() {
-        "default-user".to_string()
-    } else {
-        meuxe_core::character::slugify(&config.user.name)
-    }
+fn get_user_id(state: &AppState) -> Result<String, String> {
+    let config = state.config.load().map_err(|e| e.to_string())?;
+    Ok(derive_user_id(&config))
 }
 
 #[tauri::command]
@@ -19,7 +15,9 @@ pub fn memory_snapshot(
     state: State<Arc<AppState>>,
     character_id: String,
 ) -> Result<MemorySnapshot, String> {
-    let user_id = get_user_id(&state);
+    require_id(&character_id)?;
+
+    let user_id = get_user_id(&state)?;
     state
         .memory
         .snapshot(&character_id, &user_id)
@@ -32,7 +30,9 @@ pub fn memory_add_fact(
     character_id: String,
     text: String,
 ) -> Result<Fact, String> {
-    let user_id = get_user_id(&state);
+    require_id(&character_id)?;
+
+    let user_id = get_user_id(&state)?;
     state
         .memory
         .add_fact(&character_id, &user_id, &text)
@@ -46,7 +46,10 @@ pub fn memory_update_fact(
     fact_id: String,
     text: String,
 ) -> Result<Fact, String> {
-    let user_id = get_user_id(&state);
+    require_id(&character_id)?;
+    require_id(&fact_id)?;
+
+    let user_id = get_user_id(&state)?;
     state
         .memory
         .update_fact(&character_id, &user_id, &fact_id, &text)
@@ -59,7 +62,10 @@ pub fn memory_forget_fact(
     character_id: String,
     fact_id: String,
 ) -> Result<(), String> {
-    let user_id = get_user_id(&state);
+    require_id(&character_id)?;
+    require_id(&fact_id)?;
+
+    let user_id = get_user_id(&state)?;
     state
         .memory
         .forget_fact(&character_id, &user_id, &fact_id)
@@ -72,7 +78,10 @@ pub fn memory_forget_moment(
     character_id: String,
     moment_id: String,
 ) -> Result<(), String> {
-    let user_id = get_user_id(&state);
+    require_id(&character_id)?;
+    require_id(&moment_id)?;
+
+    let user_id = get_user_id(&state)?;
     state
         .memory
         .forget_moment(&character_id, &user_id, &moment_id)
@@ -81,7 +90,9 @@ pub fn memory_forget_moment(
 
 #[tauri::command]
 pub fn memory_reset(state: State<Arc<AppState>>, character_id: String) -> Result<(), String> {
-    let user_id = get_user_id(&state);
+    require_id(&character_id)?;
+
+    let user_id = get_user_id(&state)?;
     state
         .memory
         .reset(&character_id, &user_id)

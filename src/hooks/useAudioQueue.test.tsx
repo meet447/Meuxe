@@ -109,7 +109,7 @@ describe("useAudioQueue", () => {
     expect(FakeAudio.instances).toHaveLength(0);
   });
 
-  it("keeps the last caption and expression after a no-audio reply", async () => {
+  it("clears the caption after a no-audio reply but keeps the expression", async () => {
     const onExpression = vi.fn();
     const { result } = renderHook(() => useAudioQueue());
 
@@ -125,9 +125,45 @@ describe("useAudioQueue", () => {
       await Promise.resolve();
     });
 
-    expect(result.current.speakingSentence).toBe("sentence-0");
+    expect(result.current.speakingSentence).toBeNull();
     expect(result.current.speaking).toBe(false);
     expect(onExpression).toHaveBeenCalledWith("expr-0");
+    expect(onExpression).not.toHaveBeenCalledWith("neutral");
+  });
+
+  it("shows a caption only while its sentence is playing", async () => {
+    const onExpression = vi.fn();
+    const { result } = renderHook(() => useAudioQueue());
+
+    act(() => {
+      result.current.setOnExpressionChange(onExpression);
+      result.current.beginRequest("r1");
+      result.current.addSentence("r1", sentence(0));
+      result.current.addSentence("r1", sentence(1));
+      result.current.addAudio("r1", 0, "a0");
+    });
+    expect(result.current.speakingSentence).toBe("sentence-0");
+
+    // Sentence 0 finishes before sentence 1's audio has arrived: no stale caption.
+    await act(async () => {
+      FakeAudio.instances[0].finish();
+      await Promise.resolve();
+    });
+    expect(result.current.speakingSentence).toBeNull();
+
+    act(() => {
+      result.current.addAudio("r1", 1, "a1");
+    });
+    expect(result.current.speakingSentence).toBe("sentence-1");
+
+    await act(async () => {
+      FakeAudio.instances[1].finish();
+      result.current.markTextDone("r1");
+      await Promise.resolve();
+    });
+    expect(result.current.speakingSentence).toBeNull();
+    expect(result.current.speaking).toBe(false);
+    expect(onExpression).toHaveBeenLastCalledWith("expr-1");
     expect(onExpression).not.toHaveBeenCalledWith("neutral");
   });
 });

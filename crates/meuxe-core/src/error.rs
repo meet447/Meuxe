@@ -12,16 +12,16 @@ pub enum MeuxeError {
     Http(#[from] reqwest::Error),
     #[error("Character not found: {0}")]
     CharacterNotFound(String),
+    #[error("Character already exists: {0}")]
+    CharacterExists(String),
+    #[error("Invalid id: {0}")]
+    InvalidId(String),
     #[error("Invalid config: {0}")]
     InvalidConfig(String),
-    #[error("LLM error: {0}")]
-    Llm(String),
     #[error("TTS error: {0}")]
     Tts(String),
     #[error("Memory error: {0}")]
     Memory(String),
-    #[error("Tool error: {0}")]
-    Tool(String),
 }
 
 pub type Result<T> = std::result::Result<T, MeuxeError>;

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef, useMemo, lazy, Suspense } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo, lazy, Suspense, memo } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { register, unregister } from "@tauri-apps/plugin-global-shortcut";
@@ -27,6 +27,7 @@ import {
   clearChat,
   resolveAssetUrl,
 } from "./api/tauri";
+import { sessionMessagesToChat } from "./lib/sessionHistory";
 import type { Character, ModelInfo } from "./types";
 
 const Live2DCanvas = lazy(() =>
@@ -36,6 +37,56 @@ const VRMCanvas = lazy(() =>
   import("./components/VRMCanvas").then((m) => ({ default: m.VRMCanvas }))
 );
 
+type AvatarStageProps = {
+  modelType: "vrm" | "live2d";
+  selectedCharId: string;
+  modelPath: string | null;
+  canvasProps: {
+    modelPath: string | null;
+    expression: string;
+    speaking: boolean;
+    userTyping: boolean;
+    uiMode: "full" | "mini";
+    background: string;
+    zoom: number;
+    framing: "full" | "half";
+    onZoomChange: (zoom: number) => void;
+    onBackgroundChange: (bg: string) => void;
+    onFramingChange: (framing: "full" | "half") => void;
+    getAudioLevels: () => { volume: number; mouthOpen: number; mouthForm: number };
+  };
+  animations?: import("./types").AnimationInfo[];
+  modelMapping: import("./types").ModelMapping | null;
+};
+
+const AvatarStage = memo(function AvatarStage({
+  modelType,
+  selectedCharId,
+  canvasProps,
+  animations,
+  modelMapping,
+}: AvatarStageProps) {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex h-full w-full items-center justify-center text-sm text-ink-3">
+          Loading model...
+        </div>
+      }
+    >
+      {modelType === "vrm" ? (
+        <VRMCanvas key={`vrm-${selectedCharId}`} {...canvasProps} animations={animations} />
+      ) : (
+        <Live2DCanvas
+          key={`l2d-${selectedCharId}`}
+          {...canvasProps}
+          modelMapping={modelMapping}
+        />
+      )}
+    </Suspense>
+  );
+});
+
 
 function devAvatarPreview(): "haru" | "utsuwa" | null {
   if (!import.meta.env.DEV) return null;
@@ -44,12 +95,19 @@ function devAvatarPreview(): "haru" | "utsuwa" | null {
   return null;
 }
 
+const SHORTCUT_TOGGLE = "CommandOrControl+Shift+E";
+const SHORTCUT_TEXT = "CommandOrControl+Shift+Space";
+const SHORTCUT_MIC = "CommandOrControl+Shift+M";
+// Serializes global-shortcut (un)registration across effect runs.
+let shortcutQueue: Promise<void> = Promise.resolve();
+
 function App() {
   const avatarPreview = useMemo(() => devAvatarPreview(), []);
   const { isMiniMode, miniCharacterId, toggleMini } = useWindow();
 
   // Refs for global shortcut callbacks (so they always see latest state)
   const selectedCharIdRef = useRef("");
+  const historyGenerationRef = useRef(0);
 
   // Trigger to open mini composer from global shortcut
   const [miniComposerTrigger, setMiniComposerTrigger] = useState(0);
@@ -60,58 +118,45 @@ function App() {
 
   // Global shortcuts: registered once from main window, work in all modes
   // Actions are dispatched via Tauri events so both windows can respond
+  const toggleMiniRef = useRef(toggleMini);
+  toggleMiniRef.current = toggleMini;
   useEffect(() => {
-    if (isMiniMode) return; // only main window registers shortcuts
+    if (isMiniMode) return;
 
-    const TOGGLE = "CommandOrControl+Shift+E";
-    const TEXT = "CommandOrControl+Shift+Space";
-    const MIC = "CommandOrControl+Shift+M";
-    const registered: string[] = [];
+    let cancelled = false;
+    const broadcast = (event: string) => invoke("broadcast_event", { event }).catch(() => {});
+    const handlers: Array<[string, () => void]> = [
+      [SHORTCUT_TOGGLE, () => toggleMiniRef.current(selectedCharIdRef.current || undefined)],
+      [SHORTCUT_TEXT, () => broadcast("shortcut:text")],
+      [SHORTCUT_MIC, () => broadcast("shortcut:mic")],
+    ];
 
-    const setup = async () => {
-      const broadcast = (event: string) => invoke("broadcast_event", { event }).catch(() => {});
-
-      try {
-        await register(TOGGLE, (event) => {
-          if (event.state === "Pressed") {
-            toggleMini(selectedCharIdRef.current || undefined);
-          }
-        });
-        registered.push(TOGGLE);
-      } catch (err) {
-        console.error("Failed to register toggle shortcut:", err);
+    // Register/unregister are async and must be serialized: a remount (StrictMode
+    // in dev, or a real one) would otherwise race a fresh register() against the
+    // previous effect's still-pending unregister() and fail with "already registered".
+    shortcutQueue = shortcutQueue.then(async () => {
+      if (cancelled) return;
+      for (const [combo, run] of handlers) {
+        try {
+          await unregister(combo).catch(() => {});
+          await register(combo, (event) => {
+            if (event.state === "Pressed") run();
+          });
+        } catch (err) {
+          console.error(`Failed to register shortcut ${combo}:`, err);
+        }
       }
+    });
 
-      try {
-        await register(TEXT, (event) => {
-          if (event.state === "Pressed") {
-            broadcast("shortcut:text");
-          }
-        });
-        registered.push(TEXT);
-      } catch (err) {
-        console.error("Failed to register text shortcut:", err);
-      }
-
-      try {
-        await register(MIC, (event) => {
-          if (event.state === "Pressed") {
-            broadcast("shortcut:mic");
-          }
-        });
-        registered.push(MIC);
-      } catch (err) {
-        console.error("Failed to register mic shortcut:", err);
-      }
-    };
-
-    void setup();
     return () => {
-      for (const s of registered) {
-        unregister(s).catch(() => {});
-      }
+      cancelled = true;
+      shortcutQueue = shortcutQueue.then(async () => {
+        for (const [combo] of handlers) {
+          await unregister(combo).catch(() => {});
+        }
+      });
     };
-  }, [isMiniMode, toggleMini]);
+  }, [isMiniMode]);
 
   // Listen for shortcut events (both windows listen, only the active one acts)
   useEffect(() => {
@@ -159,6 +204,7 @@ function App() {
     setOnError,
     toolCalls,
     handleConfirm,
+    cancel,
   } = useChat();
   const { listening, startListening, stopListening } = useVoice();
   const {
@@ -181,20 +227,11 @@ function App() {
 
   const loadHistory = useCallback(
     async (characterId: string) => {
+      const generation = ++historyGenerationRef.current;
       try {
-        const history = (await getChatHistory(characterId)) as Array<{
-          role: "user" | "assistant";
-          content?: string;
-          text?: string;
-          expression?: string;
-        }>;
-        setMessages(
-          history.map((m) => ({
-            role: m.role,
-            content: m.content ?? m.text ?? "",
-            expression: m.expression,
-          }))
-        );
+        const history = await getChatHistory(characterId);
+        if (generation !== historyGenerationRef.current) return;
+        setMessages(sessionMessagesToChat(history));
       } catch (err) {
         console.error("History load error:", err);
       }
@@ -212,29 +249,27 @@ function App() {
     [setMessages]
   );
 
-  const refreshCharacters = useCallback(
-    async (preferredId?: string) => {
-      try {
-        const data = await listCharacters();
-        const chars = data as Character[];
-        setCharacters(chars);
+  const refreshCharacters = useCallback(async (preferredId?: string) => {
+    try {
+      const data = await listCharacters();
+      const chars = data as Character[];
+      setCharacters(chars);
 
-        if (preferredId && chars.some((char) => char.id === preferredId)) {
-          setSelectedCharId(preferredId);
-          return;
-        }
-
-        if (!selectedCharId && chars.length > 0) {
-          setSelectedCharId(chars[0].id);
-        } else if (selectedCharId && !chars.some((char) => char.id === selectedCharId) && chars.length > 0) {
-          setSelectedCharId(chars[0].id);
-        }
-      } catch (err) {
-        console.error("Character list load error:", err);
+      if (preferredId && chars.some((char) => char.id === preferredId)) {
+        setSelectedCharId(preferredId);
+        return;
       }
-    },
-    [selectedCharId]
-  );
+
+      const currentId = selectedCharIdRef.current;
+      if (!currentId && chars.length > 0) {
+        setSelectedCharId(chars[0].id);
+      } else if (currentId && !chars.some((char) => char.id === currentId) && chars.length > 0) {
+        setSelectedCharId(chars[0].id);
+      }
+    } catch (err) {
+      console.error("Character list load error:", err);
+    }
+  }, []);
 
   // Wire audio queue events to model
   useEffect(() => {
@@ -464,9 +499,18 @@ function App() {
 
   useEffect(() => {
     if (!selectedCharId) return;
+    const generation = ++historyGenerationRef.current;
     setMessages([]);
-    loadHistory(selectedCharId);
-  }, [selectedCharId, loadHistory, setMessages]);
+    void (async () => {
+      try {
+        const history = await getChatHistory(selectedCharId);
+        if (generation !== historyGenerationRef.current) return;
+        setMessages(sessionMessagesToChat(history));
+      } catch (err) {
+        console.error("History load error:", err);
+      }
+    })();
+  }, [selectedCharId, setMessages]);
 
   // Reload chat history when switching from mini mode back to full mode
   useEffect(() => {
@@ -549,29 +593,16 @@ function App() {
     [modelPath, currentExpression, speaking, userTyping, isMiniMode, background, zoom, framing, getAudioLevels]
   );
 
-  const avatarCanvas = useMemo(() => (
-    <Suspense
-      fallback={
-        <div className="flex h-full w-full items-center justify-center text-sm text-ink-3">
-          Loading model...
-        </div>
-      }
-    >
-      {modelType === "vrm" ? (
-        <VRMCanvas
-          key={`vrm-${selectedCharId}`}
-          {...canvasProps}
-          animations={selectedModel?.animations}
-        />
-      ) : (
-        <Live2DCanvas
-          key={`l2d-${selectedCharId}`}
-          {...canvasProps}
-          modelMapping={modelMapping}
-        />
-      )}
-    </Suspense>
-  ), [modelType, selectedCharId, canvasProps, selectedModel?.animations, modelMapping]);
+  const avatarCanvas = (
+    <AvatarStage
+      modelType={modelType}
+      selectedCharId={selectedCharId}
+      modelPath={modelPath}
+      canvasProps={canvasProps}
+      animations={selectedModel?.animations}
+      modelMapping={modelMapping}
+    />
+  );
 
   const charName = selectedChar?.name || "Companion";
 
@@ -597,6 +628,7 @@ function App() {
         onSend={handleSend}
         onMicToggle={handleMicToggle}
         onToolConfirm={handleConfirm}
+        onCancel={cancel}
         pendingConfirmation={pendingToolConfirm !== null}
         openComposerTrigger={miniComposerTrigger}
       />
@@ -716,7 +748,9 @@ function App() {
             <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20 flex flex-col items-center px-4 pb-6 pt-16">
               <FloatingChatInput
                 isProcessing={isStreaming}
+                isStreaming={isStreaming}
                 onSend={handleSend}
+                onCancel={cancel}
                 onTypingChange={handleTypingChange}
                 listening={listening}
                 onMicToggle={handleMicToggle}
@@ -747,6 +781,7 @@ function App() {
             listening={listening}
             onMicToggle={handleMicToggle}
             onToolConfirm={handleConfirm}
+            onCancel={cancel}
           />
         </HistoryDrawer>
       )}

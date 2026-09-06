@@ -66,7 +66,7 @@ describe('tauri api utilities', () => {
     });
 
     it('saveConfig calls config_save with correct config', async () => {
-      const mockConfig = { theme: 'dark' };
+      const mockConfig = { onboarding_complete: true };
       await tauriApi.saveConfig(mockConfig);
       expect(invoke).toHaveBeenCalledWith('config_save', { config: mockConfig });
     });
@@ -83,11 +83,6 @@ describe('tauri api utilities', () => {
     it('listCharacters calls characters_list', async () => {
       await tauriApi.listCharacters();
       expect(invoke).toHaveBeenCalledWith('characters_list');
-    });
-
-    it('getCharacter calls characters_get with correct id', async () => {
-      await tauriApi.getCharacter('char-123');
-      expect(invoke).toHaveBeenCalledWith('characters_get', { id: 'char-123' });
     });
 
     it('createCharacter calls characters_create with properly mapped data', async () => {
@@ -142,6 +137,16 @@ describe('tauri api utilities', () => {
     it('clearChat calls chat_clear', async () => {
       await tauriApi.clearChat('char-1');
       expect(invoke).toHaveBeenCalledWith('chat_clear', { characterId: 'char-1' });
+    });
+
+    it('cancelChat calls chat_cancel', async () => {
+      await tauriApi.cancelChat();
+      expect(invoke).toHaveBeenCalledWith('chat_cancel');
+    });
+
+    it('confirmToolCall calls chat_tool_confirm', async () => {
+      await tauriApi.confirmToolCall('perm-1', true);
+      expect(invoke).toHaveBeenCalledWith('chat_tool_confirm', { permissionId: 'perm-1', approved: true });
     });
 
     it('transcribeVoice calls voice_transcribe', async () => {

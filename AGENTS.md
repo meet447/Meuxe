@@ -27,23 +27,29 @@ The full desktop app (`npm run tauri dev`) requires a display. In a headless Clo
 
 See `package.json` scripts and the CI workflow at `.github/workflows/ci.yml`.
 
-- **Frontend tests:** `npm test` (Vitest, 64 tests)
+- **Frontend tests:** `npm test` (Vitest, 85 tests)
 - **Frontend build:** `npm run build` (tsc + vite build)
 - **Rust format check:** `cargo fmt --all -- --check`
 - **Rust lint:** `cargo clippy --workspace --all-targets -- -D warnings`
-- **Rust tests:** `cargo test --workspace` (72 tests across meuxe-core and tauri crate)
+- **Rust tests:** `cargo test --workspace` (118 tests across meuxe-core and tauri crate)
 
-### Rust build environment variables
+### Rust build environment (whisper-rs-sys / libstdc++)
 
-The `whisper-rs-sys` crate requires CMake and g++ for its C++ build. Set these environment variables before any `cargo` command:
+The `whisper-rs-sys` crate builds whisper.cpp with CMake. On Ubuntu images where `cc`/`c++` point at Clang, the build can fail with `ld: cannot find -lstdc++` while CMake checks the C++ compiler. Cause: Clang selects the newest GCC directory under `/usr/lib/gcc/x86_64-linux-gnu/` (e.g. `14`), but only the older one (`13`) has `libstdc++.so`, because the matching `libstdc++-N-dev` package is missing. Check with `clang++ -v /dev/null 2>&1 | grep 'Selected GCC'`.
+
+Durable fix — install the dev package for the GCC version Clang selected, then plain `cargo` works:
+
+```bash
+sudo apt-get install -y libstdc++-14-dev
+```
+
+Alternative (what CI does) — force GCC and point the Rust linker at its `libstdc++`:
 
 ```bash
 export CC=gcc CXX=g++
 gcc_dir=$(dirname "$(gcc -print-file-name=libstdc++.so)")
 export RUSTFLAGS="-C link-arg=-L${gcc_dir}"
 ```
-
-This mirrors the CI configuration and prevents linker errors with `libstdc++`.
 
 ### External APIs (optional)
 

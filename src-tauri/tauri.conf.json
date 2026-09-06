@@ -22,13 +22,16 @@
       }
     ],
     "security": {
-      "csp": null,
+      "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' asset: http://asset.localhost data: blob:; media-src 'self' asset: http://asset.localhost data: blob:; font-src 'self' data:; connect-src 'self' ipc: http://ipc.localhost asset: http://asset.localhost; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; frame-src 'none'",
+      "devCsp": "default-src 'self'; script-src 'self' http://localhost:1420; style-src 'self' 'unsafe-inline'; img-src 'self' asset: http://asset.localhost data: blob:; media-src 'self' asset: http://asset.localhost data: blob:; font-src 'self' data:; connect-src 'self' ipc: http://ipc.localhost asset: http://asset.localhost http://localhost:1420 ws://localhost:1420; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; frame-src 'none'",
       "assetProtocol": {
         "enable": true,
         "scope": {
           "allow": [
-            "$APPDATA/**",
-            "$APPLOCALDATA/**",
+            "$APPDATA/models/**",
+            "$APPDATA/characters/**",
+            "$APPLOCALDATA/models/**",
+            "$APPLOCALDATA/characters/**",
             "$RESOURCE/**"
           ],
           "requireLiteralLeadingDot": false

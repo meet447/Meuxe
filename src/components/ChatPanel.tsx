@@ -1,16 +1,21 @@
-import { useState, useRef, useEffect, useCallback, memo, useMemo } from "react";
+import { useState, useRef, useEffect, memo, useMemo, useCallback } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import type { ChatMessage, ChatTimelineItem } from "../types";
-import { MicButton } from "./MicButton";
+import type { ChatTimelineItem } from "../types";
+import { openExternalUrl } from "../lib/openExternal";
+import {
+  CHAT_TIMELINE_WINDOW,
+  shouldShowEarlierControl,
+  sliceWindow,
+} from "../lib/chatTimelineWindow";
 import { ToolCallBubble } from "./ToolCallBubble";
+import { ChatComposer } from "./chat/ChatComposer";
 import {
   AsciiAccent,
+  Button,
   Dots,
   Mascot,
   Pill,
-  SendIcon,
-  Spinner,
 } from "./ui";
 
 interface Props {
@@ -22,16 +27,45 @@ interface Props {
   onTypingChange: (isTyping: boolean) => void;
   listening: boolean;
   onMicToggle: () => void;
-  ttsLoading?: boolean;
-  speaking?: boolean;
-  onToolConfirm?: (requestId: string, approved: boolean) => void;
-  inputRef?: React.RefObject<HTMLInputElement | null>;
+  onToolConfirm?: (permissionId: string, approved: boolean) => void;
+  onCancel?: () => void;
+  inputRef?: React.RefObject<HTMLTextAreaElement | null>;
   /** Timeline only: for sidebar layout with external input bar */
   hideInput?: boolean;
   appearance?: "light" | "dark";
 }
 
 // Markdown component config: shared between messages and streaming
+const ALLOWED_LINK_PROTOCOLS = /^(https?:|mailto:)/i;
+
+function SafeMarkdownLink({
+  href,
+  children,
+}: {
+  href?: string;
+  children?: React.ReactNode;
+}) {
+  const safeHref = href?.trim() ?? "";
+  const isAllowed = ALLOWED_LINK_PROTOCOLS.test(safeHref);
+
+  if (!isAllowed) {
+    return <span>{children}</span>;
+  }
+
+  return (
+    <a
+      href={safeHref}
+      className="text-accent-600 underline decoration-accent-300 underline-offset-2 hover:text-accent-700"
+      onClick={(event) => {
+        event.preventDefault();
+        void openExternalUrl(safeHref);
+      }}
+    >
+      {children}
+    </a>
+  );
+}
+
 const markdownComponents = {
   p: ({ children }: { children?: React.ReactNode }) => (
     <p className="mb-2 last:mb-0 leading-relaxed">{children}</p>
@@ -77,16 +111,7 @@ const markdownComponents = {
       {children}
     </blockquote>
   ),
-  a: ({ href, children }: { href?: string; children?: React.ReactNode }) => (
-    <a
-      href={href}
-      className="text-accent-600 underline decoration-accent-300 underline-offset-2 hover:text-accent-700"
-      target="_blank"
-      rel="noopener noreferrer"
-    >
-      {children}
-    </a>
-  ),
+  a: SafeMarkdownLink,
   h1: ({ children }: { children?: React.ReactNode }) => (
     <h1 className="text-lg font-bold text-ink mb-2 mt-3 first:mt-0">{children}</h1>
   ),
@@ -174,10 +199,11 @@ const MessageBubble = memo(function MessageBubble({
 });
 
 // Extracted to isolate frequent state updates (text input) from the main chat list.
-// This prevents O(N) re-renders of all MessageBubble and ToolCallBubble components on every keystroke.
 const ChatInput = memo(function ChatInput({
   isProcessing,
+  isStreaming,
   onSend,
+  onStop,
   onTypingChange,
   listening,
   onMicToggle,
@@ -185,91 +211,43 @@ const ChatInput = memo(function ChatInput({
   floating = false,
 }: {
   isProcessing: boolean;
+  isStreaming?: boolean;
   onSend: (text: string) => void;
+  onStop?: () => void;
   onTypingChange: (isTyping: boolean) => void;
   listening: boolean;
   onMicToggle: () => void;
-  inputRef: React.RefObject<HTMLInputElement | null>;
+  inputRef: React.RefObject<HTMLTextAreaElement | null>;
   floating?: boolean;
 }) {
   const [input, setInput] = useState("");
-  const typingTimeoutRef = useRef<number | null>(null);
-
-  useEffect(() => {
-    return () => {
-      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
-    };
-  }, []);
-
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setInput(e.target.value);
-    onTypingChange(true);
-    if (typingTimeoutRef.current) {
-      clearTimeout(typingTimeoutRef.current);
-    }
-    typingTimeoutRef.current = window.setTimeout(() => {
-      onTypingChange(false);
-    }, 1500);
-  };
-
-  const handleSubmit = useCallback(
-    (e: React.FormEvent) => {
-      e.preventDefault();
-      if (!input.trim() || isProcessing) return;
-      onTypingChange(false);
-      if (typingTimeoutRef.current) {
-        clearTimeout(typingTimeoutRef.current);
-      }
-      onSend(input.trim());
-      setInput("");
-      inputRef.current?.focus();
-    },
-    [input, isProcessing, onSend, onTypingChange, inputRef],
-  );
 
   return (
     <div className={floating ? "w-full" : "w-full bg-transparent pb-2 pt-1"}>
-      <form
-        onSubmit={handleSubmit}
-        className={`flex items-center gap-1 rounded-full bg-surface-2 p-1.5 ${
-          floating ? "shadow-float" : "shadow-soft"
-        } ${floating ? "px-1" : "mx-4"}`}
-      >
-        <MicButton listening={listening} onToggle={onMicToggle} variant="stage" />
-        <input
-          ref={inputRef}
-          type="text"
-          value={input}
-          onChange={handleInputChange}
-          placeholder="Say something..."
-          className="companion-chat-input min-w-0 flex-1 bg-transparent px-2 py-2.5 text-[15px] text-ink outline-none placeholder:text-ink-4 disabled:opacity-50"
-          disabled={isProcessing}
-        />
-        <button
-          type="submit"
-          disabled={isProcessing || !input.trim()}
-          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-ink text-white transition hover:bg-ink-2 disabled:opacity-30"
-        >
-          {isProcessing ? (
-            <Spinner />
-          ) : (
-            <SendIcon className="h-4 w-4" strokeWidth={2} />
-          )}
-        </button>
-      </form>
+      <ChatComposer
+        value={input}
+        onChange={setInput}
+        onSend={onSend}
+        onStop={onStop}
+        isStreaming={!!isStreaming}
+        disabled={isProcessing}
+        onTypingChange={onTypingChange}
+        inputRef={inputRef}
+        voice={{ isRecording: listening, onToggle: onMicToggle }}
+        placeholder="Say something..."
+        className={floating ? "shadow-float" : `shadow-soft ${floating ? "" : "mx-4"}`}
+      />
     </div>
   );
 });
 
-function timelineItemToMessage(item: ChatTimelineItem): ChatMessage | null {
+function timelineItemToBubble(item: ChatTimelineItem) {
   if (item.kind === "tool") return null;
   if (item.kind === "user") {
-    return { role: "user", text: item.text };
+    return { role: "user" as const, text: item.text };
   }
-  return { role: "assistant", text: item.text, expression: item.expression };
+  return { role: "assistant" as const, text: item.text, expression: item.expression };
 }
-
-export const ChatInputBar = ChatInput;
 
 export function ChatPanel({
   timeline,
@@ -280,23 +258,64 @@ export function ChatPanel({
   onTypingChange,
   listening,
   onMicToggle,
-  ttsLoading = false,
-  speaking = false,
   onToolConfirm,
+  onCancel,
   inputRef: externalInputRef,
   hideInput = false,
   appearance = "light",
 }: Props) {
   const dark = appearance === "dark";
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const internalInputRef = useRef<HTMLInputElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const internalInputRef = useRef<HTMLTextAreaElement>(null);
   const inputRef = externalInputRef || internalInputRef;
+  const scrollRafRef = useRef<number | null>(null);
+  const [windowSize, setWindowSize] = useState(CHAT_TIMELINE_WINDOW);
+
+  useEffect(() => {
+    if (timeline.length === 0) {
+      setWindowSize(CHAT_TIMELINE_WINDOW);
+    }
+  }, [timeline.length]);
+
+  const { visible: visibleTimeline, hiddenCount } = useMemo(
+    () => sliceWindow(timeline, windowSize),
+    [timeline, windowSize],
+  );
+
+  const showEarlier = shouldShowEarlierControl(hiddenCount, timeline.length, windowSize);
+
+  const handleShowEarlier = useCallback(() => {
+    const container = scrollContainerRef.current;
+    const previousHeight = container?.scrollHeight ?? 0;
+    setWindowSize((current) => current + CHAT_TIMELINE_WINDOW);
+    requestAnimationFrame(() => {
+      if (!container) return;
+      container.scrollTop += container.scrollHeight - previousHeight;
+    });
+  }, []);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [timeline, streamingText]);
+  }, [timeline]);
 
-  const isProcessing = loading || ttsLoading;
+  useEffect(() => {
+    if (!streamingText) return;
+    if (scrollRafRef.current !== null) {
+      cancelAnimationFrame(scrollRafRef.current);
+    }
+    scrollRafRef.current = requestAnimationFrame(() => {
+      scrollRafRef.current = null;
+      messagesEndRef.current?.scrollIntoView({ behavior: "instant" });
+    });
+    return () => {
+      if (scrollRafRef.current !== null) {
+        cancelAnimationFrame(scrollRafRef.current);
+      }
+    };
+  }, [streamingText]);
+
+  const isProcessing = loading;
 
   // ⚡ Bolt: Wrap O(N) array operations on the timeline in useMemo to prevent
   // traversing the entire history on every single streaming text update.
@@ -312,32 +331,40 @@ export function ChatPanel({
   // ⚡ Bolt: Memoize the mapping of the timeline to prevent O(N) React element
   // recreation on every streaming token update.
   const renderedTimeline = useMemo(() => {
-    return timeline.map((item) => {
+    return visibleTimeline.map((item) => {
       if (item.kind === "tool") {
         return (
           <ToolCallBubble key={item.id} call={item.call} onConfirm={onToolConfirm} />
         );
       }
 
-      const msg = timelineItemToMessage(item);
-      if (!msg) return null;
+      const bubble = timelineItemToBubble(item);
+      if (!bubble) return null;
       return (
         <MessageBubble
           key={item.id}
-          role={msg.role}
-          text={msg.text}
-          expression={msg.expression}
+          role={bubble.role}
+          text={bubble.text}
+          expression={bubble.expression}
           characterName={characterName}
           dark={dark}
         />
       );
     });
-  }, [timeline, onToolConfirm, characterName, dark]);
+  }, [visibleTimeline, onToolConfirm, characterName, dark]);
 
   return (
     <div className="flex-1 flex flex-col bg-transparent relative h-full">
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto px-5 py-5 space-y-4 scrollbar-thin">
+      <div ref={scrollContainerRef} className="flex-1 overflow-y-auto px-5 py-5 space-y-4 scrollbar-thin">
+        {showEarlier && (
+          <div className="flex justify-center pb-1">
+            <Button variant="ghost" size="sm" onClick={handleShowEarlier}>
+              Show earlier messages ({hiddenCount} earlier messages)
+            </Button>
+          </div>
+        )}
+
         {timeline.length === 0 && !streamingText && (
           <div className="mt-16 flex flex-col items-center text-center">
             <Mascot mood="neutral" className="h-16 w-16" />
@@ -367,8 +394,8 @@ export function ChatPanel({
                 </span>
                 <Dots size="sm" />
               </div>
-              <div className="text-[14px] leading-relaxed">
-                <MarkdownContent content={streamingText} />
+              <div className="text-[14px] leading-relaxed whitespace-pre-wrap break-words">
+                {streamingText}
               </div>
             </div>
           </div>
@@ -392,42 +419,19 @@ export function ChatPanel({
           </div>
         )}
 
-        {/* Voice generating indicator */}
-        {ttsLoading && !loading && (
-          <div className="flex justify-start">
-            <div
-              className={`max-w-[88%] rounded-card rounded-tl-[10px] px-4 py-3 ${
-                dark ? "bg-white/10 shadow-soft" : "bg-surface-2 shadow-soft"
-              }`}
-            >
-              <Pill tone="accent" dot pulse>
-                Speaking…
-              </Pill>
-            </div>
-          </div>
-        )}
-
         <div ref={messagesEndRef} className="h-6" />
       </div>
-
-      {/* Status Bar */}
-      {(speaking || ttsLoading) && !hideInput && (
-        <div className="flex items-center gap-2 px-4 py-1.5">
-          <Pill tone="accent" dot pulse>
-            {speaking ? "Speaking" : "Generating voice"}
-          </Pill>
-          <span className="text-xs text-ink-3">{characterName}</span>
-        </div>
-      )}
 
       {!hideInput && (
         <ChatInput
           isProcessing={isProcessing}
+          isStreaming={loading}
           onSend={onSend}
+          onStop={onCancel}
           onTypingChange={onTypingChange}
           listening={listening}
           onMicToggle={onMicToggle}
-          inputRef={inputRef as React.RefObject<HTMLInputElement | null>}
+          inputRef={inputRef as React.RefObject<HTMLTextAreaElement | null>}
         />
       )}
     </div>

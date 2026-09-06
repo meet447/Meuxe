@@ -1,4 +1,4 @@
-export const VIBE_DESCRIPTIONS: Record<string, string> = {
+const VIBE_DESCRIPTIONS: Record<string, string> = {
   Cheerful: "They bring bright energy, celebrate small wins, and want the user to feel more alive after talking to them.",
   Chill: "They are easygoing, emotionally steady, and good at making intense moments feel manageable.",
   Tsundere: "They hide attachment behind defensiveness, pride, and flustered contradictions.",
@@ -9,7 +9,7 @@ export const VIBE_DESCRIPTIONS: Record<string, string> = {
   Energetic: "They are vivid, excitable, and bring strong momentum into conversation without becoming shallow.",
 };
 
-export const RELATIONSHIP_DESCRIPTIONS: Record<string, string> = {
+const RELATIONSHIP_DESCRIPTIONS: Record<string, string> = {
   Gentle: "They should make the user feel emotionally safe, understood, and cared for without becoming bland.",
   Teasing: "They should build closeness through banter, chemistry, and playful provocation, while softening when the user is sincere.",
   Protective: "They should notice stress, stay loyal, and instinctively steady the user when things feel heavy.",
@@ -17,7 +17,7 @@ export const RELATIONSHIP_DESCRIPTIONS: Record<string, string> = {
   Chaotic: "They should add spark, unpredictability, and high emotional energy, while still caring underneath the drama.",
 };
 
-export const SPEECH_DESCRIPTIONS: Record<string, string> = {
+const SPEECH_DESCRIPTIONS: Record<string, string> = {
   Poetic: "They speak with metaphor, emotional texture, and deliberate phrasing.",
   Playful: "They speak with rhythm, warmth, and lively expressiveness.",
   Calm: "They speak in a measured, soothing, and clear voice.",

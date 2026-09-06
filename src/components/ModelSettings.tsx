@@ -14,13 +14,13 @@ import {
   PlayIcon,
   SectionTitle,
   Select,
+  Notice,
 } from "./ui";
 
 interface Props {
   modelId: string;
   onPreviewExpression: (expr: string) => void;
   onSaved?: () => void;
-  onClose: () => void;
 }
 
 const FALLBACK_EXPRESSIONS = [
@@ -47,6 +47,7 @@ export const ModelSettings = memo(function ModelSettings({
   const [modelExpressions, setModelExpressions] = useState<string[]>([]);
   const [mapping, setMapping] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const [activePreview, setActivePreview] = useState<string | null>(null);
 
   useEffect(() => {
@@ -89,13 +90,16 @@ export const ModelSettings = memo(function ModelSettings({
 
   const handleSave = async () => {
     setSaving(true);
+    setSaveError(null);
     try {
       await saveExpressions(modelId, mapping);
       onSaved?.();
     } catch (err) {
       console.error("Failed to save expressions:", err);
+      setSaveError(err instanceof Error ? err.message : "Failed to save expressions. Please try again.");
+    } finally {
+      setSaving(false);
     }
-    setSaving(false);
   };
 
   return (
@@ -173,6 +177,9 @@ export const ModelSettings = memo(function ModelSettings({
       <Button variant="primary" fullWidth loading={saving} onClick={handleSave}>
         Save mapping
       </Button>
+      {saveError && (
+        <Notice tone="danger" className="mt-3">{saveError}</Notice>
+      )}
     </div>
   );
 });

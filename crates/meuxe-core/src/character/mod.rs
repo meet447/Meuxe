@@ -1,14 +1,15 @@
-pub mod expressions;
 pub mod types;
 
 pub use types::*;
 
+use crate::ids::validate_id;
 use crate::{MeuxeError, Result};
 use regex::Regex;
+use serde::Serialize;
 use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::sync::RwLock;
+use std::sync::{Mutex, PoisonError, RwLock};
 use std::time::SystemTime;
 
 struct CharacterBlueprintInput<'a> {
@@ -39,6 +40,7 @@ struct CachedCharacter {
 pub struct CharacterLoader {
     characters_dir: PathBuf,
     cache: RwLock<HashMap<String, CachedCharacter>>,
+    list_cache: Mutex<Option<Vec<CharacterSummary>>>,
 }
 
 impl CharacterLoader {
@@ -46,17 +48,48 @@ impl CharacterLoader {
         Self {
             characters_dir: data_dir.join("characters"),
             cache: RwLock::new(HashMap::new()),
+            list_cache: Mutex::new(None),
         }
     }
 
     pub fn clear_cache(&self) {
-        if let Ok(mut cache) = self.cache.write() {
-            cache.clear();
-        }
+        let mut cache = self.cache.write().unwrap_or_else(PoisonError::into_inner);
+        cache.clear();
+        self.invalidate_cache();
+    }
+
+    pub fn invalidate_cache(&self) {
+        let mut list_cache = self
+            .list_cache
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner);
+        *list_cache = None;
     }
 
     /// List all available characters (summary only).
     pub fn list_characters(&self) -> Result<Vec<CharacterSummary>> {
+        {
+            let list_cache = self
+                .list_cache
+                .lock()
+                .unwrap_or_else(PoisonError::into_inner);
+            if let Some(cached) = list_cache.as_ref() {
+                return Ok(cached.clone());
+            }
+        }
+
+        let summaries = self.list_characters_uncached()?;
+
+        let mut list_cache = self
+            .list_cache
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner);
+        *list_cache = Some(summaries.clone());
+
+        Ok(summaries)
+    }
+
+    fn list_characters_uncached(&self) -> Result<Vec<CharacterSummary>> {
         let sources = self.iter_character_sources()?;
         let mut summaries = Vec::new();
         for src in sources {
@@ -98,6 +131,7 @@ impl CharacterLoader {
 
     /// Load a full character, using a cache invalidated by file mtime.
     pub fn load_character(&self, character_id: &str) -> Result<Character> {
+        validate_id(character_id)?;
         let sources = self.iter_character_sources()?;
         let source = sources
             .into_iter()
@@ -107,18 +141,16 @@ impl CharacterLoader {
             })
             .ok_or_else(|| MeuxeError::CharacterNotFound(character_id.to_string()))?;
 
-        let (mtime_path, source_type_tag) = match &source {
-            CharacterSource::Directory { path, .. } => (path.join("character.yaml"), "directory"),
-            CharacterSource::Markdown { path, .. } => (path.clone(), "markdown"),
+        let mtime = match &source {
+            CharacterSource::Directory { path, .. } => directory_latest_mtime(path)?,
+            CharacterSource::Markdown { path, .. } => fs::metadata(path)?
+                .modified()
+                .unwrap_or(SystemTime::UNIX_EPOCH),
         };
-
-        let mtime = fs::metadata(&mtime_path)?
-            .modified()
-            .unwrap_or(SystemTime::UNIX_EPOCH);
 
         // Check cache
         {
-            let cache = self.cache.read().unwrap();
+            let cache = self.cache.read().unwrap_or_else(PoisonError::into_inner);
             if let Some(cached) = cache.get(character_id) {
                 if cached.mtime == mtime {
                     return Ok(cached.character.clone());
@@ -133,7 +165,7 @@ impl CharacterLoader {
 
         // Store in cache
         {
-            let mut cache = self.cache.write().unwrap();
+            let mut cache = self.cache.write().unwrap_or_else(PoisonError::into_inner);
             cache.insert(
                 character_id.to_string(),
                 CachedCharacter {
@@ -143,7 +175,6 @@ impl CharacterLoader {
             );
         }
 
-        let _ = source_type_tag; // used for clarity only
         Ok(character)
     }
 
@@ -162,7 +193,18 @@ impl CharacterLoader {
         user_about: &str,
     ) -> Result<String> {
         let id = slugify(name);
+        if id.is_empty() {
+            return Err(MeuxeError::InvalidConfig(
+                "Character name must contain letters or numbers".into(),
+            ));
+        }
+        validate_id(&id)?;
+        validate_id(model_id)?;
+
         let char_dir = self.characters_dir.join(&id);
+        if char_dir.exists() {
+            return Err(MeuxeError::CharacterExists(id));
+        }
         fs::create_dir_all(&char_dir)?;
         fs::create_dir_all(char_dir.join("examples"))?;
 
@@ -176,11 +218,14 @@ impl CharacterLoader {
             user_about,
         };
 
-        // character.yaml
-        let yaml_content = format!(
-            "name: \"{name}\"\nlive2d_model: \"{model_id}\"\nvoice: \"{voice}\"\ndefault_emotion: \"neutral\"\n",
-        );
-        fs::write(char_dir.join("character.yaml"), &yaml_content)?;
+        let yaml = NewCharacterYaml {
+            name: name.to_string(),
+            live2d_model: model_id.to_string(),
+            voice: voice.to_string(),
+            default_emotion: "neutral".to_string(),
+        };
+        let yaml_content = serde_yaml::to_string(&yaml)?;
+        fs::write(char_dir.join("character.yaml"), yaml_content)?;
 
         // soul.md
         let soul = build_soul_section(&blueprint);
@@ -201,6 +246,8 @@ impl CharacterLoader {
         // examples/chat_examples.md
         let examples = build_examples_section(&blueprint);
         fs::write(char_dir.join("examples/chat_examples.md"), &examples)?;
+
+        self.invalidate_cache();
 
         Ok(id)
     }
@@ -227,6 +274,37 @@ impl CharacterLoader {
         }
         Ok(sources)
     }
+}
+
+#[derive(Serialize)]
+struct NewCharacterYaml {
+    name: String,
+    live2d_model: String,
+    voice: String,
+    default_emotion: String,
+}
+
+fn directory_latest_mtime(dir: &Path) -> Result<SystemTime> {
+    let yaml_path = dir.join("character.yaml");
+    let mut latest = fs::metadata(&yaml_path)?
+        .modified()
+        .unwrap_or(SystemTime::UNIX_EPOCH);
+
+    if let Ok(entries) = fs::read_dir(dir) {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if !path.is_file() {
+                continue;
+            }
+            if let Ok(mtime) = fs::metadata(&path).and_then(|meta| meta.modified()) {
+                if mtime > latest {
+                    latest = mtime;
+                }
+            }
+        }
+    }
+
+    Ok(latest)
 }
 
 fn build_soul_section(input: &CharacterBlueprintInput<'_>) -> String {
@@ -436,10 +514,15 @@ fn load_from_markdown(id: &str, path: &Path) -> Result<Character> {
     })
 }
 
+fn md_frontmatter_regex() -> &'static Regex {
+    static RE: std::sync::OnceLock<Regex> = std::sync::OnceLock::new();
+    RE.get_or_init(|| Regex::new(r"(?s)^---\s*\n(.*?)\n---\s*\n(.*)").expect("invalid regex"))
+}
+
 /// Parse YAML frontmatter from a markdown string.
 /// Returns (frontmatter_yaml, body).
 pub fn parse_md_frontmatter(input: &str) -> Result<(String, String)> {
-    let re = Regex::new(r"(?s)^---\s*\n(.*?)\n---\s*\n(.*)").unwrap();
+    let re = md_frontmatter_regex();
     let caps = re.captures(input).ok_or_else(|| {
         MeuxeError::InvalidConfig("Missing YAML frontmatter in markdown file".to_string())
     })?;
@@ -667,6 +750,7 @@ fn list_vrm_animations(model_dir: &Path, model_id: &str) -> Option<Vec<Animation
 /// Read the available expression names from a Live2D model's model3.json file
 /// or the standard blend-shape set for VRM models.
 pub fn get_model_expressions(data_dir: &Path, model_id: &str) -> Result<Vec<String>> {
+    validate_id(model_id)?;
     for models_dir in model_scan_roots(data_dir) {
         let live2d_dir = models_dir.join("live2d").join(model_id);
         if live2d_dir.exists() {
@@ -769,6 +853,7 @@ fn find_model3_json(dir: &Path) -> Option<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::time::SystemTime;
     use tempfile::TempDir;
 
     #[test]
@@ -976,5 +1061,190 @@ mod tests {
 
         let character = loader.load_character("luna").unwrap();
         assert_eq!(character.live2d_model, "my_avatar");
+    }
+
+    #[test]
+    fn test_directory_cache_invalidates_on_section_edit() {
+        use std::fs::File;
+        use std::time::Duration;
+
+        let tmp = TempDir::new().unwrap();
+        let loader = CharacterLoader::new(tmp.path());
+        let id = loader
+            .create_character(
+                "Cache Test",
+                "Personality",
+                "model1",
+                "en-US-1",
+                "Chill",
+                "Gentle",
+                "natural",
+                "User",
+                "About",
+            )
+            .unwrap();
+
+        let before = loader.load_character(&id).unwrap();
+        assert!(before.system_prompt.contains("Cache Test"));
+
+        let soul_path = tmp.path().join("characters").join(&id).join("soul.md");
+        fs::write(
+            &soul_path,
+            "# Soul\n\nBrand new soul content for cache busting.",
+        )
+        .unwrap();
+        let later = SystemTime::now() + Duration::from_secs(5);
+        File::open(&soul_path).unwrap().set_modified(later).unwrap();
+
+        let after = loader.load_character(&id).unwrap();
+        assert!(after
+            .system_prompt
+            .contains("Brand new soul content for cache busting"));
+        assert_ne!(before.system_prompt, after.system_prompt);
+    }
+
+    #[test]
+    fn test_create_character_escapes_yaml_special_chars() {
+        let tmp = TempDir::new().unwrap();
+        let loader = CharacterLoader::new(tmp.path());
+        let id = loader
+            .create_character(
+                "Test \"Quote\" Name",
+                "A \"quoted\" personality.",
+                "model1",
+                "en-US-1",
+                "Chill",
+                "Gentle",
+                "natural",
+                "User",
+                "About",
+            )
+            .unwrap();
+
+        let character = loader.load_character(&id).unwrap();
+        assert_eq!(character.name, "Test \"Quote\" Name");
+        assert_eq!(character.live2d_model, "model1");
+    }
+
+    #[test]
+    fn test_create_character_rejects_empty_slug() {
+        let tmp = TempDir::new().unwrap();
+        let loader = CharacterLoader::new(tmp.path());
+        let err = loader
+            .create_character(
+                "!!!",
+                "Personality",
+                "model1",
+                "en-US-1",
+                "Chill",
+                "Gentle",
+                "natural",
+                "User",
+                "About",
+            )
+            .unwrap_err();
+        assert!(err.to_string().contains("letters or numbers"));
+    }
+
+    #[test]
+    fn test_create_character_rejects_existing_directory() {
+        let tmp = TempDir::new().unwrap();
+        let loader = CharacterLoader::new(tmp.path());
+        loader
+            .create_character(
+                "Aria",
+                "Personality",
+                "model1",
+                "en-US-1",
+                "Chill",
+                "Gentle",
+                "natural",
+                "User",
+                "About",
+            )
+            .unwrap();
+
+        let err = loader
+            .create_character(
+                "Aria", "Other", "model2", "en-US-2", "Cheerful", "Teasing", "playful", "User",
+                "About",
+            )
+            .unwrap_err();
+        assert!(err.to_string().contains("already exists"));
+    }
+
+    #[test]
+    fn test_list_characters_cache_hit() {
+        let tmp = TempDir::new().unwrap();
+        let loader = CharacterLoader::new(tmp.path());
+        loader
+            .create_character(
+                "Cache List",
+                "Personality",
+                "model1",
+                "en-US-1",
+                "Chill",
+                "Gentle",
+                "natural",
+                "User",
+                "About",
+            )
+            .unwrap();
+
+        let first = loader.list_characters().unwrap();
+        assert_eq!(first.len(), 1);
+        assert_eq!(first[0].name, "Cache List");
+
+        std::fs::remove_dir_all(tmp.path().join("characters/cache_list")).unwrap();
+
+        let cached = loader.list_characters().unwrap();
+        assert_eq!(cached.len(), 1);
+        assert_eq!(cached[0].name, "Cache List");
+    }
+
+    #[test]
+    fn test_list_characters_cache_invalidation() {
+        let tmp = TempDir::new().unwrap();
+        let loader = CharacterLoader::new(tmp.path());
+        loader
+            .create_character(
+                "First",
+                "Personality",
+                "model1",
+                "en-US-1",
+                "Chill",
+                "Gentle",
+                "natural",
+                "User",
+                "About",
+            )
+            .unwrap();
+
+        let first = loader.list_characters().unwrap();
+        assert_eq!(first.len(), 1);
+
+        loader
+            .create_character(
+                "Second",
+                "Personality",
+                "model2",
+                "en-US-2",
+                "Cheerful",
+                "Teasing",
+                "playful",
+                "User",
+                "About",
+            )
+            .unwrap();
+
+        let refreshed = loader.list_characters().unwrap();
+        assert_eq!(refreshed.len(), 2);
+        let names: Vec<_> = refreshed.iter().map(|c| c.name.as_str()).collect();
+        assert!(names.contains(&"First"));
+        assert!(names.contains(&"Second"));
+
+        loader.invalidate_cache();
+        let after_external = loader.list_characters().unwrap();
+        assert_eq!(after_external.len(), 2);
     }
 }

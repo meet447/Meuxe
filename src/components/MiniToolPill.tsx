@@ -1,4 +1,4 @@
-import type { ToolCallStatus } from "./ToolCallBubble";
+import type { ToolCallStatus } from "../types";
 import { CheckIcon, Pill } from "./ui";
 
 const TOOL_LABELS: Record<string, string> = {
@@ -41,10 +41,9 @@ function statusTone(status: ToolCallStatus["status"]) {
 
 interface Props {
   toolCalls: ToolCallStatus[];
-  pendingConfirmation: boolean;
 }
 
-export function MiniToolPills({ toolCalls, pendingConfirmation }: Props) {
+export function MiniToolPills({ toolCalls }: Props) {
   if (toolCalls.length === 0) return null;
 
   return (
@@ -56,7 +55,7 @@ export function MiniToolPills({ toolCalls, pendingConfirmation }: Props) {
 
         return (
           <Pill
-            key={tc.requestId}
+            key={tc.toolCallId}
             tone={tone}
             dot={dot}
             pulse={pulse}
@@ -73,14 +72,6 @@ export function MiniToolPills({ toolCalls, pendingConfirmation }: Props) {
         );
       })}
 
-      {/* Voice confirmation hint */}
-      {pendingConfirmation && (
-        <div className="mt-1 w-full text-center">
-          <Pill tone="honey" dot pulse size="xs" className="bg-honey-50/95 shadow-soft backdrop-blur">
-            Say &quot;yes&quot; to allow or &quot;no&quot; to deny
-          </Pill>
-        </div>
-      )}
     </div>
   );
 }

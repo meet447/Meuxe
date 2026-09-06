@@ -4,9 +4,11 @@ use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::io::BufRead;
 use std::path::{Path, PathBuf};
-use std::sync::RwLock;
+use std::sync::{Mutex, PoisonError, RwLock};
 use uuid::Uuid;
 
+use crate::fs_util::write_atomic;
+use crate::ids::validate_id;
 use crate::{MeuxeError, Result};
 
 use super::types::{
@@ -16,7 +18,10 @@ use super::types::{
 
 const FACT_CAP: usize = 300;
 const THREAD_CAP: usize = 8;
-const MOMENT_SNAPSHOT_CAP: usize = 50;
+const MOMENT_CAP: usize = 50;
+/// Moments kept on disk. Larger than the snapshot cap so long-running
+/// companions keep their "remember when" history until consolidation exists.
+const MOMENT_DISK_CAP: usize = 1000;
 const CLOSENESS_BASELINE: f64 = 0.002;
 const CLOSENESS_STEP: f64 = 0.015;
 const CLOSENESS_DRIFT_PER_DAY: f64 = 0.005;
@@ -45,10 +50,18 @@ struct LegacyMemory {
     metadata: serde_json::Value,
 }
 
+#[derive(Debug, Clone)]
+struct CachedCompanion {
+    bond: Bond,
+    facts: Vec<Fact>,
+    moments: Vec<Moment>,
+}
+
 /// File-backed companion memory store.
 pub struct CompanionMemory {
     data_dir: PathBuf,
     _lock: RwLock<()>,
+    cache: Mutex<HashMap<(String, String), CachedCompanion>>,
 }
 
 impl CompanionMemory {
@@ -56,7 +69,18 @@ impl CompanionMemory {
         Self {
             data_dir: data_dir.to_path_buf(),
             _lock: RwLock::new(()),
+            cache: Mutex::new(HashMap::new()),
         }
+    }
+
+    pub fn invalidate(&self, character_id: &str, user_id: &str) {
+        let mut cache = self.cache.lock().unwrap_or_else(PoisonError::into_inner);
+        cache.remove(&(character_id.to_string(), user_id.to_string()));
+    }
+
+    pub fn invalidate_all(&self) {
+        let mut cache = self.cache.lock().unwrap_or_else(PoisonError::into_inner);
+        cache.clear();
     }
 
     pub fn snapshot(&self, character_id: &str, user_id: &str) -> Result<MemorySnapshot> {
@@ -70,13 +94,14 @@ impl CompanionMemory {
         now: DateTime<Utc>,
     ) -> Result<MemorySnapshot> {
         let _guard = self.lock_read()?;
-        let dir = self.companion_dir(user_id, character_id);
-        let (mut bond, facts, moments) = self.load_or_import(&dir, character_id, user_id)?;
+        let dir = self.companion_dir(user_id, character_id)?;
+        let (mut bond, facts, moments) = self.load_or_import(character_id, user_id, &dir)?;
         let changed = apply_time_rules(&mut bond, now);
         if changed {
             self.write_bond(&dir, &bond)?;
+            self.put_cache(character_id, user_id, &bond, &facts, &moments);
         }
-        let snapshot_moments = cap_moments_newest_first(&moments, MOMENT_SNAPSHOT_CAP);
+        let snapshot_moments = cap_moments_newest_first(&moments, MOMENT_CAP);
         Ok(MemorySnapshot {
             bond: BondView::new(bond, now),
             facts,
@@ -104,9 +129,9 @@ impl CompanionMemory {
         now: DateTime<Utc>,
     ) -> Result<MemorySnapshot> {
         let _guard = self.lock_write()?;
-        let dir = self.companion_dir(user_id, character_id);
+        let dir = self.companion_dir(user_id, character_id)?;
         let (mut bond, mut facts, mut moments) =
-            self.load_or_import(&dir, character_id, user_id)?;
+            self.load_or_import(character_id, user_id, &dir)?;
 
         apply_time_rules(&mut bond, now);
 
@@ -169,8 +194,9 @@ impl CompanionMemory {
         bond.updated_at = now;
 
         self.persist_all(&dir, &bond, &facts, &moments)?;
+        self.put_cache(character_id, user_id, &bond, &facts, &moments);
 
-        let snapshot_moments = cap_moments_newest_first(&moments, MOMENT_SNAPSHOT_CAP);
+        let snapshot_moments = cap_moments_newest_first(&moments, MOMENT_CAP);
         Ok(MemorySnapshot {
             bond: BondView::new(bond, now),
             facts,
@@ -185,11 +211,12 @@ impl CompanionMemory {
             return Err(MeuxeError::Memory("Fact text cannot be empty".into()));
         }
         let _guard = self.lock_write()?;
-        let dir = self.companion_dir(user_id, character_id);
-        let (bond, mut facts, moments) = self.load_or_import(&dir, character_id, user_id)?;
+        let dir = self.companion_dir(user_id, character_id)?;
+        let (bond, mut facts, moments) = self.load_or_import(character_id, user_id, &dir)?;
         let now = Utc::now();
         let fact = upsert_fact(&mut facts, trimmed, FactSource::User, now);
         self.persist_all(&dir, &bond, &facts, &moments)?;
+        self.put_cache(character_id, user_id, &bond, &facts, &moments);
         Ok(fact)
     }
 
@@ -205,8 +232,8 @@ impl CompanionMemory {
             return Err(MeuxeError::Memory("Fact text cannot be empty".into()));
         }
         let _guard = self.lock_write()?;
-        let dir = self.companion_dir(user_id, character_id);
-        let (bond, mut facts, moments) = self.load_or_import(&dir, character_id, user_id)?;
+        let dir = self.companion_dir(user_id, character_id)?;
+        let (bond, mut facts, moments) = self.load_or_import(character_id, user_id, &dir)?;
         let fact = facts
             .iter_mut()
             .find(|f| f.id == fact_id)
@@ -216,38 +243,41 @@ impl CompanionMemory {
         fact.confirmed_at = Utc::now();
         let updated = fact.clone();
         self.persist_all(&dir, &bond, &facts, &moments)?;
+        self.put_cache(character_id, user_id, &bond, &facts, &moments);
         Ok(updated)
     }
 
     pub fn forget_fact(&self, character_id: &str, user_id: &str, fact_id: &str) -> Result<()> {
         let _guard = self.lock_write()?;
-        let dir = self.companion_dir(user_id, character_id);
-        let (bond, mut facts, moments) = self.load_or_import(&dir, character_id, user_id)?;
+        let dir = self.companion_dir(user_id, character_id)?;
+        let (bond, mut facts, moments) = self.load_or_import(character_id, user_id, &dir)?;
         let before = facts.len();
         facts.retain(|f| f.id != fact_id);
         if facts.len() == before {
             return Err(MeuxeError::Memory(format!("Fact not found: {fact_id}")));
         }
         self.persist_all(&dir, &bond, &facts, &moments)?;
+        self.put_cache(character_id, user_id, &bond, &facts, &moments);
         Ok(())
     }
 
     pub fn forget_moment(&self, character_id: &str, user_id: &str, moment_id: &str) -> Result<()> {
         let _guard = self.lock_write()?;
-        let dir = self.companion_dir(user_id, character_id);
-        let (bond, facts, mut moments) = self.load_or_import(&dir, character_id, user_id)?;
+        let dir = self.companion_dir(user_id, character_id)?;
+        let (bond, facts, mut moments) = self.load_or_import(character_id, user_id, &dir)?;
         let before = moments.len();
         moments.retain(|m| m.id != moment_id);
         if moments.len() == before {
             return Err(MeuxeError::Memory(format!("Moment not found: {moment_id}")));
         }
         self.persist_all(&dir, &bond, &facts, &moments)?;
+        self.put_cache(character_id, user_id, &bond, &facts, &moments);
         Ok(())
     }
 
     pub fn reset(&self, character_id: &str, user_id: &str) -> Result<()> {
         let _guard = self.lock_write()?;
-        let dir = self.companion_dir(user_id, character_id);
+        let dir = self.companion_dir(user_id, character_id)?;
         if dir.exists() {
             std::fs::remove_dir_all(&dir)?;
         }
@@ -255,26 +285,33 @@ impl CompanionMemory {
         // Empty profile prevents legacy re-import on next load.
         self.write_profile(&dir, &Profile::default())?;
         let bond = Bond::default();
-        self.write_bond(&dir, &bond)?;
         self.write_moments(&dir, &[])?;
+        self.write_bond(&dir, &bond)?;
+        self.put_cache(character_id, user_id, &bond, &[], &[]);
         Ok(())
     }
 
-    fn companion_dir(&self, user_id: &str, character_id: &str) -> PathBuf {
-        self.data_dir
+    fn companion_dir(&self, user_id: &str, character_id: &str) -> Result<PathBuf> {
+        validate_id(user_id)?;
+        validate_id(character_id)?;
+        Ok(self
+            .data_dir
             .join("data")
             .join("users")
             .join(user_id)
             .join("companions")
-            .join(character_id)
+            .join(character_id))
     }
 
-    fn legacy_memory_dir(&self, character_id: &str, user_id: &str) -> PathBuf {
-        self.data_dir
+    fn legacy_memory_dir(&self, character_id: &str, user_id: &str) -> Result<PathBuf> {
+        validate_id(character_id)?;
+        validate_id(user_id)?;
+        Ok(self
+            .data_dir
             .join("data")
             .join(character_id)
             .join(user_id)
-            .join("memory")
+            .join("memory"))
     }
 
     fn lock_read(&self) -> Result<std::sync::RwLockReadGuard<'_, ()>> {
@@ -289,7 +326,48 @@ impl CompanionMemory {
             .map_err(|e| MeuxeError::Memory(format!("Lock poisoned: {e}")))
     }
 
+    fn put_cache(
+        &self,
+        character_id: &str,
+        user_id: &str,
+        bond: &Bond,
+        facts: &[Fact],
+        moments: &[Moment],
+    ) {
+        let mut cache = self.cache.lock().unwrap_or_else(PoisonError::into_inner);
+        cache.insert(
+            (character_id.to_string(), user_id.to_string()),
+            CachedCompanion {
+                bond: bond.clone(),
+                facts: facts.to_vec(),
+                moments: moments.to_vec(),
+            },
+        );
+    }
+
     fn load_or_import(
+        &self,
+        character_id: &str,
+        user_id: &str,
+        dir: &Path,
+    ) -> Result<(Bond, Vec<Fact>, Vec<Moment>)> {
+        {
+            let cache = self.cache.lock().unwrap_or_else(PoisonError::into_inner);
+            if let Some(cached) = cache.get(&(character_id.to_string(), user_id.to_string())) {
+                return Ok((
+                    cached.bond.clone(),
+                    cached.facts.clone(),
+                    cached.moments.clone(),
+                ));
+            }
+        }
+
+        let (bond, facts, moments) = self.load_or_import_from_disk(dir, character_id, user_id)?;
+        self.put_cache(character_id, user_id, &bond, &facts, &moments);
+        Ok((bond, facts, moments))
+    }
+
+    fn load_or_import_from_disk(
         &self,
         dir: &Path,
         character_id: &str,
@@ -326,7 +404,7 @@ impl CompanionMemory {
         facts: &mut Vec<Fact>,
         moments: &mut Vec<Moment>,
     ) -> Result<()> {
-        let legacy_dir = self.legacy_memory_dir(character_id, user_id);
+        let legacy_dir = self.legacy_memory_dir(character_id, user_id)?;
         if !legacy_dir.exists() {
             return Ok(());
         }
@@ -364,6 +442,8 @@ impl CompanionMemory {
             }
         }
 
+        enforce_fact_cap(facts);
+
         Ok(())
     }
 
@@ -391,9 +471,26 @@ impl CompanionMemory {
             return Ok(vec![]);
         }
         let mut moments = Vec::new();
-        for line in read_jsonl_lines(&path)? {
-            if let Ok(moment) = serde_json::from_str::<Moment>(&line) {
-                moments.push(moment);
+        let file = std::fs::File::open(&path)?;
+        let reader = std::io::BufReader::new(file);
+        let mut line_number = 0u64;
+        for line in reader.lines() {
+            line_number += 1;
+            let line = line?;
+            let trimmed = line.trim();
+            if trimmed.is_empty() {
+                continue;
+            }
+            match serde_json::from_str::<Moment>(trimmed) {
+                Ok(moment) => moments.push(moment),
+                Err(e) => {
+                    eprintln!(
+                        "memory: skipping corrupt moment line {} in {}: {}",
+                        line_number,
+                        path.display(),
+                        e
+                    );
+                }
             }
         }
         Ok(moments)
@@ -431,20 +528,14 @@ impl CompanionMemory {
 
     fn write_moments(&self, dir: &Path, moments: &[Moment]) -> Result<()> {
         let path = dir.join("moments.jsonl");
+        let capped = cap_moments_newest_first(moments, MOMENT_DISK_CAP);
         let mut body = String::new();
-        for moment in moments {
+        for moment in &capped {
             body.push_str(&serde_json::to_string(moment)?);
             body.push('\n');
         }
         write_atomic(&path, &body)
     }
-}
-
-fn write_atomic(path: &Path, contents: &str) -> Result<()> {
-    let tmp = path.with_extension("tmp");
-    std::fs::write(&tmp, contents)?;
-    std::fs::rename(tmp, path)?;
-    Ok(())
 }
 
 fn read_jsonl_lines(path: &Path) -> Result<Vec<String>> {
@@ -915,6 +1006,13 @@ mod tests {
     }
 
     #[test]
+    fn rejects_invalid_ids() {
+        let (_tmp, store) = mem();
+        assert!(store.snapshot("../x", "user1").is_err());
+        assert!(store.add_fact("rika", "", "fact").is_err());
+    }
+
+    #[test]
     fn store_round_trip() {
         let (_tmp, store) = mem();
         store
@@ -1250,6 +1348,60 @@ mod tests {
     }
 
     #[test]
+    fn legacy_import_enforces_fact_cap() {
+        let tmp = tempfile::tempdir().unwrap();
+        let legacy_dir = tmp.path().join("data/rika/user1/memory");
+        std::fs::create_dir_all(&legacy_dir).unwrap();
+
+        let mut lines = String::new();
+        for i in 0..305 {
+            let row = LegacyMemory {
+                id: format!("s{i}"),
+                ts: Utc.with_ymd_and_hms(2026, 1, 1, 0, 0, 0).unwrap(),
+                memory_type: "semantic".into(),
+                summary: format!("Unique legacy fact number {i}"),
+                importance: 0.5,
+                tags: vec![],
+                metadata: serde_json::Value::Null,
+            };
+            lines.push_str(&serde_json::to_string(&row).unwrap());
+            lines.push('\n');
+        }
+        std::fs::write(legacy_dir.join("semantic.jsonl"), lines).unwrap();
+
+        let store = CompanionMemory::new(tmp.path());
+        let snap = store.snapshot("rika", "user1").unwrap();
+        assert_eq!(snap.facts.len(), FACT_CAP);
+    }
+
+    #[test]
+    fn moment_cap_persisted_on_disk() {
+        let (_tmp, store) = mem();
+        let t0 = Utc.with_ymd_and_hms(2026, 1, 1, 0, 0, 0).unwrap();
+        for i in 0..(MOMENT_DISK_CAP + 5) {
+            store
+                .apply_turn_at(
+                    "rika",
+                    "user1",
+                    "",
+                    Some(TurnNotes {
+                        moment: Some(format!("Moment number {i}")),
+                        ..Default::default()
+                    }),
+                    t0 + chrono::Duration::minutes(i as i64),
+                )
+                .unwrap();
+        }
+        let dir = store.snapshot("rika", "user1").unwrap().memory_dir;
+        let on_disk = std::fs::read_to_string(Path::new(&dir).join("moments.jsonl"))
+            .unwrap()
+            .lines()
+            .filter(|l| !l.trim().is_empty())
+            .count();
+        assert_eq!(on_disk, MOMENT_DISK_CAP);
+    }
+
+    #[test]
     fn long_conversation_holds_anger_until_a_real_apology() {
         let (_tmp, store) = mem();
         let t0 = Utc.with_ymd_and_hms(2026, 9, 5, 10, 0, 0).unwrap();
@@ -1344,5 +1496,67 @@ mod tests {
         let context = crate::memory::format_memory_context(&last, "Meet", "how is rex");
         assert!(context.contains("Rex") || context.contains("rex"));
         assert!(!context.to_lowercase().contains("<<<meuxe"));
+    }
+
+    #[test]
+    fn cache_hit_avoids_disk_re_read() {
+        let (_tmp, store) = mem();
+        store
+            .add_fact("rika", "user1", "Their dog is named Rex")
+            .unwrap();
+        let snap1 = store.snapshot("rika", "user1").unwrap();
+        assert_eq!(snap1.facts.len(), 1);
+
+        let dir = Path::new(&snap1.memory_dir);
+        std::fs::remove_file(dir.join("bond.json")).unwrap();
+        std::fs::remove_file(dir.join("profile.json")).unwrap();
+        std::fs::remove_file(dir.join("moments.jsonl")).unwrap();
+
+        let snap2 = store.snapshot("rika", "user1").unwrap();
+        assert_eq!(snap2.facts.len(), 1);
+        assert_eq!(snap2.facts[0].text, "Their dog is named Rex");
+    }
+
+    #[test]
+    fn cache_write_through_updates_snapshot() {
+        let (_tmp, store) = mem();
+        store.add_fact("rika", "user1", "They like tea").unwrap();
+        store.add_fact("rika", "user1", "They have a cat").unwrap();
+        let snap = store.snapshot("rika", "user1").unwrap();
+        assert_eq!(snap.facts.len(), 2);
+    }
+
+    #[test]
+    fn cache_invalidate_forces_disk_re_read() {
+        let (_tmp, store) = mem();
+        store.add_fact("rika", "user1", "Original fact").unwrap();
+        let snap = store.snapshot("rika", "user1").unwrap();
+        let dir = Path::new(&snap.memory_dir);
+
+        std::fs::write(
+            dir.join("profile.json"),
+            r#"{"facts":[{"id":"f1","text":"Disk-only fact","kind":"other","created_at":"2026-01-01T00:00:00Z","confirmed_at":"2026-01-01T00:00:00Z","mentions":1,"source":"user"}]}"#,
+        )
+        .unwrap();
+
+        let cached = store.snapshot("rika", "user1").unwrap();
+        assert_eq!(cached.facts[0].text, "Original fact");
+
+        store.invalidate("rika", "user1");
+        let fresh = store.snapshot("rika", "user1").unwrap();
+        assert_eq!(fresh.facts.len(), 1);
+        assert_eq!(fresh.facts[0].text, "Disk-only fact");
+    }
+
+    #[test]
+    fn cache_invalidate_all_clears_every_entry() {
+        let (_tmp, store) = mem();
+        store.add_fact("rika", "user1", "Fact A").unwrap();
+        store.add_fact("luna", "user2", "Fact B").unwrap();
+        store.invalidate_all();
+
+        let snap = store.snapshot("rika", "user1").unwrap();
+        assert_eq!(snap.facts.len(), 1);
+        assert_eq!(snap.facts[0].text, "Fact A");
     }
 }

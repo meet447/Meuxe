@@ -1,3 +1,4 @@
+use crate::commands::require_id;
 use crate::AppState;
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -16,6 +17,8 @@ pub fn expressions_model_list(
     state: State<Arc<AppState>>,
     model_id: String,
 ) -> Result<Vec<String>, String> {
+    require_id(&model_id)?;
+
     meuxe_core::character::get_model_expressions(&state.data_dir, &model_id)
         .map_err(|e| e.to_string())
 }
@@ -25,6 +28,8 @@ pub fn expressions_get(
     state: State<Arc<AppState>>,
     model_id: String,
 ) -> Result<HashMap<String, String>, String> {
+    require_id(&model_id)?;
+
     Ok(state.expressions.get_mapping(&model_id))
 }
 
@@ -34,6 +39,8 @@ pub fn expressions_save(
     model_id: String,
     mapping: HashMap<String, String>,
 ) -> Result<(), String> {
+    require_id(&model_id)?;
+
     state
         .expressions
         .save_mapping(&model_id, mapping)

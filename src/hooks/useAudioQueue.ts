@@ -166,6 +166,7 @@ export function useAudioQueue() {
               await new Promise((resolve) => setTimeout(resolve, holdMs));
             }
             if (queueRef.current.activeRequestId() !== action.requestId) break;
+            setSpeakingSentence(null);
           }
           queueRef.current.advance(action.requestId, action.index);
           continue;
@@ -176,14 +177,16 @@ export function useAudioQueue() {
         onExpressionChangeRef.current?.(action.task.expression);
         await playAudioChunk(action.audio);
         if (queueRef.current.activeRequestId() !== action.requestId) break;
+        // The caption belongs to the sentence being spoken; the next sentence
+        // sets its own. The expression is kept until the next user turn.
+        setSpeakingSentence(null);
         queueRef.current.advance(action.requestId, action.index);
       }
     } finally {
       playingRef.current = false;
       setSpeaking(false);
-      // Keep the last caption and face until the next user turn. Resetting to
-      // idle here made the avatar go blank the instant TTS (or the no-TTS hold)
-      // finished, which is how most replies look in the desktop app.
+      // Do not reset the expression here: it stays until the next user turn so
+      // the avatar does not go blank the instant TTS finishes.
       if (queueRef.current.peekNext().kind !== "wait") {
         queueMicrotask(() => processQueueRef.current());
       }

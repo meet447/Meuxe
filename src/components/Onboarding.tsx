@@ -8,17 +8,14 @@ import {
   installAgentSetup,
   type AgentSetupStatusResponse,
 } from "../api/tauri";
-import {
-  ACP_AGENT_PRESET_IDS,
-  type AcpAgentPresetId,
-} from "../lib/agentPresets";
+import type { AcpAgentPresetId } from "../lib/agentPresets";
 import { COMPANION_VIBE_PACKS } from "../lib/companionVibes";
 import { buildCompanionPersonalityDraft } from "../lib/companionCharacterDraft";
 import { DEFAULT_TTS_PROVIDER, DEFAULT_TTS_VOICE, TTS_PRESETS_UI } from "../lib/ttsPresets";
-import { AgentPresetCard } from "./agents/AgentPresetCard";
-import { AgentSetupPanel } from "./agents/AgentSetupPanel";
+import { AgentSection } from "./settings/AgentSection";
+import { TtsSection } from "./settings/TtsSection";
 import { CompanionAvatarPreview } from "./onboarding/CompanionAvatarPreview";
-import { ModelPicker } from "./onboarding/ModelPicker";
+import { ModelPicker } from "./settings/ModelPicker";
 import { OnboardingShell } from "./onboarding/OnboardingShell";
 import {
   BackIcon,
@@ -31,26 +28,12 @@ import {
   Input,
   LockIcon,
   Notice,
-  PlayIcon,
-  Select,
   SparkIcon,
-  SpeakerIcon,
   Textarea,
   VibeGlyph,
 } from "./ui";
 
-interface Voice {
-  id: string;
-  name: string;
-}
-
-interface Model {
-  id: string;
-  type: string;
-  model_file: string;
-  path: string;
-  animations?: { name: string; path: string }[];
-}
+import type { ModelInfo, Voice } from "../types";
 
 interface FormData {
   user: { name: string; about: string };
@@ -58,6 +41,7 @@ interface FormData {
     preset: AcpAgentPresetId;
     program: string;
     args: string;
+    auto_approve_tools: boolean;
   };
   tts: { provider: string; api_key: string; voice: string };
   companion: {
@@ -79,18 +63,20 @@ const FEATURE_TILES = [
 export function Onboarding({ onComplete }: { onComplete: () => void }) {
   const [step, setStep] = useState(0);
   const [voices, setVoices] = useState<Voice[]>([]);
-  const [models, setModels] = useState<Model[]>([]);
+  const [models, setModels] = useState<ModelInfo[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const previewUrlRef = useRef<string | null>(null);
   const [agentSetup, setAgentSetup] = useState<AgentSetupStatusResponse | null>(null);
   const [agentSetupLoading, setAgentSetupLoading] = useState(false);
+  const [agentSetupError, setAgentSetupError] = useState<string | null>(null);
 
   const ttsPresets = TTS_PRESETS_UI;
 
   const [form, setForm] = useState<FormData>({
     user: { name: "", about: "" },
-    agent: { preset: "opencode", program: "", args: "" },
+    agent: { preset: "opencode", program: "", args: "", auto_approve_tools: true },
     tts: { provider: DEFAULT_TTS_PROVIDER, api_key: "", voice: DEFAULT_TTS_VOICE },
     companion: {
       name: "",
@@ -105,7 +91,7 @@ export function Onboarding({ onComplete }: { onComplete: () => void }) {
   useEffect(() => {
     listModels()
       .then((data) => {
-        const list = data as Model[];
+        const list = data as ModelInfo[];
         setModels(list);
         if (list.length > 0 && !list.some((m) => m.id === form.companion.model_id)) {
           setForm((prev) => ({
@@ -135,12 +121,22 @@ export function Onboarding({ onComplete }: { onComplete: () => void }) {
     if (step !== 4 || form.agent.preset === "custom") {
       setAgentSetup(null);
       setAgentSetupLoading(false);
+      setAgentSetupError(null);
     }
   }, [step, form.agent.preset]);
 
-  const handleAgentSetupStatus = (status: AgentSetupStatusResponse | null, loading: boolean) => {
+  const handleAgentSetupStatus = (
+    status: AgentSetupStatusResponse | null,
+    loading: boolean,
+    error?: string,
+  ) => {
     setAgentSetup(status);
     setAgentSetupLoading(loading);
+    if (error) {
+      setAgentSetupError(error);
+    } else if (status) {
+      setAgentSetupError(null);
+    }
   };
 
   const updateForm = (section: keyof FormData, field: string, value: string) => {
@@ -175,6 +171,10 @@ export function Onboarding({ onComplete }: { onComplete: () => void }) {
       audioRef.current.pause();
       audioRef.current = null;
     }
+    if (previewUrlRef.current) {
+      URL.revokeObjectURL(previewUrlRef.current);
+      previewUrlRef.current = null;
+    }
     setPreviewError("");
     setPreviewing(true);
     try {
@@ -185,8 +185,12 @@ export function Onboarding({ onComplete }: { onComplete: () => void }) {
       }
       const blob = new Blob([new Uint8Array(data)], { type: "audio/mp3" });
       const url = URL.createObjectURL(blob);
+      previewUrlRef.current = url;
       const audio = new Audio(url);
-      audio.addEventListener("ended", () => URL.revokeObjectURL(url));
+      audio.addEventListener("ended", () => {
+        URL.revokeObjectURL(url);
+        if (previewUrlRef.current === url) previewUrlRef.current = null;
+      });
       audioRef.current = audio;
       await audio.play();
     } catch (err: unknown) {
@@ -196,6 +200,19 @@ export function Onboarding({ onComplete }: { onComplete: () => void }) {
       setPreviewing(false);
     }
   };
+
+  useEffect(() => {
+    return () => {
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current = null;
+      }
+      if (previewUrlRef.current) {
+        URL.revokeObjectURL(previewUrlRef.current);
+        previewUrlRef.current = null;
+      }
+    };
+  }, []);
 
   const canProceed = (): boolean => {
     switch (step) {
@@ -213,11 +230,18 @@ export function Onboarding({ onComplete }: { onComplete: () => void }) {
         }
         if (agentSetupLoading) return false;
         if (agentSetup?.agent.ready) return true;
+        if (agentSetupError || agentSetup === null) return true;
         return agentSetup?.prerequisites.node_available === true;
       default:
         return false;
     }
   };
+
+  const agentSetupWarning =
+    step === 4 &&
+    form.agent.preset !== "custom" &&
+    !agentSetupLoading &&
+    (agentSetupError || agentSetup === null);
 
   const stepHint = (): string | null => {
     if (step === 4 && form.agent.preset !== "custom" && !canProceed() && !agentSetupLoading) {
@@ -275,6 +299,7 @@ export function Onboarding({ onComplete }: { onComplete: () => void }) {
           preset: form.agent.preset,
           program: form.agent.program,
           args: form.agent.args.trim() ? form.agent.args.trim().split(/\s+/) : [],
+          auto_approve_tools: form.agent.auto_approve_tools,
         },
         tts: {
           provider: form.tts.provider,
@@ -414,118 +439,32 @@ export function Onboarding({ onComplete }: { onComplete: () => void }) {
       )}
 
       {step === 3 && (
-        <>
-          <Notice tone="success" className="mb-4">
-            Meuxe TTS is built in and free — ready to use with no API key. ElevenLabs and OpenAI are optional if you want studio voices.
-          </Notice>
-
-          <div className="mb-4 grid grid-cols-1 gap-2.5 sm:grid-cols-3">
-            {Object.entries(ttsPresets).map(([id, preset]) => (
-              <ChoiceCard
-                key={id}
-                selected={form.tts.provider === id}
-                onClick={() => updateForm("tts", "provider", id)}
-                leading={<SpeakerIcon />}
-                title={preset.name}
-                description={preset.hint}
-                compact
-              />
-            ))}
-          </div>
-
-          {ttsPresets[form.tts.provider]?.needs_key && (
-            <Field label="API key">
-              <Input
-                type="password"
-                value={form.tts.api_key}
-                onChange={(e) => updateForm("tts", "api_key", e.target.value)}
-                placeholder="Paste key from your voice service"
-              />
-            </Field>
-          )}
-
-          <Field label="Voice" error={previewError || undefined} className="mb-0">
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-start">
-              <Select
-                wrapperClassName="flex-1"
-                value={form.tts.voice}
-                onChange={(e) => updateForm("tts", "voice", e.target.value)}
-              >
-                {voices.map((v) => (
-                  <option key={v.id} value={v.id}>{v.name}</option>
-                ))}
-              </Select>
-              <Button
-                variant="soft"
-                leading={<PlayIcon className="h-4 w-4" />}
-                loading={previewing}
-                onClick={playSample}
-                className="shrink-0"
-              >
-                Listen
-              </Button>
-            </div>
-          </Field>
-        </>
+        <TtsSection
+          value={form.tts}
+          onChange={(next) => setForm((prev) => ({ ...prev, tts: next }))}
+          voices={voices}
+          presets={ttsPresets}
+          onPreview={playSample}
+          previewLoading={previewing}
+          previewError={previewError}
+          showBuiltInNotice
+          compactGrid
+        />
       )}
 
       {step === 4 && (
-        <>
-          <div className="mb-4 grid grid-cols-1 gap-3">
-            {ACP_AGENT_PRESET_IDS.map((id) => (
-              <AgentPresetCard
-                key={id}
-                id={id}
-                selected={form.agent.preset === id}
-                onSelect={() =>
-                  setForm((prev) => ({
-                    ...prev,
-                    agent: { ...prev.agent, preset: id },
-                  }))
-                }
-              />
-            ))}
-          </div>
+        <AgentSection
+          value={form.agent}
+          onChange={(next) => setForm((prev) => ({ ...prev, agent: next }))}
+          onAgentSetupStatus={handleAgentSetupStatus}
+          friendly
+        />
+      )}
 
-          {form.agent.preset === "custom" && (
-            <>
-              <Field label="Program to run">
-                <Input
-                  type="text"
-                  value={form.agent.program}
-                  onChange={(e) =>
-                    setForm((prev) => ({
-                      ...prev,
-                      agent: { ...prev.agent, program: e.target.value },
-                    }))
-                  }
-                  placeholder="Path or command"
-                />
-              </Field>
-              <Field label="Extra options" optional>
-                <Input
-                  type="text"
-                  value={form.agent.args}
-                  onChange={(e) =>
-                    setForm((prev) => ({
-                      ...prev,
-                      agent: { ...prev.agent, args: e.target.value },
-                    }))
-                  }
-                  placeholder="Optional flags"
-                />
-              </Field>
-            </>
-          )}
-
-          {form.agent.preset !== "custom" && (
-            <AgentSetupPanel
-              preset={form.agent.preset}
-              onStatusChange={handleAgentSetupStatus}
-              friendly
-            />
-          )}
-        </>
+      {agentSetupWarning && (
+        <Notice tone="warning" className="mt-4">
+          Could not verify the assistant setup. You can finish now and fix this later in Settings.
+        </Notice>
       )}
 
       {error && (

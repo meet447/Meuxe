@@ -1,3 +1,5 @@
+use crate::commands::require_id;
+use crate::commands::user::derive_user_id;
 use crate::AppState;
 use regex::Regex;
 use std::future::Future;
@@ -28,11 +30,14 @@ fn expression_peel_re() -> &'static Regex {
     })
 }
 
-fn global_expression_names() -> Vec<String> {
-    meuxe_core::expressions::GLOBAL_EXPRESSIONS
-        .iter()
-        .map(|s| s.to_string())
-        .collect()
+fn global_expression_names() -> &'static [String] {
+    static NAMES: OnceLock<Vec<String>> = OnceLock::new();
+    NAMES.get_or_init(|| {
+        meuxe_core::expressions::GLOBAL_EXPRESSIONS
+            .iter()
+            .map(|s| s.to_string())
+            .collect()
+    })
 }
 
 /// If `text` starts with an expression tag, update `current` and return the remainder.
@@ -49,7 +54,7 @@ pub(crate) fn peel_expression_prefix(text: &str, current: &mut String) -> String
         if !name.is_empty() {
             let available = global_expression_names();
             if let Some(valid) =
-                meuxe_core::expressions::ExpressionManager::validate_expression(name, &available)
+                meuxe_core::expressions::ExpressionManager::validate_expression(name, available)
             {
                 *current = valid;
             }
@@ -64,6 +69,7 @@ pub(crate) fn build_acp_agent_prompt(
     persona_context: &str,
     messages: &[meuxe_core::llm::types::ChatMessage],
     user_message: &str,
+    include_history: bool,
 ) -> String {
     let mut parts = vec![
         "## Meuxe companion (required)".to_string(),
@@ -77,30 +83,32 @@ pub(crate) fn build_acp_agent_prompt(
         persona_context.trim().to_string(),
     ];
 
-    let mut history_lines: Vec<String> = Vec::new();
-    for msg in messages {
-        if msg.role == "system" || msg.role == "tool" {
-            continue;
+    if include_history {
+        let mut history_lines: Vec<String> = Vec::new();
+        for msg in messages {
+            if msg.role == "system" || msg.role == "tool" {
+                continue;
+            }
+            let content = msg.content_str().trim();
+            if content.is_empty() {
+                continue;
+            }
+            if msg.role == "user" && content == user_message.trim() {
+                continue;
+            }
+            let label = if msg.role == "user" {
+                "User"
+            } else {
+                "Companion"
+            };
+            history_lines.push(format!("{label}: {content}"));
         }
-        let content = msg.content_str().trim();
-        if content.is_empty() {
-            continue;
-        }
-        if msg.role == "user" && content == user_message.trim() {
-            continue;
-        }
-        let label = if msg.role == "user" {
-            "User"
-        } else {
-            "Companion"
-        };
-        history_lines.push(format!("{label}: {content}"));
-    }
 
-    if !history_lines.is_empty() {
-        parts.push(String::new());
-        parts.push("## Recent conversation".to_string());
-        parts.extend(history_lines);
+        if !history_lines.is_empty() {
+            parts.push(String::new());
+            parts.push("## Recent conversation".to_string());
+            parts.extend(history_lines);
+        }
     }
 
     parts.push(String::new());
@@ -156,20 +164,6 @@ pub(crate) struct ChatDoneEvent {
 struct ChatErrorEvent {
     request_id: String,
     message: String,
-}
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-fn derive_user_id(config: &meuxe_core::config::types::AppConfig) -> String {
-    if !config.user.id.is_empty() {
-        config.user.id.clone()
-    } else if config.user.name.is_empty() {
-        "default-user".to_string()
-    } else {
-        meuxe_core::character::slugify(&config.user.name)
-    }
 }
 
 /// Strip expression tags (<<tag>>, [expression:tag], or [tag]) from text.
@@ -493,6 +487,39 @@ pub(crate) fn drain_buffer_sentences(
 // Commands
 // ---------------------------------------------------------------------------
 
+fn lock_chat_cancel(
+    mutex: &std::sync::Mutex<Option<tokio_util::sync::CancellationToken>>,
+) -> std::sync::MutexGuard<'_, Option<tokio_util::sync::CancellationToken>> {
+    mutex
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
+}
+
+#[tauri::command]
+pub fn chat_tool_confirm(
+    state: State<Arc<AppState>>,
+    permission_id: String,
+    approved: bool,
+) -> Result<(), String> {
+    let mut lock = state
+        .chat_permission_responders
+        .lock()
+        .unwrap_or_else(|p| p.into_inner());
+    if let Some(sender) = lock.remove(&permission_id) {
+        let _ = sender.send(approved);
+    }
+    Ok(())
+}
+
+#[tauri::command]
+pub fn chat_cancel(state: State<Arc<AppState>>) -> Result<(), String> {
+    let mut lock = lock_chat_cancel(&state.chat_cancel);
+    if let Some(token) = lock.take() {
+        token.cancel();
+    }
+    Ok(())
+}
+
 #[tauri::command]
 pub async fn chat_send(
     app: AppHandle,
@@ -501,13 +528,15 @@ pub async fn chat_send(
     message: String,
     request_id: String,
 ) -> Result<(), String> {
+    require_id(&character_id)?;
+
     let state = Arc::clone(&state);
     let app_handle = app.clone();
 
     // Cancel any previous agent loop
     let cancel_token = CancellationToken::new();
     {
-        let mut lock = state.chat_cancel.lock().unwrap();
+        let mut lock = lock_chat_cancel(&state.chat_cancel);
         if let Some(old_token) = lock.take() {
             old_token.cancel();
         }
@@ -516,16 +545,22 @@ pub async fn chat_send(
 
     tokio::spawn(async move {
         let error_request_id = request_id.clone();
-        if let Err(e) = run_chat_stream(
+        let result = run_chat_stream(
             app_handle.clone(),
-            state,
+            state.clone(),
             character_id,
             message,
             request_id,
             cancel_token,
         )
-        .await
+        .await;
+
         {
+            let mut lock = lock_chat_cancel(&state.chat_cancel);
+            *lock = None;
+        }
+
+        if let Err(e) = result {
             let _ = app_handle.emit(
                 "chat:error",
                 ChatErrorEvent {
@@ -550,8 +585,6 @@ async fn run_chat_stream(
     // 1. Load config, derive user_id
     let config = state.config.load().map_err(|e| e.to_string())?;
     let user_id = derive_user_id(&config);
-
-    // Load character to get model_id for expression resolution
     let character = state
         .characters
         .load_character(&character_id)
@@ -587,7 +620,17 @@ async fn run_chat_stream(
     persona_context.push_str("\n\n## Memory notes (required)\n");
     persona_context.push_str(meuxe_core::memory::TURN_NOTES_INSTRUCTIONS);
 
-    let acp_prompt = build_acp_agent_prompt(&persona_context, &prompt_result.messages, &message);
+    let include_history = {
+        let acp = state.acp.lock().unwrap_or_else(|p| p.into_inner());
+        !acp.has_live_session(&character_id, &config.agent)
+    };
+
+    let acp_prompt = build_acp_agent_prompt(
+        &persona_context,
+        &prompt_result.messages,
+        &message,
+        include_history,
+    );
 
     crate::acp::run_acp_chat_stream(crate::acp::RunAcpChatStreamParams {
         app,
@@ -712,7 +755,7 @@ mod tests {
             meuxe_core::llm::types::ChatMessage::text("assistant", "Hey!"),
             meuxe_core::llm::types::ChatMessage::text("user", "Who are you?"),
         ];
-        let prompt = build_acp_agent_prompt("You are Luna.", &messages, "Who are you?");
+        let prompt = build_acp_agent_prompt("You are Luna.", &messages, "Who are you?", true);
         assert!(prompt.contains("You are Luna."));
         assert!(prompt.contains("User: Hi"));
         assert!(prompt.contains("Companion: Hey!"));
@@ -779,25 +822,22 @@ mod tests {
 pub fn chat_history(
     state: State<Arc<AppState>>,
     character_id: String,
-) -> Result<Vec<serde_json::Value>, String> {
+) -> Result<Vec<meuxe_core::session::SessionMessage>, String> {
+    require_id(&character_id)?;
+
     let config = state.config.load().map_err(|e| e.to_string())?;
     let user_id = derive_user_id(&config);
 
-    let history = state
+    state
         .sessions
         .load_history(&character_id, &user_id, Some(50))
-        .map_err(|e| e.to_string())?;
-
-    let values: Vec<serde_json::Value> = history
-        .into_iter()
-        .map(|msg| serde_json::to_value(msg).unwrap_or(serde_json::Value::Null))
-        .collect();
-
-    Ok(values)
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
 pub fn chat_clear(state: State<Arc<AppState>>, character_id: String) -> Result<(), String> {
+    require_id(&character_id)?;
+
     let config = state.config.load().map_err(|e| e.to_string())?;
     let user_id = derive_user_id(&config);
 

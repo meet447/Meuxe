@@ -45,27 +45,47 @@ export const VRMCanvas = memo(function VRMCanvas({
     handlePointerCancel,
   } = useVRM(canvasRef);
   const prevModelPath = useRef<string | null>(null);
+
+  // The hook disposes its renderer on unmount; forget what was loaded so a remount
+  // (including React StrictMode's simulated one in dev) loads the model again.
+  useEffect(() => {
+    return () => {
+      prevModelPath.current = null;
+    };
+  }, []);
   const prevExpression = useRef<string>("");
   const expressionRef = useRef(expression);
   expressionRef.current = expression;
   const [modelLoading, setModelLoading] = useState(false);
 
   useEffect(() => {
-    if (modelPath && modelPath !== prevModelPath.current) {
-      prevModelPath.current = modelPath;
-      setModelLoading(true);
-      loadModel(modelPath, animations).then(() => {
+    if (!modelPath) return;
+
+    const pathChanged = modelPath !== prevModelPath.current;
+    if (!pathChanged) return;
+
+    prevModelPath.current = modelPath;
+
+    let cancelled = false;
+    setModelLoading(true);
+    loadModel(modelPath, animations)
+      .then(() => {
+        if (cancelled) return;
         setViewport(zoom, framing);
         const expr = expressionRef.current;
         if (expr) {
           prevExpression.current = expr;
           setExpression(expr);
         }
-      }).finally(() => setModelLoading(false));
-    }
-    // Intentionally disabling lint rule - loading state is necessary for model loading UX
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-  }, [modelPath, animations, loadModel]);
+      })
+      .finally(() => {
+        if (!cancelled) setModelLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [modelPath, animations, loadModel, setViewport, setExpression, zoom, framing]);
 
   useEffect(() => {
     if (expression && expression !== prevExpression.current) {

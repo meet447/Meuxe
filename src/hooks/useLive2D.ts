@@ -3,6 +3,29 @@ import * as PIXI from "pixi.js";
 import { Live2DModel } from "pixi-live2d-display/cubism4";
 import type { ModelMapping } from "../types";
 import type { AudioLevels } from "./useAudioAnalyser";
+import {
+  createBlinkScheduler,
+  createLipSyncDriver,
+  speakingHeadSway,
+} from "../utils/avatarAnimation";
+
+const LIVE2D_BLINK_MIN_MS = 2000;
+const LIVE2D_BLINK_MAX_MS = 6000;
+const LIVE2D_BLINK_DURATION_MS = 150;
+const LIVE2D_LIP_ATTACK = 0.4;
+const LIVE2D_LIP_RELEASE = 0.35;
+const LIVE2D_SPEAK_SWAY = {
+  xFreq: 1.8,
+  xAmp: 2,
+  xSecondaryFreq: 3.1,
+  xSecondaryAmp: 1,
+  yFreq: 2.3,
+  yAmp: 1.5,
+  ySecondaryFreq: 1.5,
+  ySecondaryAmp: 0.8,
+  zFreq: 1.2,
+  zAmp: 1.5,
+};
 
 // Expose PIXI globally for pixi-live2d-display
 (window as any).PIXI = PIXI;
@@ -30,15 +53,17 @@ export interface DebugInfo {
 }
 
 // Easing functions
-function easeOutCubic(t: number): number {
-  return 1 - Math.pow(1 - t, 3);
-}
-
 function lerp(a: number, b: number, t: number): number {
   return a + (b - a) * t;
 }
 
-export function useLive2D(canvasRef: React.RefObject<HTMLCanvasElement | null>) {
+/**
+ * Drives a Live2D model inside `hostRef`. The hook creates and owns the <canvas>:
+ * PIXI's destroy() loses the WebGL context and detaches the view, so it must
+ * never be a React-rendered node (React would crash on its next insertBefore).
+ */
+export function useLive2D(hostRef: React.RefObject<HTMLElement | null>) {
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const appRef = useRef<PIXI.Application | null>(null);
   const modelRef = useRef<any>(null);
   const baseScaleRef = useRef(1);
@@ -64,12 +89,16 @@ export function useLive2D(canvasRef: React.RefObject<HTMLCanvasElement | null>) 
   const speakingHandlerRef = useRef<(() => void) | null>(null);
   const mouthValueRef = useRef(0);
   const mouthTargetRef = useRef(0);
+  const lipSyncDriverRef = useRef(
+    createLipSyncDriver({ attack: LIVE2D_LIP_ATTACK, release: LIVE2D_LIP_RELEASE })
+  );
   const lastToggleRef = useRef(0);
   const breathPhaseRef = useRef(0);
   const breathSpeedRef = useRef(0.03); // Adjustable per emotion
   const audioLevelsGetterRef = useRef<(() => AudioLevels) | null>(null);
   const typingReactionRef = useRef<(() => void) | null>(null);
   const mouseCleanupRef = useRef<(() => void) | null>(null);
+  const loadGenerationRef = useRef(0);
   const viewportRef = useRef({
     zoom: 1,
     framing: "full" as "full" | "half",
@@ -82,19 +111,71 @@ export function useLive2D(canvasRef: React.RefObject<HTMLCanvasElement | null>) 
     return mappingRef.current?.params || DEFAULT_PARAMS;
   }, []);
 
+  const ensureCanvas = useCallback((): HTMLCanvasElement | null => {
+    const host = hostRef.current;
+    if (!host) return null;
+    const existing = canvasRef.current;
+    if (existing && existing.parentElement === host) return existing;
+    existing?.remove();
+    const canvas = document.createElement("canvas");
+    canvas.className = "block h-full w-full cursor-default";
+    canvas.style.touchAction = "none";
+    host.appendChild(canvas);
+    canvasRef.current = canvas;
+    return canvas;
+  }, [hostRef]);
+
+  const disposeLive2DResources = useCallback(() => {
+    // Abort any in-flight loadModel so it never touches the destroyed app.
+    loadGenerationRef.current += 1;
+    lipSyncActiveRef.current = false;
+    mouseCleanupRef.current?.();
+    mouseCleanupRef.current = null;
+
+    const model = modelRef.current;
+    if (model) {
+      if (idleHandlerRef.current) {
+        model.internalModel.off("beforeModelUpdate", idleHandlerRef.current);
+        idleHandlerRef.current = null;
+      }
+      if (lipSyncHandlerRef.current) {
+        model.internalModel.off("beforeModelUpdate", lipSyncHandlerRef.current);
+        lipSyncHandlerRef.current = null;
+      }
+      if (speakingHandlerRef.current) {
+        model.internalModel.off("beforeModelUpdate", speakingHandlerRef.current);
+        speakingHandlerRef.current = null;
+      }
+      if (typingReactionRef.current) {
+        model.internalModel.off("beforeModelUpdate", typingReactionRef.current);
+        typingReactionRef.current = null;
+      }
+      model.destroy();
+      modelRef.current = null;
+      modelSizeRef.current = { width: 0, height: 0 };
+    }
+
+    if (appRef.current) {
+      appRef.current.destroy(true, { children: true, texture: true, baseTexture: true });
+      appRef.current = null;
+    }
+    // destroy() lost this canvas's WebGL context; a fresh one is created on next load.
+    canvasRef.current?.remove();
+    canvasRef.current = null;
+  }, []);
+
   useEffect(() => {
     return () => {
-      lipSyncActiveRef.current = false;
-      mouseCleanupRef.current?.();
+      disposeLive2DResources();
     };
-  }, []);
+  }, [disposeLive2DResources]);
 
   const applyModelLayout = useCallback(() => {
     const model = modelRef.current;
     const app = appRef.current;
     if (!model || !app) return;
 
-    const parent = canvasRef.current?.parentElement;
+    const parent = hostRef.current;
     if (parent) {
       const w = parent.clientWidth;
       const h = parent.clientHeight;
@@ -132,13 +213,12 @@ export function useLive2D(canvasRef: React.RefObject<HTMLCanvasElement | null>) 
     model.scale.set(targetScale);
     model.x = screenW / 2 + offsetX;
     model.y = targetY;
-  }, [canvasRef]);
+  }, [hostRef]);
 
   applyModelLayoutRef.current = applyModelLayout;
 
   useEffect(() => {
-    const canvas = canvasRef.current;
-    const parent = canvas?.parentElement;
+    const parent = hostRef.current;
     if (!parent) return;
 
     const observer = new ResizeObserver(() => {
@@ -148,7 +228,7 @@ export function useLive2D(canvasRef: React.RefObject<HTMLCanvasElement | null>) 
     });
     observer.observe(parent);
     return () => observer.disconnect();
-  }, [canvasRef]);
+  }, [hostRef]);
 
   // ========================================
   // IDLE ANIMATION SYSTEM
@@ -158,12 +238,16 @@ export function useLive2D(canvasRef: React.RefObject<HTMLCanvasElement | null>) 
       model.internalModel.off("beforeModelUpdate", idleHandlerRef.current);
     }
 
-    // Blink state
-    let lastBlinkTime = Date.now();
-    let nextBlinkDelay = 2000 + Math.random() * 4000;
-    let blinkPhase = 0;
-    let doubleBlink = false;
-    const BLINK_DURATION = 150;
+    const blinkScheduler = createBlinkScheduler({
+      minIntervalMs: LIVE2D_BLINK_MIN_MS,
+      maxIntervalMs: LIVE2D_BLINK_MAX_MS,
+      durationMs: LIVE2D_BLINK_DURATION_MS,
+      doubleBlinkChance: 0.2,
+      doubleBlinkGapMinMs: 150,
+      doubleBlinkGapMaxMs: 250,
+      curve: "ease-hold",
+    });
+    blinkScheduler.reset(Date.now());
 
     // Eye saccade state: subtle micro eye movements
     let saccadeX = 0;
@@ -233,38 +317,9 @@ export function useLive2D(canvasRef: React.RefObject<HTMLCanvasElement | null>) 
       } catch {}
 
       // --- Random blinking with occasional double blinks ---
-      if (blinkPhase === 0) {
-        if (now - lastBlinkTime > nextBlinkDelay) {
-          blinkPhase = 1;
-          lastBlinkTime = now;
-          // 20% chance of double blink
-          doubleBlink = Math.random() < 0.2;
-          nextBlinkDelay = doubleBlink ? 300 : (2000 + Math.random() * 4000);
-        }
-      } else {
-        const blinkProgress = (now - lastBlinkTime) / BLINK_DURATION;
-        let eyeOpen: number;
-
-        if (blinkProgress < 0.3) {
-          eyeOpen = 1.0 - easeOutCubic(blinkProgress / 0.3);
-        } else if (blinkProgress < 0.5) {
-          eyeOpen = 0;
-        } else if (blinkProgress < 1.0) {
-          eyeOpen = easeOutCubic((blinkProgress - 0.5) / 0.5);
-        } else {
-          eyeOpen = 1.0;
-          blinkPhase = 0;
-
-          if (doubleBlink) {
-            // Queue second blink quickly
-            doubleBlink = false;
-            nextBlinkDelay = 150 + Math.random() * 100;
-          } else {
-            nextBlinkDelay = 2000 + Math.random() * 4000;
-          }
-          lastBlinkTime = now;
-        }
-
+      const blinkClose = blinkScheduler.update(now);
+      if (blinkClose > 0) {
+        const eyeOpen = 1 - blinkClose;
         try {
           coreModel.setParameterValueById(params.eyeLeftOpen, eyeOpen);
           coreModel.setParameterValueById(params.eyeRightOpen, eyeOpen);
@@ -312,16 +367,12 @@ export function useLive2D(canvasRef: React.RefObject<HTMLCanvasElement | null>) 
     const handler = () => {
       const elapsed = (Date.now() - startTime) / 1000;
       const coreModel = model.internalModel.coreModel;
+      const sway = speakingHeadSway(elapsed, LIVE2D_SPEAK_SWAY);
 
       try {
-        // Subtle head nod while speaking: varies speed to look natural
-        const nodX = Math.sin(elapsed * 1.8) * 2 + Math.sin(elapsed * 3.1) * 1;
-        const nodY = Math.sin(elapsed * 2.3) * 1.5 + Math.cos(elapsed * 1.5) * 0.8;
-        const nodZ = Math.sin(elapsed * 1.2) * 1.5;
-
-        coreModel.addParameterValueById("ParamAngleX", nodX);
-        coreModel.addParameterValueById("ParamAngleY", nodY);
-        coreModel.addParameterValueById("ParamAngleZ", nodZ);
+        coreModel.addParameterValueById("ParamAngleX", sway.x);
+        coreModel.addParameterValueById("ParamAngleY", sway.y);
+        coreModel.addParameterValueById("ParamAngleZ", sway.z);
       } catch {}
     };
 
@@ -342,7 +393,9 @@ export function useLive2D(canvasRef: React.RefObject<HTMLCanvasElement | null>) 
   // ========================================
   const loadModel = useCallback(
     async (modelPath: string, mapping?: ModelMapping) => {
-      if (!canvasRef.current) return;
+      if (!hostRef.current) return;
+
+      const generation = ++loadGenerationRef.current;
 
       if (mapping) {
         mappingRef.current = mapping;
@@ -382,14 +435,16 @@ export function useLive2D(canvasRef: React.RefObject<HTMLCanvasElement | null>) 
 
       let app = appRef.current;
       if (!app) {
+        const canvas = ensureCanvas();
+        if (!canvas) return;
         app = new PIXI.Application({
-          view: canvasRef.current,
-          width: canvasRef.current.clientWidth,
-          height: canvasRef.current.clientHeight,
+          view: canvas,
+          width: canvas.clientWidth,
+          height: canvas.clientHeight,
           backgroundAlpha: 0,
           resolution: Math.min(window.devicePixelRatio || 1, 2),
           autoDensity: true,
-          resizeTo: canvasRef.current.parentElement || window,
+          resizeTo: hostRef.current,
         });
         // Cap PIXI ticker to 30 FPS
         app.ticker.maxFPS = 30;
@@ -402,6 +457,11 @@ export function useLive2D(canvasRef: React.RefObject<HTMLCanvasElement | null>) 
         const model = await Live2DModel.from(cacheBust, {
           motionPreload: "IDLE" as any,
         });
+
+        if (generation !== loadGenerationRef.current) {
+          model.destroy();
+          return;
+        }
 
         modelRef.current = model;
 
@@ -449,6 +509,7 @@ export function useLive2D(canvasRef: React.RefObject<HTMLCanvasElement | null>) 
 
         // Cursor tracking
         const canvas = canvasRef.current;
+        if (!canvas) return;
         const onMouseMove = (e: MouseEvent) => {
           if (!modelRef.current || !canvas) return;
           try {
@@ -480,7 +541,7 @@ export function useLive2D(canvasRef: React.RefObject<HTMLCanvasElement | null>) 
         console.error("Failed to load Live2D model:", err);
       }
     },
-    [canvasRef, startIdleAnimations]
+    [hostRef, ensureCanvas, startIdleAnimations]
   );
 
   // ========================================
@@ -558,6 +619,7 @@ export function useLive2D(canvasRef: React.RefObject<HTMLCanvasElement | null>) 
 
     lipSyncActiveRef.current = true;
     debugRef.current.lipSyncActive = true;
+    lipSyncDriverRef.current.reset();
     mouthValueRef.current = 0;
     mouthTargetRef.current = 0;
 
@@ -576,7 +638,7 @@ export function useLive2D(canvasRef: React.RefObject<HTMLCanvasElement | null>) 
 
       if (getter) {
         const levels = getter();
-        mouthValueRef.current += (levels.mouthOpen - mouthValueRef.current) * 0.4;
+        mouthValueRef.current = lipSyncDriverRef.current.update(levels.mouthOpen, 33);
         debugRef.current.mouthValue = Math.round(mouthValueRef.current * 100) / 100;
 
         try {
@@ -612,6 +674,7 @@ export function useLive2D(canvasRef: React.RefObject<HTMLCanvasElement | null>) 
     lipSyncActiveRef.current = false;
     debugRef.current.lipSyncActive = false;
     debugRef.current.mouthValue = 0;
+    lipSyncDriverRef.current.reset();
     mouthValueRef.current = 0;
     mouthTargetRef.current = 0;
     audioLevelsGetterRef.current = null;
@@ -637,15 +700,6 @@ export function useLive2D(canvasRef: React.RefObject<HTMLCanvasElement | null>) 
   // ========================================
   // OTHER CONTROLS
   // ========================================
-  const triggerMotion = useCallback((group: string, index?: number) => {
-    const model = modelRef.current;
-    if (!model) return;
-    try {
-      if (index !== undefined) model.motion(group, index, 3);
-      else model.motion(group);
-    } catch {}
-  }, []);
-
   const setViewport = useCallback((zoom: number, framing: "full" | "half", offsetX: number = 0, offsetY: number = 0) => {
     viewportRef.current = { zoom, framing, offsetX, offsetY };
     applyModelLayout();
@@ -688,18 +742,12 @@ export function useLive2D(canvasRef: React.RefObject<HTMLCanvasElement | null>) 
     }
   }, []);
 
-  const getDebug = useCallback((): DebugInfo => {
-    return { ...debugRef.current };
-  }, []);
-
   return {
     loadModel,
     setExpression,
     startLipSync,
     stopLipSync,
-    triggerMotion,
     setViewport,
     setTypingReaction,
-    getDebug,
   };
 }

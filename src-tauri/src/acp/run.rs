@@ -1,22 +1,16 @@
 use std::path::Path;
 use std::sync::Arc;
 
-use agent_client_protocol::util::MatchDispatch;
-use agent_client_protocol::{AcpAgent, Agent, Client, ConnectionTo, SessionMessage};
-
 use agent_client_protocol::schema::v1::{
-    ContentBlock, ContentChunk, InitializeRequest, PermissionOption, PermissionOptionId,
-    PermissionOptionKind, RequestPermissionOutcome, RequestPermissionRequest,
-    RequestPermissionResponse, SelectedPermissionOutcome, SessionNotification, SessionUpdate,
-    StopReason,
+    PermissionOption, PermissionOptionId, PermissionOptionKind,
 };
-use agent_client_protocol::schema::ProtocolVersion;
+use agent_client_protocol::AcpAgent;
 use meuxe_core::config::types::AgentConfig;
 use meuxe_core::memory::MemorySnapshot;
-use tauri::{AppHandle, Emitter};
+use tauri::AppHandle;
 use tokio_util::sync::CancellationToken;
 
-use crate::commands::chat::ChatDoneEvent;
+use crate::acp::manager::dispatch_turn;
 use crate::AppState;
 
 pub struct RunAcpChatStreamParams {
@@ -72,7 +66,7 @@ pub fn pick_companion_permission(options: &[PermissionOption]) -> Option<Permiss
     None
 }
 
-fn write_companion_home_context(
+pub fn write_companion_home_context(
     companion_home: &Path,
     persona_context: &str,
     character_id: &str,
@@ -169,10 +163,25 @@ pub fn render_memory_brief(snapshot: &MemorySnapshot) -> String {
 pub async fn resolve_acp_agent(config: &AgentConfig, data_dir: &Path) -> Result<AcpAgent, String> {
     match config.preset.as_str() {
         "opencode" => {
+            let resolution =
+                crate::commands::agent_setup::resolve_agent(data_dir, "opencode").await;
+            if resolution.source == crate::commands::agent_setup::AgentInstallSource::None {
+                return Err(
+                    "Agent CLI for preset `opencode` is not installed. Open Settings → Agent and click Install."
+                        .into(),
+                );
+            }
             let args = crate::commands::agent_setup::resolve_opencode_argv(data_dir).await;
             AcpAgent::from_args(args).map_err(|e| e.to_string())
         }
         "claude" => {
+            let resolution = crate::commands::agent_setup::resolve_agent(data_dir, "claude").await;
+            if resolution.source == crate::commands::agent_setup::AgentInstallSource::None {
+                return Err(
+                    "Agent CLI for preset `claude` is not installed. Open Settings → Agent and click Install."
+                        .into(),
+                );
+            }
             if let Some(args) = crate::commands::agent_setup::resolve_claude_argv(data_dir).await {
                 AcpAgent::from_args(args).map_err(|e| e.to_string())
             } else {
@@ -180,6 +189,13 @@ pub async fn resolve_acp_agent(config: &AgentConfig, data_dir: &Path) -> Result<
             }
         }
         "codex" => {
+            let resolution = crate::commands::agent_setup::resolve_agent(data_dir, "codex").await;
+            if resolution.source == crate::commands::agent_setup::AgentInstallSource::None {
+                return Err(
+                    "Agent CLI for preset `codex` is not installed. Open Settings → Agent and click Install."
+                        .into(),
+                );
+            }
             if let Some(args) = crate::commands::agent_setup::resolve_codex_argv(data_dir).await {
                 AcpAgent::from_args(args).map_err(|e| e.to_string())
             } else {
@@ -199,268 +215,7 @@ pub async fn resolve_acp_agent(config: &AgentConfig, data_dir: &Path) -> Result<
 }
 
 pub async fn run_acp_chat_stream(params: RunAcpChatStreamParams) -> Result<(), String> {
-    let app = params.app;
-    let state = params.state;
-    let character_id = params.character_id;
-    let user_message = params.user_message;
-    let agent_prompt = params.agent_prompt;
-    let request_id = params.request_id;
-    let cancel = params.cancel;
-    let persona_context = params.persona_context;
-    let memory_snapshot = params.memory_snapshot;
-    let model_id = params.model_id;
-    let tts_config = params.tts_config;
-    let agent_config = params.agent_config;
-
-    let companion_home = companion_home_dir(&state.data_dir);
-    ensure_companion_home(&state.data_dir).map_err(|e| e.to_string())?;
-    write_companion_home_context(
-        &companion_home,
-        &persona_context,
-        &character_id,
-        &memory_snapshot,
-    )
-    .map_err(|e| e.to_string())?;
-
-    if agent_config.preset != "custom" {
-        crate::commands::agent_setup::ensure_agent_installed_globally(
-            &state.data_dir,
-            &agent_config.preset,
-        )
-        .await
-        .map_err(|e| format!("Could not set up agent CLI: {e}"))?;
-    }
-
-    let agent = resolve_acp_agent(&agent_config, &state.data_dir).await?;
-    let user_id = derive_user_id_from_state(&state)?;
-
-    let app_emit = app.clone();
-    let request_id_emit = request_id.clone();
-    let cancel_read = cancel.clone();
-    let state_for_session = state.clone();
-    let character_id_session = character_id.clone();
-    let user_message_session = user_message.clone();
-    let request_id_session = request_id.clone();
-    let model_id_session = model_id.clone();
-    let tts_config_session = tts_config.clone();
-    let agent_prompt_send = agent_prompt.clone();
-    let starting_expression =
-        meuxe_core::expressions::canonical_expression(&memory_snapshot.bond.bond.mood.name);
-
-    Client
-        .builder()
-        .name("meuxe")
-        .on_receive_request(
-            async move |request: RequestPermissionRequest, responder, _connection| {
-                let option_id = pick_companion_permission(&request.options);
-                if let Some(id) = option_id {
-                    responder.respond(RequestPermissionResponse::new(
-                        RequestPermissionOutcome::Selected(SelectedPermissionOutcome::new(id)),
-                    ))?;
-                } else {
-                    responder.respond(RequestPermissionResponse::new(
-                        RequestPermissionOutcome::Cancelled,
-                    ))?;
-                }
-                Ok(())
-            },
-            agent_client_protocol::on_receive_request!(),
-        )
-        .connect_with(agent, move |connection: ConnectionTo<Agent>| {
-            let app = app_emit.clone();
-            let request_id = request_id_emit.clone();
-            let cancel = cancel_read.clone();
-            let state = state_for_session.clone();
-            let model_id = model_id_session.clone();
-            let tts_config = tts_config_session.clone();
-            let character_id = character_id_session.clone();
-            let user_message = user_message_session.clone();
-            let request_id_done = request_id_session.clone();
-            let user_id = user_id.clone();
-            let companion_home = companion_home.clone();
-            let agent_prompt_send = agent_prompt_send.clone();
-            let starting_expression = starting_expression.clone();
-
-            async move {
-                connection
-                    .send_request(InitializeRequest::new(ProtocolVersion::V1))
-                    .block_task()
-                    .await?;
-
-                connection
-                    .build_session(&companion_home)
-                    .block_task()
-                    .run_until(async move |mut session| {
-                        let mut accumulated = String::new();
-                        let mut tts_buffer = String::new();
-                        let mut splitter = meuxe_core::memory::TrailerSplitter::new();
-                        let mut sentence_index = 0u32;
-                        let mut current_expression = starting_expression.clone();
-
-                        session.send_prompt(&agent_prompt_send)?;
-
-                        loop {
-                            if cancel.is_cancelled() {
-                                break;
-                            }
-
-                            let update = tokio::select! {
-                                () = cancel.cancelled() => break,
-                                res = session.read_update() => res?,
-                            };
-
-                            match update {
-                                SessionMessage::SessionMessage(dispatch) => {
-                                    MatchDispatch::new(dispatch)
-                                        .if_notification(async |notif: SessionNotification| {
-                                            if let SessionUpdate::AgentMessageChunk(
-                                                ContentChunk {
-                                                    content: ContentBlock::Text(text),
-                                                    ..
-                                                },
-                                            ) = notif.update
-                                            {
-                                                let chunk = text.text;
-                                                if !chunk.is_empty() {
-                                                    let visible = splitter.feed(&chunk);
-                                                    if !visible.is_empty() {
-                                                        accumulated.push_str(&visible);
-                                                        tts_buffer.push_str(&visible);
-                                                        crate::commands::chat::drain_buffer_sentences(
-                                                            &app,
-                                                            &state,
-                                                            &model_id,
-                                                            &mut current_expression,
-                                                            &tts_config,
-                                                            &request_id,
-                                                            &cancel,
-                                                            &mut sentence_index,
-                                                            &mut tts_buffer,
-                                                            false,
-                                                        );
-                                                        let _ = app.emit(
-                                                            "chat:text-chunk",
-                                                            serde_json::json!({ "text": visible }),
-                                                        );
-                                                    }
-                                                }
-                                            }
-                                            Ok(())
-                                        })
-                                        .await
-                                        .otherwise_ignore()?;
-                                }
-                                SessionMessage::StopReason(reason) => {
-                                    if reason == StopReason::Cancelled {
-                                        return Ok(());
-                                    }
-                                    break;
-                                }
-                                _ => {}
-                            }
-                        }
-
-                        let (rest, mut trailer) = splitter.finish();
-                        if !rest.is_empty() {
-                            accumulated.push_str(&rest);
-                            tts_buffer.push_str(&rest);
-                        }
-
-                        if trailer.is_none() {
-                            if let Some((visible, recovered)) =
-                                meuxe_core::memory::recover_turn_notes_from_reply(&accumulated)
-                            {
-                                if let Some(pos) = tts_buffer.find(&recovered) {
-                                    tts_buffer.truncate(pos);
-                                }
-                                accumulated = visible;
-                                trailer = Some(recovered);
-                            }
-                        }
-
-                        if !accumulated.trim().is_empty() {
-                            crate::commands::chat::drain_buffer_sentences(
-                                &app,
-                                &state,
-                                &model_id,
-                                &mut current_expression,
-                                &tts_config,
-                                &request_id,
-                                &cancel,
-                                &mut sentence_index,
-                                &mut tts_buffer,
-                                true,
-                            );
-                        }
-
-                        let cleaned_response =
-                            crate::commands::chat::clean_text_for_memory(&accumulated);
-
-                        state
-                            .sessions
-                            .append_message(&character_id, &user_id, "user", &user_message, None)
-                            .map_err(|e| {
-                                agent_client_protocol::Error::internal_error().data(e.to_string())
-                            })?;
-                        state
-                            .sessions
-                            .append_message(
-                                &character_id,
-                                &user_id,
-                                "assistant",
-                                &cleaned_response,
-                                None,
-                            )
-                            .map_err(|e| {
-                                agent_client_protocol::Error::internal_error().data(e.to_string())
-                            })?;
-
-                        let notes = trailer
-                            .as_deref()
-                            .and_then(meuxe_core::memory::parse_turn_notes);
-                        let state_update = match state.memory.apply_turn(
-                            &character_id,
-                            &user_id,
-                            &user_message,
-                            notes,
-                        ) {
-                            Ok(snapshot) => serde_json::to_value(&snapshot).unwrap_or_default(),
-                            Err(err) => {
-                                eprintln!("[memory] failed to apply turn: {err}");
-                                serde_json::Value::Null
-                            }
-                        };
-
-                        let _ = app.emit(
-                            "chat:done",
-                            ChatDoneEvent {
-                                request_id: request_id_done,
-                                state_update,
-                            },
-                        );
-
-                        Ok(())
-                    })
-                    .await?;
-
-                Ok(())
-            }
-        })
-        .await
-        .map_err(|e| e.to_string())?;
-
-    Ok(())
-}
-
-fn derive_user_id_from_state(state: &AppState) -> Result<String, String> {
-    let config = state.config.load().map_err(|e| e.to_string())?;
-    if !config.user.id.trim().is_empty() {
-        return Ok(config.user.id.trim().to_string());
-    }
-    if !config.user.name.trim().is_empty() {
-        return Ok(meuxe_core::character::slugify(&config.user.name));
-    }
-    Ok("default-user".to_string())
+    dispatch_turn(Arc::clone(&params.state), params).await
 }
 
 #[cfg(test)]

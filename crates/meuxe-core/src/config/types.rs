@@ -30,6 +30,14 @@ pub struct AgentConfig {
     pub program: String,
     #[serde(default)]
     pub args: Vec<String>,
+    /// When true, tool permission prompts from the agent are approved automatically so the
+    /// companion can help without interruptions. When false, each request is shown in the UI.
+    #[serde(default = "default_true")]
+    pub auto_approve_tools: bool,
+}
+
+fn default_true() -> bool {
+    true
 }
 
 fn default_agent_preset() -> String {
@@ -42,6 +50,7 @@ impl Default for AgentConfig {
             preset: default_agent_preset(),
             program: String::new(),
             args: Vec::new(),
+            auto_approve_tools: true,
         }
     }
 }

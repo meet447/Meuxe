@@ -9,16 +9,14 @@ import {
   resetOnboarding,
   getVoices,
 } from "../api/tauri";
-import { ACP_AGENT_PRESET_IDS } from "../lib/agentPresets";
 import { DEFAULT_TTS_PROVIDER, DEFAULT_TTS_VOICE, TTS_PRESETS_UI } from "../lib/ttsPresets";
-import { AgentPresetCard } from "./agents/AgentPresetCard";
-import { AgentSetupPanel } from "./agents/AgentSetupPanel";
+import { AgentSection } from "./settings/AgentSection";
 import { AvatarViewportSettings } from "./settings/AvatarViewportSettings";
+import { TtsSection } from "./settings/TtsSection";
 import type { AcpAgentPresetId } from "../lib/agentPresets";
 import {
   AsciiAccent,
   Button,
-  ChoiceCard,
   CloseIcon,
   Dots,
   FaceIcon,
@@ -32,7 +30,6 @@ import {
   Notice,
   Pill,
   SectionTitle,
-  Select,
   ShieldIcon,
   SparkIcon,
   SpeakerIcon,
@@ -41,11 +38,7 @@ import {
   UserIcon,
   cn,
 } from "./ui";
-
-interface Voice {
-  id: string;
-  name: string;
-}
+import type { AppConfig, Voice } from "../types";
 
 type SettingsPage = "profile" | "llm" | "tts" | "privacy" | "expressions" | "memory" | "avatar";
 
@@ -99,14 +92,6 @@ const YOU_NAV: NavItem[] = [
   { id: "profile", label: "Profile", icon: UserIcon },
   { id: "privacy", label: "Privacy & data", icon: ShieldIcon },
 ];
-
-function LocalFirstNotice({ needsKey }: { needsKey: boolean }) {
-  return (
-    <Notice tone={needsKey ? "info" : "success"}>
-      Memory and chat stay on this device. Voice and your assistant only use the network when you configure them.
-    </Notice>
-  );
-}
 
 function PrivacyCard({
   title,
@@ -189,10 +174,11 @@ export function Settings({
   onAvatarBackgroundChange?: (bg: string) => void;
 }) {
   const [page, setPage] = useState<SettingsPage>("llm");
-  const [config, setConfig] = useState<any>(null);
+  const [config, setConfig] = useState<AppConfig | null>(null);
   const [voices, setVoices] = useState<Voice[]>([]);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   const isMac = navigator.platform.toUpperCase().includes("MAC");
 
@@ -206,21 +192,22 @@ export function Settings({
   const [agentPreset, setAgentPreset] = useState("opencode");
   const [agentProgram, setAgentProgram] = useState("");
   const [agentArgs, setAgentArgs] = useState("");
+  const [autoApproveTools, setAutoApproveTools] = useState(true);
   const [confirmReset, setConfirmReset] = useState(false);
   const [resetting, setResetting] = useState(false);
   const [resetError, setResetError] = useState<string | null>(null);
   const [resettingOnboarding, setResettingOnboarding] = useState(false);
   const [onboardingResetError, setOnboardingResetError] = useState<string | null>(null);
 
-  const deriveConfigured = (cfg: any) => {
+  const deriveConfigured = (cfg: AppConfig) => {
     const ttsConfigured: Record<string, { configured: boolean; voice: string }> = {};
 
-    if (cfg?.tts_providers) {
-      for (const [id, prov] of Object.entries(cfg.tts_providers as Record<string, any>)) {
-        ttsConfigured[id] = { configured: true, voice: (prov as any).voice || "" };
+    if (cfg.tts_providers) {
+      for (const [id, prov] of Object.entries(cfg.tts_providers)) {
+        ttsConfigured[id] = { configured: true, voice: prov.voice || "" };
       }
     }
-    if (cfg?.tts?.provider) {
+    if (cfg.tts?.provider) {
       ttsConfigured[cfg.tts.provider] = {
         configured: true,
         voice: cfg.tts.voice || "",
@@ -232,7 +219,7 @@ export function Settings({
 
   useEffect(() => {
     getConfig()
-      .then((cfg: any) => {
+      .then((cfg) => {
         setConfig(cfg);
         deriveConfigured(cfg);
 
@@ -244,6 +231,7 @@ export function Settings({
         setAgentPreset(cfg.agent?.preset || "opencode");
         setAgentProgram(cfg.agent?.program || "");
         setAgentArgs((cfg.agent?.args || []).join(" "));
+        setAutoApproveTools(cfg.agent?.auto_approve_tools ?? true);
       })
       .catch((err) => console.error("Failed to load config:", err));
   }, []);
@@ -264,29 +252,34 @@ export function Settings({
 
   const handleSave = async () => {
     setSaving(true);
-    const update: any = {
+    setSaveError(null);
+    const update: Partial<AppConfig> = {
       user: { name: userName, about: userAbout },
       tts: { provider: ttsProvider, voice: ttsVoice },
       agent: {
         preset: agentPreset,
         program: agentProgram,
         args: agentArgs.trim() ? agentArgs.trim().split(/\s+/) : [],
+        auto_approve_tools: autoApproveTools,
       },
     };
-    if (ttsApiKey) update.tts.api_key = ttsApiKey;
+    if (ttsApiKey && update.tts) {
+      update.tts = { ...update.tts, api_key: ttsApiKey };
+    }
     try {
       await saveConfig(update);
 
-      const freshConfig: any = await getConfig();
+      const freshConfig = await getConfig();
       setConfig(freshConfig);
       deriveConfigured(freshConfig);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
     } catch (err) {
       console.error("Failed to save config:", err);
+      setSaveError(err instanceof Error ? err.message : "Failed to save settings. Please try again.");
+    } finally {
+      setSaving(false);
     }
-
-    setSaving(false);
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
   };
 
   const handleResetAll = async () => {
@@ -404,42 +397,22 @@ export function Settings({
     }
 
     if (page === "llm") {
-      const presetId = (agentPreset as AcpAgentPresetId) || "opencode";
       return (
         <div className="space-y-6">
-          <div className="grid grid-cols-1 gap-3">
-            {ACP_AGENT_PRESET_IDS.map((id) => (
-              <AgentPresetCard
-                key={id}
-                id={id}
-                selected={agentPreset === id}
-                onSelect={() => setAgentPreset(id)}
-              />
-            ))}
-          </div>
-
-          {agentPreset === "custom" && (
-            <>
-              <Field label="Command">
-                <Input
-                  type="text"
-                  value={agentProgram}
-                  onChange={(e) => setAgentProgram(e.target.value)}
-                  placeholder="e.g. python my_agent.py"
-                />
-              </Field>
-              <Field label="Arguments (optional)">
-                <Input
-                  type="text"
-                  value={agentArgs}
-                  onChange={(e) => setAgentArgs(e.target.value)}
-                  placeholder="space-separated flags"
-                />
-              </Field>
-            </>
-          )}
-
-          {agentPreset !== "custom" && <AgentSetupPanel preset={presetId} />}
+          <AgentSection
+            value={{
+              preset: (agentPreset as AcpAgentPresetId) || "opencode",
+              program: agentProgram,
+              args: agentArgs,
+              auto_approve_tools: autoApproveTools,
+            }}
+            onChange={(next) => {
+              setAgentPreset(next.preset);
+              setAgentProgram(next.program);
+              setAgentArgs(next.args);
+              setAutoApproveTools(next.auto_approve_tools);
+            }}
+          />
 
           <Button variant="primary" loading={saving} onClick={handleSave}>
             Save agent
@@ -451,58 +424,22 @@ export function Settings({
     if (page === "tts") {
       return (
         <div className="space-y-6">
-          <LocalFirstNotice needsKey={!!SETTINGS_TTS_PRESETS[ttsProvider]?.needs_key} />
-
-          <div>
-            <SectionTitle>Voice service</SectionTitle>
-            <div className="grid gap-2.5 sm:grid-cols-2">
-              {Object.entries(SETTINGS_TTS_PRESETS).map(([id, preset]) => (
-                <ChoiceCard
-                  key={id}
-                  compact
-                  selected={ttsProvider === id}
-                  onClick={() => setTtsProvider(id)}
-                  leading={<SpeakerIcon className="h-5 w-5" />}
-                  title={preset.name}
-                  description={preset.needs_key ? "Needs an API key" : "Built in, no key needed"}
-                  trailing={
-                    configuredTts[id]?.configured && ttsProvider !== id ? (
-                      <Pill tone="sage" size="xs">
-                        Configured
-                      </Pill>
-                    ) : undefined
-                  }
-                />
-              ))}
-            </div>
-          </div>
-
-          {SETTINGS_TTS_PRESETS[ttsProvider]?.needs_key && (
-            <Field label="API key">
-              <Input
-                type="password"
-                value={ttsApiKey}
-                onChange={(e) => setTtsApiKey(e.target.value)}
-                placeholder="Paste your API key (blank to keep current)"
-              />
-            </Field>
-          )}
-
-          {!SETTINGS_TTS_PRESETS[ttsProvider]?.needs_key && (
-            <Notice tone="success">
-              Meuxe TTS is the default — built in and free, with no account or API key needed.
-            </Notice>
-          )}
-
-          <Field label="Voice">
-            <Select value={ttsVoice} onChange={(e) => setTtsVoice(e.target.value)}>
-              {voices.map((v) => (
-                <option key={v.id} value={v.id}>
-                  {v.name}
-                </option>
-              ))}
-            </Select>
-          </Field>
+          <TtsSection
+            value={{
+              provider: ttsProvider,
+              api_key: ttsApiKey,
+              voice: ttsVoice,
+            }}
+            onChange={(next) => {
+              setTtsProvider(next.provider);
+              setTtsApiKey(next.api_key);
+              setTtsVoice(next.voice);
+            }}
+            voices={voices}
+            presets={SETTINGS_TTS_PRESETS}
+            configuredProviders={configuredTts}
+            showLocalFirstNotice
+          />
 
           <Button variant="primary" loading={saving} onClick={handleSave}>
             Save configuration
@@ -592,7 +529,6 @@ export function Settings({
           modelId={modelId}
           onPreviewExpression={onPreviewExpression || (() => {})}
           onSaved={onExpressionsSaved}
-          onClose={() => {}}
         />
       );
     }
@@ -675,7 +611,12 @@ export function Settings({
             </IconButton>
           </header>
 
-          <div className="scrollbar-thin min-h-0 flex-1 overflow-y-auto px-8 pb-8">{renderPageContent()}</div>
+          <div className="scrollbar-thin min-h-0 flex-1 overflow-y-auto px-8 pb-8">
+            {saveError && (
+              <Notice tone="danger" className="mb-4">{saveError}</Notice>
+            )}
+            {renderPageContent()}
+          </div>
         </div>
       </Surface>
     </div>

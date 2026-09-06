@@ -3,13 +3,31 @@ import * as THREE from "three";
 import { ACESFilmicToneMapping, SRGBColorSpace } from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { FBXLoader } from "three/examples/jsm/loaders/FBXLoader.js";
-import { VRMLoaderPlugin, VRM, VRMExpressionPresetName } from "@pixiv/three-vrm";
+import { VRMLoaderPlugin, VRM, VRMExpressionPresetName, VRMUtils } from "@pixiv/three-vrm";
 import { VRMAnimationLoaderPlugin, createVRMAnimationClip } from "@pixiv/three-vrm-animation";
 import { mixamoVRMRigMap } from "../utils/mixamoRigMap";
 import { resolveAssetUrl } from "../api/tauri";
 import { resolveVrmExpressionName } from "../utils/vrmExpressions";
+import {
+  createBlinkScheduler,
+  createLipSyncDriver,
+  speakingHeadSway,
+} from "../utils/avatarAnimation";
 import type { AudioLevels } from "./useAudioAnalyser";
 import type { AnimationInfo } from "../types";
+
+const VRM_BLINK_MIN_MS = 2000;
+const VRM_BLINK_MAX_MS = 6000;
+/** Matches legacy delta * 15 blink ramp (0 → 2 in ~133 ms). */
+const VRM_BLINK_DURATION_MS = 2000 / 15;
+const VRM_LIP_ATTACK = 0.4;
+const VRM_LIP_RELEASE = 0.3;
+const VRM_SPEAK_SWAY = {
+  yFreq: 1.8,
+  yAmp: 0.02,
+  xFreq: 2.3,
+  xAmp: 0.015,
+};
 
 function lerp(a: number, b: number, t: number): number {
   return a + (b - a) * t;
@@ -48,6 +66,8 @@ export function useVRM(canvasRef: React.RefObject<HTMLCanvasElement | null>) {
   const clockRef = useRef<THREE.Clock | null>(null);
   const animFrameRef = useRef<number>(0);
   const animatingRef = useRef(false);
+  const loopGenerationRef = useRef(0);
+  const loadGenerationRef = useRef(0);
   const viewportRef = useRef({
     zoom: 1,
     framing: "full" as "full" | "half",
@@ -65,28 +85,67 @@ export function useVRM(canvasRef: React.RefObject<HTMLCanvasElement | null>) {
   // Lip sync / expression state
   const lipSyncActiveRef = useRef(false);
   const audioLevelsGetterRef = useRef<(() => AudioLevels) | null>(null);
-  const mouthValueRef = useRef(0);
   const speakingRef = useRef(false);
   const speakStartRef = useRef(0);
+  const headBaseRotationRef = useRef<{ x: number; y: number; z: number } | null>(null);
   const currentEmotionRef = useRef("");
+  const blinkSchedulerRef = useRef(
+    createBlinkScheduler({
+      minIntervalMs: VRM_BLINK_MIN_MS,
+      maxIntervalMs: VRM_BLINK_MAX_MS,
+      durationMs: VRM_BLINK_DURATION_MS,
+      doubleBlinkChance: 0.2,
+      doubleBlinkGapMinMs: 150,
+      doubleBlinkGapMaxMs: 250,
+      curve: "triangle",
+    })
+  );
+  const lipSyncDriverRef = useRef(
+    createLipSyncDriver({ attack: VRM_LIP_ATTACK, release: VRM_LIP_RELEASE })
+  );
 
   // Debug cache
   const availableExpressionsRef = useRef<string[]>([]);
   const availableMotionGroupsRef = useRef<string[]>([]);
   const lastErrorRef = useRef("");
 
-  // Blinking
-  const lastBlinkTimeRef = useRef(Date.now());
-  const nextBlinkDelayRef = useRef(2000 + Math.random() * 4000);
-  const blinkValueRef = useRef(0);
-  const blinkClosingRef = useRef(false);
+  const disposeSceneResources = useCallback(() => {
+    // Abort any in-flight loadModel so it never touches the disposed scene/renderer.
+    loadGenerationRef.current += 1;
+    loopGenerationRef.current += 1;
+    animatingRef.current = false;
+    if (animFrameRef.current) {
+      cancelAnimationFrame(animFrameRef.current);
+      animFrameRef.current = 0;
+    }
+
+    if (vrmRef.current) {
+      VRMUtils.deepDispose(vrmRef.current.scene);
+      vrmRef.current.scene.removeFromParent();
+      vrmRef.current = null;
+    }
+
+    if (rendererRef.current) {
+      rendererRef.current.dispose();
+      rendererRef.current = null;
+    }
+
+    sceneRef.current = null;
+    cameraRef.current = null;
+    pivotRef.current = null;
+    clockRef.current = null;
+    mixerRef.current = null;
+    clipsRef.current.clear();
+    currentActionRef.current = null;
+    currentClipNameRef.current = "";
+    headBaseRotationRef.current = null;
+  }, []);
 
   useEffect(() => {
     return () => {
-      animatingRef.current = false;
-      if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
+      disposeSceneResources();
     };
-  }, []);
+  }, [disposeSceneResources]);
 
   const applyViewport = useCallback(() => {
     if (!cameraRef.current) return;
@@ -259,7 +318,11 @@ export function useVRM(canvasRef: React.RefObject<HTMLCanvasElement | null>) {
   );
 
   const startAnimationLoop = useCallback(() => {
-    if (animatingRef.current) return;
+    if (animFrameRef.current) {
+      cancelAnimationFrame(animFrameRef.current);
+      animFrameRef.current = 0;
+    }
+    const generation = ++loopGenerationRef.current;
     animatingRef.current = true;
 
     const TARGET_FPS = 30;
@@ -267,7 +330,7 @@ export function useVRM(canvasRef: React.RefObject<HTMLCanvasElement | null>) {
     let lastFrameTime = 0;
 
     const tick = (timestamp: number) => {
-      if (!animatingRef.current) return;
+      if (!animatingRef.current || loopGenerationRef.current !== generation) return;
 
       const elapsed = timestamp - lastFrameTime;
       if (elapsed < FRAME_INTERVAL) {
@@ -313,35 +376,17 @@ export function useVRM(canvasRef: React.RefObject<HTMLCanvasElement | null>) {
       }
 
       // ========== BLINKING ==========
-      if (!blinkClosingRef.current) {
-        if (now - lastBlinkTimeRef.current > nextBlinkDelayRef.current) {
-          blinkClosingRef.current = true;
-          blinkValueRef.current = 0;
-        }
-      }
-      if (blinkClosingRef.current) {
-        blinkValueRef.current += delta * 15;
-        if (blinkValueRef.current >= 2) {
-          blinkValueRef.current = 0;
-          blinkClosingRef.current = false;
-          lastBlinkTimeRef.current = now;
-          nextBlinkDelayRef.current = Math.random() < 0.2
-            ? 150 + Math.random() * 100
-            : 2000 + Math.random() * 4000;
-        }
-      }
-      const blinkWeight = blinkValueRef.current <= 1
-        ? blinkValueRef.current
-        : 2 - blinkValueRef.current;
+      const blinkWeight = blinkSchedulerRef.current.update(now);
       vrm.expressionManager?.setValue(VRMExpressionPresetName.Blink, blinkWeight);
 
       // ========== LIP SYNC ==========
+      const lipDriver = lipSyncDriverRef.current;
+      const dtMs = delta * 1000;
       if (lipSyncActiveRef.current) {
         const getter = audioLevelsGetterRef.current;
         if (getter) {
           const levels = getter();
-          mouthValueRef.current = lerp(mouthValueRef.current, levels.mouthOpen, 0.4);
-          const mouth = mouthValueRef.current;
+          const mouth = lipDriver.update(levels.mouthOpen, dtMs);
           const form = levels.mouthForm;
 
           vrm.expressionManager?.setValue(VRMExpressionPresetName.Aa, Math.min(1, mouth * Math.max(0, 1 - Math.abs(form)) * 0.8));
@@ -354,13 +399,22 @@ export function useVRM(canvasRef: React.RefObject<HTMLCanvasElement | null>) {
         if (speakingRef.current) {
           const head = vrm.humanoid?.getNormalizedBoneNode("head");
           if (head) {
+            if (!headBaseRotationRef.current) {
+              headBaseRotationRef.current = {
+                x: head.rotation.x,
+                y: head.rotation.y,
+                z: head.rotation.z,
+              };
+            }
             const elapsed = (now - speakStartRef.current) / 1000;
-            head.rotation.y += Math.sin(elapsed * 1.8) * 0.02;
-            head.rotation.x += Math.sin(elapsed * 2.3) * 0.015;
+            const base = headBaseRotationRef.current;
+            const sway = speakingHeadSway(elapsed, VRM_SPEAK_SWAY);
+            head.rotation.y = base.y + sway.y;
+            head.rotation.x = base.x + sway.x;
           }
         }
       } else {
-        mouthValueRef.current = lerp(mouthValueRef.current, 0, 0.3);
+        lipDriver.update(0, dtMs);
         vrm.expressionManager?.setValue(VRMExpressionPresetName.Aa, 0);
         vrm.expressionManager?.setValue(VRMExpressionPresetName.Oh, 0);
         vrm.expressionManager?.setValue(VRMExpressionPresetName.Ee, 0);
@@ -406,7 +460,10 @@ export function useVRM(canvasRef: React.RefObject<HTMLCanvasElement | null>) {
     async (modelPath: string, animations?: AnimationInfo[]) => {
       if (!canvasRef.current) return;
 
-      // Stop animation
+      const generation = ++loadGenerationRef.current;
+
+      // Stop animation (invalidate any in-flight RAF loop)
+      loopGenerationRef.current += 1;
       animatingRef.current = false;
       if (animFrameRef.current) {
         cancelAnimationFrame(animFrameRef.current);
@@ -414,8 +471,8 @@ export function useVRM(canvasRef: React.RefObject<HTMLCanvasElement | null>) {
       }
 
       lastErrorRef.current = "";
-      // Clean up previous
       if (vrmRef.current) {
+        VRMUtils.deepDispose(vrmRef.current.scene);
         vrmRef.current.scene.removeFromParent();
         vrmRef.current = null;
       }
@@ -423,7 +480,10 @@ export function useVRM(canvasRef: React.RefObject<HTMLCanvasElement | null>) {
       clipsRef.current.clear();
       currentActionRef.current = null;
       currentClipNameRef.current = "";
+      headBaseRotationRef.current = null;
       currentEmotionRef.current = "";
+      blinkSchedulerRef.current.reset(Date.now());
+      lipSyncDriverRef.current.reset();
 
       // Create renderer once
       if (!rendererRef.current) {
@@ -487,6 +547,13 @@ export function useVRM(canvasRef: React.RefObject<HTMLCanvasElement | null>) {
         const gltf = await gltfLoader.loadAsync(cacheBust);
         const vrm = gltf.userData.vrm as VRM;
 
+        if (generation !== loadGenerationRef.current) {
+          if (vrm) {
+            VRMUtils.deepDispose(vrm.scene);
+          }
+          return;
+        }
+
         if (!vrm || !sceneRef.current || !rendererRef.current) {
           console.error("[VRM] Failed to load: scene or renderer destroyed");
           return;
@@ -545,6 +612,13 @@ export function useVRM(canvasRef: React.RefObject<HTMLCanvasElement | null>) {
           if (!currentActionRef.current && clipsRef.current.size > 0) {
             playAnimation(clipsRef.current.keys().next().value!);
           }
+        }
+
+        if (generation !== loadGenerationRef.current) {
+          VRMUtils.deepDispose(vrm.scene);
+          vrm.scene.removeFromParent();
+          vrmRef.current = null;
+          return;
         }
 
         clockRef.current = new THREE.Clock();
@@ -625,6 +699,7 @@ export function useVRM(canvasRef: React.RefObject<HTMLCanvasElement | null>) {
     lipSyncActiveRef.current = true;
     speakingRef.current = true;
     speakStartRef.current = Date.now();
+    headBaseRotationRef.current = null;
     if (getAudioLevels) audioLevelsGetterRef.current = getAudioLevels;
 
     // Play talking animation if available
@@ -640,7 +715,15 @@ export function useVRM(canvasRef: React.RefObject<HTMLCanvasElement | null>) {
     lipSyncActiveRef.current = false;
     speakingRef.current = false;
     audioLevelsGetterRef.current = null;
-    mouthValueRef.current = 0;
+    lipSyncDriverRef.current.reset();
+
+    const head = vrmRef.current?.humanoid?.getNormalizedBoneNode("head");
+    if (head && headBaseRotationRef.current) {
+      head.rotation.x = headBaseRotationRef.current.x;
+      head.rotation.y = headBaseRotationRef.current.y;
+      head.rotation.z = headBaseRotationRef.current.z;
+    }
+    headBaseRotationRef.current = null;
 
     // Return to idle animation
     const idleNames = ["idle", "breathingidle", "breathing_idle", "standing", "default"];
@@ -666,30 +749,13 @@ export function useVRM(canvasRef: React.RefObject<HTMLCanvasElement | null>) {
     // Handled by the animation system: no manual bone manipulation needed
   }, []);
 
-  const triggerMotion = useCallback((_group: string, _index?: number) => {}, []);
-
-  const getDebug = useCallback(() => ({
-    modelLoaded: !!vrmRef.current,
-    currentEmotion: "",
-    expressionId: "",
-    motionPlaying: currentClipNameRef.current,
-    lipSyncActive: lipSyncActiveRef.current,
-    mouthValue: Math.round(mouthValueRef.current * 100) / 100,
-    mappingEmotions: [],
-    availableExpressions: availableExpressionsRef.current,
-    availableMotionGroups: availableMotionGroupsRef.current,
-    lastError: lastErrorRef.current,
-  }), []);
-
   return {
     loadModel,
     setExpression,
     startLipSync,
     stopLipSync,
-    triggerMotion,
     setViewport,
     setTypingReaction,
-    getDebug,
     handlePointerDown,
     handlePointerMove,
     handlePointerUp: endPointerDrag,

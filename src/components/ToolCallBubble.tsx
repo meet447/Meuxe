@@ -22,13 +22,6 @@ import {
   type IconProps,
 } from "./ui";
 
-interface ConfirmRequest {
-  requestId: string;
-  toolName: string;
-  arguments: Record<string, unknown>;
-  description: string;
-}
-
 type IconComponent = ComponentType<IconProps>;
 
 const TOOL_META: Record<string, { icon: IconComponent; label: string }> = {
@@ -116,7 +109,7 @@ export const ToolCallBubble = memo(function ToolCallBubble({
   onConfirm,
 }: {
   call: ToolCallStatus;
-  onConfirm?: (requestId: string, approved: boolean) => void;
+  onConfirm?: (permissionId: string, approved: boolean) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
   const meta = resolveToolMeta(call.toolName);
@@ -130,8 +123,10 @@ export const ToolCallBubble = memo(function ToolCallBubble({
       <div
         className={`w-full max-w-[90%] overflow-hidden rounded-card shadow-soft ${statusCfg.bg} transition-colors`}
       >
-        <div
-          className="flex items-center gap-2.5 px-3.5 py-2.5 cursor-pointer select-none hover:bg-black/[0.02] transition-colors"
+        <button
+          type="button"
+          aria-expanded={expanded}
+          className="flex w-full items-center gap-2.5 px-3.5 py-2.5 cursor-pointer select-none hover:bg-black/[0.02] transition-colors text-left"
           onClick={() => hasResult && setExpanded(!expanded)}
         >
           <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-[9px] bg-well text-ink-2">
@@ -149,7 +144,7 @@ export const ToolCallBubble = memo(function ToolCallBubble({
               className={`h-4 w-4 shrink-0 text-ink-4 transition-transform ${expanded ? "rotate-180" : ""}`}
             />
           )}
-        </div>
+        </button>
 
         {expanded && hasResult && (
           <div className="px-3.5 pb-3">
@@ -161,12 +156,12 @@ export const ToolCallBubble = memo(function ToolCallBubble({
           </div>
         )}
 
-        {call.status === "awaiting_confirmation" && onConfirm && (
+        {call.status === "awaiting_confirmation" && onConfirm && call.permissionId && (
           <div className="flex gap-2 px-3.5 pb-3">
-            <Button size="sm" variant="primary" className="flex-1" onClick={() => onConfirm(call.requestId, true)}>
+            <Button size="sm" variant="primary" className="flex-1" onClick={() => onConfirm(call.permissionId!, true)}>
               Allow
             </Button>
-            <Button size="sm" variant="secondary" className="flex-1" onClick={() => onConfirm(call.requestId, false)}>
+            <Button size="sm" variant="secondary" className="flex-1" onClick={() => onConfirm(call.permissionId!, false)}>
               Deny
             </Button>
           </div>
@@ -198,5 +193,4 @@ function ToolCallLabel({
   );
 }
 
-export type { ConfirmRequest };
 export type { ToolCallStatus } from "../types";

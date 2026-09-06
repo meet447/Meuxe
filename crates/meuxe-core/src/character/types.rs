@@ -50,20 +50,7 @@ pub struct CharacterYaml {
     pub default_emotion: Option<String>,
 }
 
-pub const DEFAULT_EXPRESSIONS: &[&str] = &[
-    "neutral",
-    "happy",
-    "sad",
-    "angry",
-    "surprised",
-    "excited",
-    "embarrassed",
-    "thinking",
-    "blush",
-    "smirk",
-    "scared",
-    "disgusted",
-];
+pub use crate::expressions::GLOBAL_EXPRESSIONS as DEFAULT_EXPRESSIONS;
 
 pub const VRM_EXPRESSIONS: &[&str] = &["happy", "angry", "sad", "relaxed", "surprised"];
 
