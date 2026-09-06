@@ -9,16 +9,14 @@ import {
   resetOnboarding,
   getVoices,
 } from "../api/tauri";
-import { ACP_AGENT_PRESET_IDS } from "../lib/agentPresets";
 import { DEFAULT_TTS_PROVIDER, DEFAULT_TTS_VOICE, TTS_PRESETS_UI } from "../lib/ttsPresets";
-import { AgentPresetCard } from "./agents/AgentPresetCard";
-import { AgentSetupPanel } from "./agents/AgentSetupPanel";
+import { AgentSection } from "./settings/AgentSection";
 import { AvatarViewportSettings } from "./settings/AvatarViewportSettings";
+import { TtsSection } from "./settings/TtsSection";
 import type { AcpAgentPresetId } from "../lib/agentPresets";
 import {
   AsciiAccent,
   Button,
-  ChoiceCard,
   CloseIcon,
   Dots,
   FaceIcon,
@@ -32,10 +30,8 @@ import {
   Notice,
   Pill,
   SectionTitle,
-  Select,
   ShieldIcon,
   SparkIcon,
-  SpeakerIcon,
   Surface,
   Textarea,
   UserIcon,
@@ -95,14 +91,6 @@ const YOU_NAV: NavItem[] = [
   { id: "profile", label: "Profile", icon: UserIcon },
   { id: "privacy", label: "Privacy & data", icon: ShieldIcon },
 ];
-
-function LocalFirstNotice({ needsKey }: { needsKey: boolean }) {
-  return (
-    <Notice tone={needsKey ? "info" : "success"}>
-      Memory and chat stay on this device. Voice and your assistant only use the network when you configure them.
-    </Notice>
-  );
-}
 
 function PrivacyCard({
   title,
@@ -408,64 +396,22 @@ export function Settings({
     }
 
     if (page === "llm") {
-      const presetId = (agentPreset as AcpAgentPresetId) || "opencode";
       return (
         <div className="space-y-6">
-          <div className="grid grid-cols-1 gap-3">
-            {ACP_AGENT_PRESET_IDS.map((id) => (
-              <AgentPresetCard
-                key={id}
-                id={id}
-                selected={agentPreset === id}
-                onSelect={() => setAgentPreset(id)}
-              />
-            ))}
-          </div>
-
-          {agentPreset === "custom" && (
-            <>
-              <Field label="Command">
-                <Input
-                  type="text"
-                  value={agentProgram}
-                  onChange={(e) => setAgentProgram(e.target.value)}
-                  placeholder="e.g. python my_agent.py"
-                />
-              </Field>
-              <Field label="Arguments (optional)">
-                <Input
-                  type="text"
-                  value={agentArgs}
-                  onChange={(e) => setAgentArgs(e.target.value)}
-                  placeholder="space-separated flags"
-                />
-              </Field>
-            </>
-          )}
-
-          {agentPreset !== "custom" && <AgentSetupPanel preset={presetId} />}
-
-          <Field
-            label="Tool permissions"
-            hint="Agents ask before reading files or running commands. Choose whether Meuxe answers for you."
-          >
-            <div className="grid gap-2 sm:grid-cols-2">
-              <ChoiceCard
-                compact
-                selected={autoApproveTools}
-                onClick={() => setAutoApproveTools(true)}
-                title="Allow automatically"
-                description="Smoother chats; the companion can help without interruptions."
-              />
-              <ChoiceCard
-                compact
-                selected={!autoApproveTools}
-                onClick={() => setAutoApproveTools(false)}
-                title="Ask me each time"
-                description="Every tool request shows an Allow / Deny prompt in the chat."
-              />
-            </div>
-          </Field>
+          <AgentSection
+            value={{
+              preset: (agentPreset as AcpAgentPresetId) || "opencode",
+              program: agentProgram,
+              args: agentArgs,
+              auto_approve_tools: autoApproveTools,
+            }}
+            onChange={(next) => {
+              setAgentPreset(next.preset);
+              setAgentProgram(next.program);
+              setAgentArgs(next.args);
+              setAutoApproveTools(next.auto_approve_tools);
+            }}
+          />
 
           <Button variant="primary" loading={saving} onClick={handleSave}>
             Save agent
@@ -477,58 +423,22 @@ export function Settings({
     if (page === "tts") {
       return (
         <div className="space-y-6">
-          <LocalFirstNotice needsKey={!!SETTINGS_TTS_PRESETS[ttsProvider]?.needs_key} />
-
-          <div>
-            <SectionTitle>Voice service</SectionTitle>
-            <div className="grid gap-2.5 sm:grid-cols-2">
-              {Object.entries(SETTINGS_TTS_PRESETS).map(([id, preset]) => (
-                <ChoiceCard
-                  key={id}
-                  compact
-                  selected={ttsProvider === id}
-                  onClick={() => setTtsProvider(id)}
-                  leading={<SpeakerIcon className="h-5 w-5" />}
-                  title={preset.name}
-                  description={preset.needs_key ? "Needs an API key" : "Built in, no key needed"}
-                  trailing={
-                    configuredTts[id]?.configured && ttsProvider !== id ? (
-                      <Pill tone="sage" size="xs">
-                        Configured
-                      </Pill>
-                    ) : undefined
-                  }
-                />
-              ))}
-            </div>
-          </div>
-
-          {SETTINGS_TTS_PRESETS[ttsProvider]?.needs_key && (
-            <Field label="API key">
-              <Input
-                type="password"
-                value={ttsApiKey}
-                onChange={(e) => setTtsApiKey(e.target.value)}
-                placeholder="Paste your API key (blank to keep current)"
-              />
-            </Field>
-          )}
-
-          {!SETTINGS_TTS_PRESETS[ttsProvider]?.needs_key && (
-            <Notice tone="success">
-              Meuxe TTS is the default — built in and free, with no account or API key needed.
-            </Notice>
-          )}
-
-          <Field label="Voice">
-            <Select value={ttsVoice} onChange={(e) => setTtsVoice(e.target.value)}>
-              {voices.map((v) => (
-                <option key={v.id} value={v.id}>
-                  {v.name}
-                </option>
-              ))}
-            </Select>
-          </Field>
+          <TtsSection
+            value={{
+              provider: ttsProvider,
+              api_key: ttsApiKey,
+              voice: ttsVoice,
+            }}
+            onChange={(next) => {
+              setTtsProvider(next.provider);
+              setTtsApiKey(next.api_key);
+              setTtsVoice(next.voice);
+            }}
+            voices={voices}
+            presets={SETTINGS_TTS_PRESETS}
+            configuredProviders={configuredTts}
+            showLocalFirstNotice
+          />
 
           <Button variant="primary" loading={saving} onClick={handleSave}>
             Save configuration

@@ -11,7 +11,7 @@ import { COMPANION_VIBE_PACKS } from "../lib/companionVibes";
 import { DEFAULT_TTS_VOICE } from "../lib/ttsPresets";
 import type { AppConfig, ModelInfo } from "../types";
 import { CompanionAvatarPreview } from "./onboarding/CompanionAvatarPreview";
-import { ModelPicker } from "./onboarding/ModelPicker";
+import { ModelPicker } from "./settings/ModelPicker";
 import {
   Button,
   ChevronDownIcon,

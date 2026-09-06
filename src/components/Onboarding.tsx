@@ -8,17 +8,14 @@ import {
   installAgentSetup,
   type AgentSetupStatusResponse,
 } from "../api/tauri";
-import {
-  ACP_AGENT_PRESET_IDS,
-  type AcpAgentPresetId,
-} from "../lib/agentPresets";
+import type { AcpAgentPresetId } from "../lib/agentPresets";
 import { COMPANION_VIBE_PACKS } from "../lib/companionVibes";
 import { buildCompanionPersonalityDraft } from "../lib/companionCharacterDraft";
 import { DEFAULT_TTS_PROVIDER, DEFAULT_TTS_VOICE, TTS_PRESETS_UI } from "../lib/ttsPresets";
-import { AgentPresetCard } from "./agents/AgentPresetCard";
-import { AgentSetupPanel } from "./agents/AgentSetupPanel";
+import { AgentSection } from "./settings/AgentSection";
+import { TtsSection } from "./settings/TtsSection";
 import { CompanionAvatarPreview } from "./onboarding/CompanionAvatarPreview";
-import { ModelPicker } from "./onboarding/ModelPicker";
+import { ModelPicker } from "./settings/ModelPicker";
 import { OnboardingShell } from "./onboarding/OnboardingShell";
 import {
   BackIcon,
@@ -31,10 +28,7 @@ import {
   Input,
   LockIcon,
   Notice,
-  PlayIcon,
-  Select,
   SparkIcon,
-  SpeakerIcon,
   Textarea,
   VibeGlyph,
 } from "./ui";
@@ -47,6 +41,7 @@ interface FormData {
     preset: AcpAgentPresetId;
     program: string;
     args: string;
+    auto_approve_tools: boolean;
   };
   tts: { provider: string; api_key: string; voice: string };
   companion: {
@@ -81,7 +76,7 @@ export function Onboarding({ onComplete }: { onComplete: () => void }) {
 
   const [form, setForm] = useState<FormData>({
     user: { name: "", about: "" },
-    agent: { preset: "opencode", program: "", args: "" },
+    agent: { preset: "opencode", program: "", args: "", auto_approve_tools: true },
     tts: { provider: DEFAULT_TTS_PROVIDER, api_key: "", voice: DEFAULT_TTS_VOICE },
     companion: {
       name: "",
@@ -304,6 +299,7 @@ export function Onboarding({ onComplete }: { onComplete: () => void }) {
           preset: form.agent.preset,
           program: form.agent.program,
           args: form.agent.args.trim() ? form.agent.args.trim().split(/\s+/) : [],
+          auto_approve_tools: form.agent.auto_approve_tools,
         },
         tts: {
           provider: form.tts.provider,
@@ -443,118 +439,26 @@ export function Onboarding({ onComplete }: { onComplete: () => void }) {
       )}
 
       {step === 3 && (
-        <>
-          <Notice tone="success" className="mb-4">
-            Meuxe TTS is built in and free — ready to use with no API key. ElevenLabs and OpenAI are optional if you want studio voices.
-          </Notice>
-
-          <div className="mb-4 grid grid-cols-1 gap-2.5 sm:grid-cols-3">
-            {Object.entries(ttsPresets).map(([id, preset]) => (
-              <ChoiceCard
-                key={id}
-                selected={form.tts.provider === id}
-                onClick={() => updateForm("tts", "provider", id)}
-                leading={<SpeakerIcon />}
-                title={preset.name}
-                description={preset.hint}
-                compact
-              />
-            ))}
-          </div>
-
-          {ttsPresets[form.tts.provider]?.needs_key && (
-            <Field label="API key">
-              <Input
-                type="password"
-                value={form.tts.api_key}
-                onChange={(e) => updateForm("tts", "api_key", e.target.value)}
-                placeholder="Paste key from your voice service"
-              />
-            </Field>
-          )}
-
-          <Field label="Voice" error={previewError || undefined} className="mb-0">
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-start">
-              <Select
-                wrapperClassName="flex-1"
-                value={form.tts.voice}
-                onChange={(e) => updateForm("tts", "voice", e.target.value)}
-              >
-                {voices.map((v) => (
-                  <option key={v.id} value={v.id}>{v.name}</option>
-                ))}
-              </Select>
-              <Button
-                variant="soft"
-                leading={<PlayIcon className="h-4 w-4" />}
-                loading={previewing}
-                onClick={playSample}
-                className="shrink-0"
-              >
-                Listen
-              </Button>
-            </div>
-          </Field>
-        </>
+        <TtsSection
+          value={form.tts}
+          onChange={(next) => setForm((prev) => ({ ...prev, tts: next }))}
+          voices={voices}
+          presets={ttsPresets}
+          onPreview={playSample}
+          previewLoading={previewing}
+          previewError={previewError}
+          showBuiltInNotice
+          compactGrid
+        />
       )}
 
       {step === 4 && (
-        <>
-          <div className="mb-4 grid grid-cols-1 gap-3">
-            {ACP_AGENT_PRESET_IDS.map((id) => (
-              <AgentPresetCard
-                key={id}
-                id={id}
-                selected={form.agent.preset === id}
-                onSelect={() =>
-                  setForm((prev) => ({
-                    ...prev,
-                    agent: { ...prev.agent, preset: id },
-                  }))
-                }
-              />
-            ))}
-          </div>
-
-          {form.agent.preset === "custom" && (
-            <>
-              <Field label="Program to run">
-                <Input
-                  type="text"
-                  value={form.agent.program}
-                  onChange={(e) =>
-                    setForm((prev) => ({
-                      ...prev,
-                      agent: { ...prev.agent, program: e.target.value },
-                    }))
-                  }
-                  placeholder="Path or command"
-                />
-              </Field>
-              <Field label="Extra options" optional>
-                <Input
-                  type="text"
-                  value={form.agent.args}
-                  onChange={(e) =>
-                    setForm((prev) => ({
-                      ...prev,
-                      agent: { ...prev.agent, args: e.target.value },
-                    }))
-                  }
-                  placeholder="Optional flags"
-                />
-              </Field>
-            </>
-          )}
-
-          {form.agent.preset !== "custom" && (
-            <AgentSetupPanel
-              preset={form.agent.preset}
-              onStatusChange={handleAgentSetupStatus}
-              friendly
-            />
-          )}
-        </>
+        <AgentSection
+          value={form.agent}
+          onChange={(next) => setForm((prev) => ({ ...prev, agent: next }))}
+          onAgentSetupStatus={handleAgentSetupStatus}
+          friendly
+        />
       )}
 
       {agentSetupWarning && (
