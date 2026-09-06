@@ -137,6 +137,16 @@ describe('tauri api utilities', () => {
       expect(invoke).toHaveBeenCalledWith('chat_clear', { characterId: 'char-1' });
     });
 
+    it('cancelChat calls chat_cancel', async () => {
+      await tauriApi.cancelChat();
+      expect(invoke).toHaveBeenCalledWith('chat_cancel');
+    });
+
+    it('confirmToolCall calls chat_tool_confirm', async () => {
+      await tauriApi.confirmToolCall('perm-1', true);
+      expect(invoke).toHaveBeenCalledWith('chat_tool_confirm', { permissionId: 'perm-1', approved: true });
+    });
+
     it('transcribeVoice calls voice_transcribe', async () => {
       await tauriApi.transcribeVoice('base64audio', 'audio/webm');
       expect(invoke).toHaveBeenCalledWith('voice_transcribe', { audioBase64: 'base64audio', mimeType: 'audio/webm' });

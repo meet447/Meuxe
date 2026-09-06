@@ -123,6 +123,14 @@ export async function sendChat(characterId: string, message: string, requestId: 
   return invoke("chat_send", { characterId, message, requestId });
 }
 
+export async function cancelChat() {
+  return invoke("chat_cancel");
+}
+
+export async function confirmToolCall(permissionId: string, approved: boolean) {
+  return invoke("chat_tool_confirm", { permissionId, approved });
+}
+
 export async function getChatHistory(characterId: string) {
   return invoke<unknown[]>("chat_history", { characterId });
 }

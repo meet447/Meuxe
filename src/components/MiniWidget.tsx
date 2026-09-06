@@ -25,7 +25,8 @@ interface MiniWidgetProps {
   toolCalls: ToolCallStatus[];
   onSend: (text: string) => void;
   onMicToggle: () => void;
-  onToolConfirm: (requestId: string, approved: boolean) => void;
+  onToolConfirm: (permissionId: string, approved: boolean) => void;
+  onCancel?: () => void;
   pendingConfirmation: boolean;
   openComposerTrigger?: number; // increment to open composer from outside
 }
@@ -49,6 +50,7 @@ export function MiniWidget({
   onSend,
   onMicToggle,
   onToolConfirm,
+  onCancel,
   pendingConfirmation,
   openComposerTrigger = 0,
 }: MiniWidgetProps) {
@@ -232,7 +234,7 @@ export function MiniWidget({
                 size="sm"
                 variant="primary"
                 className="flex-1"
-                onClick={() => onToolConfirm(pendingTool.requestId, true)}
+                onClick={() => onToolConfirm(pendingTool.permissionId!, true)}
               >
                 Allow
               </Button>
@@ -240,7 +242,7 @@ export function MiniWidget({
                 size="sm"
                 variant="secondary"
                 className="flex-1"
-                onClick={() => onToolConfirm(pendingTool.requestId, false)}
+                onClick={() => onToolConfirm(pendingTool.permissionId!, false)}
               >
                 Deny
               </Button>
@@ -299,13 +301,22 @@ export function MiniWidget({
               disabled={isStreaming}
             />
             <button
-              type="submit"
-              disabled={!input.trim() || isStreaming}
-              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-ink text-white transition hover:bg-ink-2 disabled:opacity-30"
-              title="Send"
+              type={isStreaming && onCancel ? "button" : "submit"}
+              onClick={isStreaming && onCancel ? onCancel : undefined}
+              disabled={isStreaming ? false : !input.trim()}
+              className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full transition ${
+                isStreaming && onCancel
+                  ? "bg-clay-500 text-white hover:bg-clay-600"
+                  : "bg-ink text-white hover:bg-ink-2 disabled:opacity-30"
+              }`}
+              title={isStreaming && onCancel ? "Stop" : "Send"}
             >
               {isStreaming ? (
-                <Spinner />
+                onCancel ? (
+                  <span className="block h-3 w-3 rounded-[2px] bg-white" />
+                ) : (
+                  <Spinner />
+                )
               ) : (
                 <SendIcon className="h-4 w-4" strokeWidth={2} />
               )}

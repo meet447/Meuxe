@@ -150,6 +150,7 @@ function App() {
     setOnError,
     toolCalls,
     handleConfirm,
+    cancel,
   } = useChat();
   const { listening, startListening, stopListening } = useVoice();
   const {
@@ -527,6 +528,7 @@ function App() {
         onSend={handleSend}
         onMicToggle={handleMicToggle}
         onToolConfirm={handleConfirm}
+        onCancel={cancel}
         pendingConfirmation={pendingToolConfirm !== null}
         openComposerTrigger={miniComposerTrigger}
       />
@@ -643,7 +645,9 @@ function App() {
             <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20 flex flex-col items-center px-4 pb-6 pt-16">
               <FloatingChatInput
                 isProcessing={isStreaming}
+                isStreaming={isStreaming}
                 onSend={handleSend}
+                onCancel={cancel}
                 onTypingChange={handleTypingChange}
                 listening={listening}
                 onMicToggle={handleMicToggle}
@@ -674,6 +678,7 @@ function App() {
             listening={listening}
             onMicToggle={handleMicToggle}
             onToolConfirm={handleConfirm}
+            onCancel={cancel}
           />
         </HistoryDrawer>
       )}

@@ -15,8 +15,11 @@ export interface ChatMessage {
 
 export interface ToolCallStatus {
   requestId: string;
+  toolCallId: string;
+  permissionId?: string;
   toolName: string;
   arguments: Record<string, unknown>;
+  description?: string;
   status: "running" | "completed" | "failed" | "awaiting_confirmation";
   result?: string;
 }

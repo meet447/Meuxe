@@ -24,7 +24,8 @@ interface Props {
   onMicToggle: () => void;
   ttsLoading?: boolean;
   speaking?: boolean;
-  onToolConfirm?: (requestId: string, approved: boolean) => void;
+  onToolConfirm?: (permissionId: string, approved: boolean) => void;
+  onCancel?: () => void;
   inputRef?: React.RefObject<HTMLInputElement | null>;
   /** Timeline only: for sidebar layout with external input bar */
   hideInput?: boolean;
@@ -177,7 +178,9 @@ const MessageBubble = memo(function MessageBubble({
 // This prevents O(N) re-renders of all MessageBubble and ToolCallBubble components on every keystroke.
 const ChatInput = memo(function ChatInput({
   isProcessing,
+  isStreaming,
   onSend,
+  onCancel,
   onTypingChange,
   listening,
   onMicToggle,
@@ -185,7 +188,9 @@ const ChatInput = memo(function ChatInput({
   floating = false,
 }: {
   isProcessing: boolean;
+  isStreaming?: boolean;
   onSend: (text: string) => void;
+  onCancel?: () => void;
   onTypingChange: (isTyping: boolean) => void;
   listening: boolean;
   onMicToggle: () => void;
@@ -246,11 +251,19 @@ const ChatInput = memo(function ChatInput({
           disabled={isProcessing}
         />
         <button
-          type="submit"
-          disabled={isProcessing || !input.trim()}
-          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-ink text-white transition hover:bg-ink-2 disabled:opacity-30"
+          type={isStreaming && onCancel ? "button" : "submit"}
+          onClick={isStreaming && onCancel ? onCancel : undefined}
+          disabled={isStreaming ? false : isProcessing || !input.trim()}
+          className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full transition ${
+            isStreaming && onCancel
+              ? "bg-clay-500 text-white hover:bg-clay-600"
+              : "bg-ink text-white hover:bg-ink-2 disabled:opacity-30"
+          }`}
+          title={isStreaming && onCancel ? "Stop" : "Send"}
         >
-          {isProcessing ? (
+          {isStreaming && onCancel ? (
+            <span className="block h-3 w-3 rounded-[2px] bg-white" />
+          ) : isProcessing ? (
             <Spinner />
           ) : (
             <SendIcon className="h-4 w-4" strokeWidth={2} />
@@ -283,6 +296,7 @@ export function ChatPanel({
   ttsLoading = false,
   speaking = false,
   onToolConfirm,
+  onCancel,
   inputRef: externalInputRef,
   hideInput = false,
   appearance = "light",
@@ -423,7 +437,9 @@ export function ChatPanel({
       {!hideInput && (
         <ChatInput
           isProcessing={isProcessing}
+          isStreaming={loading}
           onSend={onSend}
+          onCancel={onCancel}
           onTypingChange={onTypingChange}
           listening={listening}
           onMicToggle={onMicToggle}

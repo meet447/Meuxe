@@ -5,7 +5,9 @@ import { MicButton } from "../MicButton";
 
 type Props = {
   isProcessing: boolean;
+  isStreaming?: boolean;
   onSend: (text: string) => void;
+  onCancel?: () => void;
   onTypingChange: (isTyping: boolean) => void;
   listening: boolean;
   onMicToggle: () => void;
@@ -17,7 +19,9 @@ type Props = {
 
 export const FloatingChatInput = memo(function FloatingChatInput({
   isProcessing,
+  isStreaming,
   onSend,
+  onCancel,
   onTypingChange,
   listening,
   onMicToggle,
@@ -85,12 +89,19 @@ export const FloatingChatInput = memo(function FloatingChatInput({
           className="companion-chat-input min-w-0 flex-1 bg-transparent px-2 py-2.5 text-[15px] text-ink outline-none placeholder:text-ink-4 focus:outline-none focus-visible:outline-none disabled:opacity-50"
         />
         <button
-          type="submit"
-          disabled={isProcessing || !input.trim()}
-          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-ink text-white transition-all hover:bg-ink-2 disabled:opacity-30"
-          title="Send"
+          type={isStreaming && onCancel ? "button" : "submit"}
+          onClick={isStreaming && onCancel ? onCancel : undefined}
+          disabled={isStreaming ? false : isProcessing || !input.trim()}
+          className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full transition-all ${
+            isStreaming && onCancel
+              ? "bg-clay-500 text-white hover:bg-clay-600"
+              : "bg-ink text-white hover:bg-ink-2 disabled:opacity-30"
+          }`}
+          title={isStreaming && onCancel ? "Stop" : "Send"}
         >
-          {isProcessing ? (
+          {isStreaming && onCancel ? (
+            <span className="block h-3 w-3 rounded-[2px] bg-white" />
+          ) : isProcessing ? (
             <Spinner className="h-4 w-4 border-white/40 border-t-white" />
           ) : (
             <SendIcon className="h-4 w-4" strokeWidth={2} />
