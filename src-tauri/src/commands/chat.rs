@@ -822,23 +822,16 @@ mod tests {
 pub fn chat_history(
     state: State<Arc<AppState>>,
     character_id: String,
-) -> Result<Vec<serde_json::Value>, String> {
+) -> Result<Vec<meuxe_core::session::SessionMessage>, String> {
     require_id(&character_id)?;
 
     let config = state.config.load().map_err(|e| e.to_string())?;
     let user_id = derive_user_id(&config);
 
-    let history = state
+    state
         .sessions
         .load_history(&character_id, &user_id, Some(50))
-        .map_err(|e| e.to_string())?;
-
-    let values: Vec<serde_json::Value> = history
-        .into_iter()
-        .map(|msg| serde_json::to_value(msg).unwrap_or(serde_json::Value::Null))
-        .collect();
-
-    Ok(values)
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
