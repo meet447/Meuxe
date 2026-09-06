@@ -5,10 +5,11 @@ pub use types::*;
 use crate::ids::validate_id;
 use crate::{MeuxeError, Result};
 use regex::Regex;
+use serde::Serialize;
 use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::sync::RwLock;
+use std::sync::{PoisonError, RwLock};
 use std::time::SystemTime;
 
 struct CharacterBlueprintInput<'a> {
@@ -50,9 +51,8 @@ impl CharacterLoader {
     }
 
     pub fn clear_cache(&self) {
-        if let Ok(mut cache) = self.cache.write() {
-            cache.clear();
-        }
+        let mut cache = self.cache.write().unwrap_or_else(PoisonError::into_inner);
+        cache.clear();
     }
 
     /// List all available characters (summary only).
@@ -108,18 +108,16 @@ impl CharacterLoader {
             })
             .ok_or_else(|| MeuxeError::CharacterNotFound(character_id.to_string()))?;
 
-        let (mtime_path, source_type_tag) = match &source {
-            CharacterSource::Directory { path, .. } => (path.join("character.yaml"), "directory"),
-            CharacterSource::Markdown { path, .. } => (path.clone(), "markdown"),
+        let mtime = match &source {
+            CharacterSource::Directory { path, .. } => directory_latest_mtime(path)?,
+            CharacterSource::Markdown { path, .. } => fs::metadata(path)?
+                .modified()
+                .unwrap_or(SystemTime::UNIX_EPOCH),
         };
-
-        let mtime = fs::metadata(&mtime_path)?
-            .modified()
-            .unwrap_or(SystemTime::UNIX_EPOCH);
 
         // Check cache
         {
-            let cache = self.cache.read().unwrap();
+            let cache = self.cache.read().unwrap_or_else(PoisonError::into_inner);
             if let Some(cached) = cache.get(character_id) {
                 if cached.mtime == mtime {
                     return Ok(cached.character.clone());
@@ -134,7 +132,7 @@ impl CharacterLoader {
 
         // Store in cache
         {
-            let mut cache = self.cache.write().unwrap();
+            let mut cache = self.cache.write().unwrap_or_else(PoisonError::into_inner);
             cache.insert(
                 character_id.to_string(),
                 CachedCharacter {
@@ -144,7 +142,6 @@ impl CharacterLoader {
             );
         }
 
-        let _ = source_type_tag; // used for clarity only
         Ok(character)
     }
 
@@ -163,7 +160,18 @@ impl CharacterLoader {
         user_about: &str,
     ) -> Result<String> {
         let id = slugify(name);
+        if id.is_empty() {
+            return Err(MeuxeError::InvalidConfig(
+                "Character name must contain letters or numbers".into(),
+            ));
+        }
+        validate_id(&id)?;
+        validate_id(model_id)?;
+
         let char_dir = self.characters_dir.join(&id);
+        if char_dir.exists() {
+            return Err(MeuxeError::CharacterExists(id));
+        }
         fs::create_dir_all(&char_dir)?;
         fs::create_dir_all(char_dir.join("examples"))?;
 
@@ -177,11 +185,14 @@ impl CharacterLoader {
             user_about,
         };
 
-        // character.yaml
-        let yaml_content = format!(
-            "name: \"{name}\"\nlive2d_model: \"{model_id}\"\nvoice: \"{voice}\"\ndefault_emotion: \"neutral\"\n",
-        );
-        fs::write(char_dir.join("character.yaml"), &yaml_content)?;
+        let yaml = NewCharacterYaml {
+            name: name.to_string(),
+            live2d_model: model_id.to_string(),
+            voice: voice.to_string(),
+            default_emotion: "neutral".to_string(),
+        };
+        let yaml_content = serde_yaml::to_string(&yaml)?;
+        fs::write(char_dir.join("character.yaml"), yaml_content)?;
 
         // soul.md
         let soul = build_soul_section(&blueprint);
@@ -228,6 +239,37 @@ impl CharacterLoader {
         }
         Ok(sources)
     }
+}
+
+#[derive(Serialize)]
+struct NewCharacterYaml {
+    name: String,
+    live2d_model: String,
+    voice: String,
+    default_emotion: String,
+}
+
+fn directory_latest_mtime(dir: &Path) -> Result<SystemTime> {
+    let yaml_path = dir.join("character.yaml");
+    let mut latest = fs::metadata(&yaml_path)?
+        .modified()
+        .unwrap_or(SystemTime::UNIX_EPOCH);
+
+    if let Ok(entries) = fs::read_dir(dir) {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if !path.is_file() {
+                continue;
+            }
+            if let Ok(mtime) = fs::metadata(&path).and_then(|meta| meta.modified()) {
+                if mtime > latest {
+                    latest = mtime;
+                }
+            }
+        }
+    }
+
+    Ok(latest)
 }
 
 fn build_soul_section(input: &CharacterBlueprintInput<'_>) -> String {
@@ -776,6 +818,7 @@ fn find_model3_json(dir: &Path) -> Option<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::time::SystemTime;
     use tempfile::TempDir;
 
     #[test]
@@ -983,5 +1026,115 @@ mod tests {
 
         let character = loader.load_character("luna").unwrap();
         assert_eq!(character.live2d_model, "my_avatar");
+    }
+
+    #[test]
+    fn test_directory_cache_invalidates_on_section_edit() {
+        use std::fs::File;
+        use std::time::Duration;
+
+        let tmp = TempDir::new().unwrap();
+        let loader = CharacterLoader::new(tmp.path());
+        let id = loader
+            .create_character(
+                "Cache Test",
+                "Personality",
+                "model1",
+                "en-US-1",
+                "Chill",
+                "Gentle",
+                "natural",
+                "User",
+                "About",
+            )
+            .unwrap();
+
+        let before = loader.load_character(&id).unwrap();
+        assert!(before.system_prompt.contains("Cache Test"));
+
+        let soul_path = tmp.path().join("characters").join(&id).join("soul.md");
+        fs::write(
+            &soul_path,
+            "# Soul\n\nBrand new soul content for cache busting.",
+        )
+        .unwrap();
+        let later = SystemTime::now() + Duration::from_secs(5);
+        File::open(&soul_path).unwrap().set_modified(later).unwrap();
+
+        let after = loader.load_character(&id).unwrap();
+        assert!(after
+            .system_prompt
+            .contains("Brand new soul content for cache busting"));
+        assert_ne!(before.system_prompt, after.system_prompt);
+    }
+
+    #[test]
+    fn test_create_character_escapes_yaml_special_chars() {
+        let tmp = TempDir::new().unwrap();
+        let loader = CharacterLoader::new(tmp.path());
+        let id = loader
+            .create_character(
+                "Test \"Quote\" Name",
+                "A \"quoted\" personality.",
+                "model1",
+                "en-US-1",
+                "Chill",
+                "Gentle",
+                "natural",
+                "User",
+                "About",
+            )
+            .unwrap();
+
+        let character = loader.load_character(&id).unwrap();
+        assert_eq!(character.name, "Test \"Quote\" Name");
+        assert_eq!(character.live2d_model, "model1");
+    }
+
+    #[test]
+    fn test_create_character_rejects_empty_slug() {
+        let tmp = TempDir::new().unwrap();
+        let loader = CharacterLoader::new(tmp.path());
+        let err = loader
+            .create_character(
+                "!!!",
+                "Personality",
+                "model1",
+                "en-US-1",
+                "Chill",
+                "Gentle",
+                "natural",
+                "User",
+                "About",
+            )
+            .unwrap_err();
+        assert!(err.to_string().contains("letters or numbers"));
+    }
+
+    #[test]
+    fn test_create_character_rejects_existing_directory() {
+        let tmp = TempDir::new().unwrap();
+        let loader = CharacterLoader::new(tmp.path());
+        loader
+            .create_character(
+                "Aria",
+                "Personality",
+                "model1",
+                "en-US-1",
+                "Chill",
+                "Gentle",
+                "natural",
+                "User",
+                "About",
+            )
+            .unwrap();
+
+        let err = loader
+            .create_character(
+                "Aria", "Other", "model2", "en-US-2", "Cheerful", "Teasing", "playful", "User",
+                "About",
+            )
+            .unwrap_err();
+        assert!(err.to_string().contains("already exists"));
     }
 }

@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
-use std::sync::RwLock;
+use std::sync::{PoisonError, RwLock};
 
 use crate::fs_util::write_atomic;
 use crate::ids::validate_id;
@@ -57,7 +57,7 @@ impl ExpressionManager {
         }
         // Check cache first
         {
-            let cache = self.cache.read().unwrap();
+            let cache = self.cache.read().unwrap_or_else(PoisonError::into_inner);
             if let Some(mapping) = cache.get(model_id) {
                 return mapping.clone();
             }
@@ -76,7 +76,7 @@ impl ExpressionManager {
         };
 
         // Cache and return
-        let mut cache = self.cache.write().unwrap();
+        let mut cache = self.cache.write().unwrap_or_else(PoisonError::into_inner);
         cache.insert(model_id.to_string(), mapping.clone());
         mapping
     }
@@ -91,7 +91,7 @@ impl ExpressionManager {
         let json = serde_json::to_string_pretty(&mapping)?;
         write_atomic(&path, &json)?;
 
-        let mut cache = self.cache.write().unwrap();
+        let mut cache = self.cache.write().unwrap_or_else(PoisonError::into_inner);
         cache.insert(model_id.to_string(), mapping);
 
         Ok(())
