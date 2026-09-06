@@ -8,6 +8,7 @@ use meuxe_core::config::ConfigManager;
 use meuxe_core::expressions::ExpressionManager;
 use meuxe_core::memory::CompanionMemory;
 use meuxe_core::session::SessionStore;
+use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use tauri::Manager;
@@ -22,6 +23,8 @@ pub struct AppState {
     pub expressions: ExpressionManager,
     pub whisper_ctx: Option<Arc<WhisperContext>>,
     pub chat_cancel: std::sync::Mutex<Option<tokio_util::sync::CancellationToken>>,
+    pub chat_permission_responders:
+        std::sync::Mutex<HashMap<String, tokio::sync::oneshot::Sender<bool>>>,
 }
 
 // Broadcast an event to ALL windows (used by global shortcuts)
@@ -160,6 +163,7 @@ pub fn run() {
                 expressions: ExpressionManager::new(&data_dir),
                 whisper_ctx,
                 chat_cancel: std::sync::Mutex::new(None),
+                chat_permission_responders: std::sync::Mutex::new(HashMap::new()),
             };
 
             app.manage(Arc::new(state));
@@ -182,6 +186,7 @@ pub fn run() {
             commands::characters::models_import_vrm_dialog,
             commands::chat::chat_send,
             commands::chat::chat_cancel,
+            commands::chat::chat_tool_confirm,
             commands::chat::chat_history,
             commands::chat::chat_clear,
             commands::agent_setup::agent_setup_status,

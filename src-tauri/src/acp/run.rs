@@ -6,8 +6,8 @@ use agent_client_protocol::{AcpAgent, Agent, Client, ConnectionTo, SessionMessag
 
 use agent_client_protocol::schema::v1::{
     ContentBlock, ContentChunk, InitializeRequest, RequestPermissionOutcome,
-    RequestPermissionRequest, RequestPermissionResponse, SelectedPermissionOutcome,
-    SessionNotification, SessionUpdate, StopReason,
+    RequestPermissionRequest, RequestPermissionResponse, SessionNotification, SessionUpdate,
+    StopReason, ToolCallStatus,
 };
 use agent_client_protocol::schema::ProtocolVersion;
 use meuxe_core::config::types::AgentConfig;
@@ -15,6 +15,11 @@ use meuxe_core::memory::MemorySnapshot;
 use tauri::{AppHandle, Emitter};
 use tokio_util::sync::CancellationToken;
 
+use crate::acp::tools::{
+    is_terminal_tool_status, permission_description, permission_id_for, permission_kind_snake_case,
+    permission_outcome, render_tool_result, tool_call_arguments, tool_call_id_str,
+    tool_display_name, tool_update_arguments,
+};
 use crate::commands::chat::ChatDoneEvent;
 use crate::commands::user::derive_user_id;
 use crate::AppState;
@@ -239,22 +244,79 @@ pub async fn run_acp_chat_stream(params: RunAcpChatStreamParams) -> Result<(), S
     let model_id_session = model_id.clone();
     let tts_config_session = tts_config.clone();
     let agent_prompt_send = agent_prompt.clone();
+    let app_perm = app.clone();
+    let state_perm = state.clone();
+    let request_id_perm = request_id.clone();
+    let cancel_perm = cancel.clone();
 
     Client
         .builder()
         .name("meuxe")
         .on_receive_request(
             async move |request: RequestPermissionRequest, responder, _connection| {
-                let option_id = request.options.first().map(|opt| opt.option_id.clone());
-                if let Some(id) = option_id {
-                    responder.respond(RequestPermissionResponse::new(
-                        RequestPermissionOutcome::Selected(SelectedPermissionOutcome::new(id)),
-                    ))?;
-                } else {
-                    responder.respond(RequestPermissionResponse::new(
-                        RequestPermissionOutcome::Cancelled,
-                    ))?;
+                let tool_call_id = tool_call_id_str(&request.tool_call);
+                let permission_id = permission_id_for(&request_id_perm, &tool_call_id);
+                let tool_name = tool_display_name(
+                    request.tool_call.fields.title.as_deref(),
+                    request.tool_call.fields.kind,
+                );
+                let arguments = tool_update_arguments(&request.tool_call.fields);
+                let description = permission_description(&request.tool_call.fields);
+                let options = request
+                    .options
+                    .iter()
+                    .map(|opt| {
+                        serde_json::json!({
+                            "id": opt.option_id.to_string(),
+                            "name": opt.name,
+                            "kind": permission_kind_snake_case(opt.kind),
+                        })
+                    })
+                    .collect::<Vec<_>>();
+
+                let (tx, rx) = tokio::sync::oneshot::channel();
+                {
+                    let mut lock = state_perm
+                        .chat_permission_responders
+                        .lock()
+                        .unwrap_or_else(|p| p.into_inner());
+                    lock.insert(permission_id.clone(), tx);
                 }
+
+                let _ = app_perm.emit(
+                    "chat:tool-confirm",
+                    serde_json::json!({
+                        "request_id": request_id_perm,
+                        "tool_call_id": tool_call_id,
+                        "permission_id": permission_id,
+                        "tool_name": tool_name,
+                        "arguments": arguments,
+                        "description": description,
+                        "options": options,
+                    }),
+                );
+
+                let outcome = tokio::select! {
+                    () = cancel_perm.cancelled() => {
+                        let mut lock = state_perm
+                            .chat_permission_responders
+                            .lock()
+                            .unwrap_or_else(|p| p.into_inner());
+                        lock.remove(&permission_id);
+                        RequestPermissionOutcome::Cancelled
+                    }
+                    result = rx => {
+                        let mut lock = state_perm
+                            .chat_permission_responders
+                            .lock()
+                            .unwrap_or_else(|p| p.into_inner());
+                        lock.remove(&permission_id);
+                        let approved = result.unwrap_or(false);
+                        permission_outcome(&request.options, approved)
+                    }
+                };
+
+                responder.respond(RequestPermissionResponse::new(outcome))?;
                 Ok(())
             },
             agent_client_protocol::on_receive_request!(),
@@ -310,13 +372,13 @@ pub async fn run_acp_chat_stream(params: RunAcpChatStreamParams) -> Result<(), S
                                 SessionMessage::SessionMessage(dispatch) => {
                                     MatchDispatch::new(dispatch)
                                         .if_notification(async |notif: SessionNotification| {
-                                            if let SessionUpdate::AgentMessageChunk(
-                                                ContentChunk {
-                                                    content: ContentBlock::Text(text),
-                                                    ..
-                                                },
-                                            ) = notif.update
-                                            {
+                                            match notif.update {
+                                                SessionUpdate::AgentMessageChunk(
+                                                    ContentChunk {
+                                                        content: ContentBlock::Text(text),
+                                                        ..
+                                                    },
+                                                ) => {
                                                 let chunk = text.text;
                                                 if !chunk.is_empty() {
                                                     let visible = splitter.feed(&chunk);
@@ -344,6 +406,49 @@ pub async fn run_acp_chat_stream(params: RunAcpChatStreamParams) -> Result<(), S
                                                         );
                                                     }
                                                 }
+                                                }
+                                                SessionUpdate::ToolCall(tool_call) => {
+                                                    let tool_name = tool_display_name(
+                                                        Some(&tool_call.title),
+                                                        Some(tool_call.kind),
+                                                    );
+                                                    let _ = app.emit(
+                                                        "chat:tool-call-start",
+                                                        serde_json::json!({
+                                                            "request_id": request_id,
+                                                            "tool_call_id": tool_call.tool_call_id.to_string(),
+                                                            "tool_name": tool_name,
+                                                            "arguments": tool_call_arguments(&tool_call),
+                                                        }),
+                                                    );
+                                                }
+                                                SessionUpdate::ToolCallUpdate(update) => {
+                                                    if let Some(status) = update.fields.status {
+                                                        if is_terminal_tool_status(status) {
+                                                            let tool_name = tool_display_name(
+                                                                update.fields.title.as_deref(),
+                                                                update.fields.kind,
+                                                            );
+                                                            let result = render_tool_result(
+                                                                update.fields.content.as_deref(),
+                                                                update.fields.raw_output.as_ref(),
+                                                            );
+                                                            let success =
+                                                                status == ToolCallStatus::Completed;
+                                                            let _ = app.emit(
+                                                                "chat:tool-call-result",
+                                                                serde_json::json!({
+                                                                    "request_id": request_id,
+                                                                    "tool_call_id": update.tool_call_id.to_string(),
+                                                                    "tool_name": tool_name,
+                                                                    "result": result,
+                                                                    "success": success,
+                                                                }),
+                                                            );
+                                                        }
+                                                    }
+                                                }
+                                                _ => {}
                                             }
                                             Ok(())
                                         })
@@ -361,6 +466,7 @@ pub async fn run_acp_chat_stream(params: RunAcpChatStreamParams) -> Result<(), S
                         }
 
                         if cancelled || cancel.is_cancelled() {
+                            clear_pending_permissions(&state);
                             let _ = app.emit(
                                 "chat:cancelled",
                                 serde_json::json!({ "request_id": request_id_done }),
@@ -446,6 +552,14 @@ pub async fn run_acp_chat_stream(params: RunAcpChatStreamParams) -> Result<(), S
         .map_err(|e| e.to_string())?;
 
     Ok(())
+}
+
+fn clear_pending_permissions(state: &AppState) {
+    let mut lock = state
+        .chat_permission_responders
+        .lock()
+        .unwrap_or_else(|p| p.into_inner());
+    lock.clear();
 }
 
 #[cfg(test)]

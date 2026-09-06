@@ -449,6 +449,22 @@ fn lock_chat_cancel(
 }
 
 #[tauri::command]
+pub fn chat_tool_confirm(
+    state: State<Arc<AppState>>,
+    permission_id: String,
+    approved: bool,
+) -> Result<(), String> {
+    let mut lock = state
+        .chat_permission_responders
+        .lock()
+        .unwrap_or_else(|p| p.into_inner());
+    if let Some(sender) = lock.remove(&permission_id) {
+        let _ = sender.send(approved);
+    }
+    Ok(())
+}
+
+#[tauri::command]
 pub fn chat_cancel(state: State<Arc<AppState>>) -> Result<(), String> {
     let mut lock = lock_chat_cancel(&state.chat_cancel);
     if let Some(token) = lock.take() {
