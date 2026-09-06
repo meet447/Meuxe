@@ -3,6 +3,29 @@ import * as PIXI from "pixi.js";
 import { Live2DModel } from "pixi-live2d-display/cubism4";
 import type { ModelMapping } from "../types";
 import type { AudioLevels } from "./useAudioAnalyser";
+import {
+  createBlinkScheduler,
+  createLipSyncDriver,
+  speakingHeadSway,
+} from "../utils/avatarAnimation";
+
+const LIVE2D_BLINK_MIN_MS = 2000;
+const LIVE2D_BLINK_MAX_MS = 6000;
+const LIVE2D_BLINK_DURATION_MS = 150;
+const LIVE2D_LIP_ATTACK = 0.4;
+const LIVE2D_LIP_RELEASE = 0.35;
+const LIVE2D_SPEAK_SWAY = {
+  xFreq: 1.8,
+  xAmp: 2,
+  xSecondaryFreq: 3.1,
+  xSecondaryAmp: 1,
+  yFreq: 2.3,
+  yAmp: 1.5,
+  ySecondaryFreq: 1.5,
+  ySecondaryAmp: 0.8,
+  zFreq: 1.2,
+  zAmp: 1.5,
+};
 
 // Expose PIXI globally for pixi-live2d-display
 (window as any).PIXI = PIXI;
@@ -30,10 +53,6 @@ export interface DebugInfo {
 }
 
 // Easing functions
-function easeOutCubic(t: number): number {
-  return 1 - Math.pow(1 - t, 3);
-}
-
 function lerp(a: number, b: number, t: number): number {
   return a + (b - a) * t;
 }
@@ -64,6 +83,9 @@ export function useLive2D(canvasRef: React.RefObject<HTMLCanvasElement | null>) 
   const speakingHandlerRef = useRef<(() => void) | null>(null);
   const mouthValueRef = useRef(0);
   const mouthTargetRef = useRef(0);
+  const lipSyncDriverRef = useRef(
+    createLipSyncDriver({ attack: LIVE2D_LIP_ATTACK, release: LIVE2D_LIP_RELEASE })
+  );
   const lastToggleRef = useRef(0);
   const breathPhaseRef = useRef(0);
   const breathSpeedRef = useRef(0.03); // Adjustable per emotion
@@ -191,12 +213,16 @@ export function useLive2D(canvasRef: React.RefObject<HTMLCanvasElement | null>) 
       model.internalModel.off("beforeModelUpdate", idleHandlerRef.current);
     }
 
-    // Blink state
-    let lastBlinkTime = Date.now();
-    let nextBlinkDelay = 2000 + Math.random() * 4000;
-    let blinkPhase = 0;
-    let doubleBlink = false;
-    const BLINK_DURATION = 150;
+    const blinkScheduler = createBlinkScheduler({
+      minIntervalMs: LIVE2D_BLINK_MIN_MS,
+      maxIntervalMs: LIVE2D_BLINK_MAX_MS,
+      durationMs: LIVE2D_BLINK_DURATION_MS,
+      doubleBlinkChance: 0.2,
+      doubleBlinkGapMinMs: 150,
+      doubleBlinkGapMaxMs: 250,
+      curve: "ease-hold",
+    });
+    blinkScheduler.reset(Date.now());
 
     // Eye saccade state: subtle micro eye movements
     let saccadeX = 0;
@@ -266,38 +292,9 @@ export function useLive2D(canvasRef: React.RefObject<HTMLCanvasElement | null>) 
       } catch {}
 
       // --- Random blinking with occasional double blinks ---
-      if (blinkPhase === 0) {
-        if (now - lastBlinkTime > nextBlinkDelay) {
-          blinkPhase = 1;
-          lastBlinkTime = now;
-          // 20% chance of double blink
-          doubleBlink = Math.random() < 0.2;
-          nextBlinkDelay = doubleBlink ? 300 : (2000 + Math.random() * 4000);
-        }
-      } else {
-        const blinkProgress = (now - lastBlinkTime) / BLINK_DURATION;
-        let eyeOpen: number;
-
-        if (blinkProgress < 0.3) {
-          eyeOpen = 1.0 - easeOutCubic(blinkProgress / 0.3);
-        } else if (blinkProgress < 0.5) {
-          eyeOpen = 0;
-        } else if (blinkProgress < 1.0) {
-          eyeOpen = easeOutCubic((blinkProgress - 0.5) / 0.5);
-        } else {
-          eyeOpen = 1.0;
-          blinkPhase = 0;
-
-          if (doubleBlink) {
-            // Queue second blink quickly
-            doubleBlink = false;
-            nextBlinkDelay = 150 + Math.random() * 100;
-          } else {
-            nextBlinkDelay = 2000 + Math.random() * 4000;
-          }
-          lastBlinkTime = now;
-        }
-
+      const blinkClose = blinkScheduler.update(now);
+      if (blinkClose > 0) {
+        const eyeOpen = 1 - blinkClose;
         try {
           coreModel.setParameterValueById(params.eyeLeftOpen, eyeOpen);
           coreModel.setParameterValueById(params.eyeRightOpen, eyeOpen);
@@ -345,16 +342,12 @@ export function useLive2D(canvasRef: React.RefObject<HTMLCanvasElement | null>) 
     const handler = () => {
       const elapsed = (Date.now() - startTime) / 1000;
       const coreModel = model.internalModel.coreModel;
+      const sway = speakingHeadSway(elapsed, LIVE2D_SPEAK_SWAY);
 
       try {
-        // Subtle head nod while speaking: varies speed to look natural
-        const nodX = Math.sin(elapsed * 1.8) * 2 + Math.sin(elapsed * 3.1) * 1;
-        const nodY = Math.sin(elapsed * 2.3) * 1.5 + Math.cos(elapsed * 1.5) * 0.8;
-        const nodZ = Math.sin(elapsed * 1.2) * 1.5;
-
-        coreModel.addParameterValueById("ParamAngleX", nodX);
-        coreModel.addParameterValueById("ParamAngleY", nodY);
-        coreModel.addParameterValueById("ParamAngleZ", nodZ);
+        coreModel.addParameterValueById("ParamAngleX", sway.x);
+        coreModel.addParameterValueById("ParamAngleY", sway.y);
+        coreModel.addParameterValueById("ParamAngleZ", sway.z);
       } catch {}
     };
 
@@ -591,6 +584,7 @@ export function useLive2D(canvasRef: React.RefObject<HTMLCanvasElement | null>) 
 
     lipSyncActiveRef.current = true;
     debugRef.current.lipSyncActive = true;
+    lipSyncDriverRef.current.reset();
     mouthValueRef.current = 0;
     mouthTargetRef.current = 0;
 
@@ -609,7 +603,7 @@ export function useLive2D(canvasRef: React.RefObject<HTMLCanvasElement | null>) 
 
       if (getter) {
         const levels = getter();
-        mouthValueRef.current += (levels.mouthOpen - mouthValueRef.current) * 0.4;
+        mouthValueRef.current = lipSyncDriverRef.current.update(levels.mouthOpen, 33);
         debugRef.current.mouthValue = Math.round(mouthValueRef.current * 100) / 100;
 
         try {
@@ -645,6 +639,7 @@ export function useLive2D(canvasRef: React.RefObject<HTMLCanvasElement | null>) 
     lipSyncActiveRef.current = false;
     debugRef.current.lipSyncActive = false;
     debugRef.current.mouthValue = 0;
+    lipSyncDriverRef.current.reset();
     mouthValueRef.current = 0;
     mouthTargetRef.current = 0;
     audioLevelsGetterRef.current = null;

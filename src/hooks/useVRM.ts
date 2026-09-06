@@ -8,8 +8,26 @@ import { VRMAnimationLoaderPlugin, createVRMAnimationClip } from "@pixiv/three-v
 import { mixamoVRMRigMap } from "../utils/mixamoRigMap";
 import { resolveAssetUrl } from "../api/tauri";
 import { resolveVrmExpressionName } from "../utils/vrmExpressions";
+import {
+  createBlinkScheduler,
+  createLipSyncDriver,
+  speakingHeadSway,
+} from "../utils/avatarAnimation";
 import type { AudioLevels } from "./useAudioAnalyser";
 import type { AnimationInfo } from "../types";
+
+const VRM_BLINK_MIN_MS = 2000;
+const VRM_BLINK_MAX_MS = 6000;
+/** Matches legacy delta * 15 blink ramp (0 → 2 in ~133 ms). */
+const VRM_BLINK_DURATION_MS = 2000 / 15;
+const VRM_LIP_ATTACK = 0.4;
+const VRM_LIP_RELEASE = 0.3;
+const VRM_SPEAK_SWAY = {
+  yFreq: 1.8,
+  yAmp: 0.02,
+  xFreq: 2.3,
+  xAmp: 0.015,
+};
 
 function lerp(a: number, b: number, t: number): number {
   return a + (b - a) * t;
@@ -65,22 +83,29 @@ export function useVRM(canvasRef: React.RefObject<HTMLCanvasElement | null>) {
   // Lip sync / expression state
   const lipSyncActiveRef = useRef(false);
   const audioLevelsGetterRef = useRef<(() => AudioLevels) | null>(null);
-  const mouthValueRef = useRef(0);
   const speakingRef = useRef(false);
   const speakStartRef = useRef(0);
   const headBaseRotationRef = useRef<{ x: number; y: number; z: number } | null>(null);
   const currentEmotionRef = useRef("");
+  const blinkSchedulerRef = useRef(
+    createBlinkScheduler({
+      minIntervalMs: VRM_BLINK_MIN_MS,
+      maxIntervalMs: VRM_BLINK_MAX_MS,
+      durationMs: VRM_BLINK_DURATION_MS,
+      doubleBlinkChance: 0.2,
+      doubleBlinkGapMinMs: 150,
+      doubleBlinkGapMaxMs: 250,
+      curve: "triangle",
+    })
+  );
+  const lipSyncDriverRef = useRef(
+    createLipSyncDriver({ attack: VRM_LIP_ATTACK, release: VRM_LIP_RELEASE })
+  );
 
   // Debug cache
   const availableExpressionsRef = useRef<string[]>([]);
   const availableMotionGroupsRef = useRef<string[]>([]);
   const lastErrorRef = useRef("");
-
-  // Blinking
-  const lastBlinkTimeRef = useRef(Date.now());
-  const nextBlinkDelayRef = useRef(2000 + Math.random() * 4000);
-  const blinkValueRef = useRef(0);
-  const blinkClosingRef = useRef(false);
 
   const disposeSceneResources = useCallback(() => {
     animatingRef.current = false;
@@ -342,35 +367,17 @@ export function useVRM(canvasRef: React.RefObject<HTMLCanvasElement | null>) {
       }
 
       // ========== BLINKING ==========
-      if (!blinkClosingRef.current) {
-        if (now - lastBlinkTimeRef.current > nextBlinkDelayRef.current) {
-          blinkClosingRef.current = true;
-          blinkValueRef.current = 0;
-        }
-      }
-      if (blinkClosingRef.current) {
-        blinkValueRef.current += delta * 15;
-        if (blinkValueRef.current >= 2) {
-          blinkValueRef.current = 0;
-          blinkClosingRef.current = false;
-          lastBlinkTimeRef.current = now;
-          nextBlinkDelayRef.current = Math.random() < 0.2
-            ? 150 + Math.random() * 100
-            : 2000 + Math.random() * 4000;
-        }
-      }
-      const blinkWeight = blinkValueRef.current <= 1
-        ? blinkValueRef.current
-        : 2 - blinkValueRef.current;
+      const blinkWeight = blinkSchedulerRef.current.update(now);
       vrm.expressionManager?.setValue(VRMExpressionPresetName.Blink, blinkWeight);
 
       // ========== LIP SYNC ==========
+      const lipDriver = lipSyncDriverRef.current;
+      const dtMs = delta * 1000;
       if (lipSyncActiveRef.current) {
         const getter = audioLevelsGetterRef.current;
         if (getter) {
           const levels = getter();
-          mouthValueRef.current = lerp(mouthValueRef.current, levels.mouthOpen, 0.4);
-          const mouth = mouthValueRef.current;
+          const mouth = lipDriver.update(levels.mouthOpen, dtMs);
           const form = levels.mouthForm;
 
           vrm.expressionManager?.setValue(VRMExpressionPresetName.Aa, Math.min(1, mouth * Math.max(0, 1 - Math.abs(form)) * 0.8));
@@ -392,12 +399,13 @@ export function useVRM(canvasRef: React.RefObject<HTMLCanvasElement | null>) {
             }
             const elapsed = (now - speakStartRef.current) / 1000;
             const base = headBaseRotationRef.current;
-            head.rotation.y = base.y + Math.sin(elapsed * 1.8) * 0.02;
-            head.rotation.x = base.x + Math.sin(elapsed * 2.3) * 0.015;
+            const sway = speakingHeadSway(elapsed, VRM_SPEAK_SWAY);
+            head.rotation.y = base.y + sway.y;
+            head.rotation.x = base.x + sway.x;
           }
         }
       } else {
-        mouthValueRef.current = lerp(mouthValueRef.current, 0, 0.3);
+        lipDriver.update(0, dtMs);
         vrm.expressionManager?.setValue(VRMExpressionPresetName.Aa, 0);
         vrm.expressionManager?.setValue(VRMExpressionPresetName.Oh, 0);
         vrm.expressionManager?.setValue(VRMExpressionPresetName.Ee, 0);
@@ -462,6 +470,8 @@ export function useVRM(canvasRef: React.RefObject<HTMLCanvasElement | null>) {
       currentClipNameRef.current = "";
       headBaseRotationRef.current = null;
       currentEmotionRef.current = "";
+      blinkSchedulerRef.current.reset(Date.now());
+      lipSyncDriverRef.current.reset();
 
       // Create renderer once
       if (!rendererRef.current) {
@@ -679,7 +689,7 @@ export function useVRM(canvasRef: React.RefObject<HTMLCanvasElement | null>) {
     lipSyncActiveRef.current = false;
     speakingRef.current = false;
     audioLevelsGetterRef.current = null;
-    mouthValueRef.current = 0;
+    lipSyncDriverRef.current.reset();
 
     const head = vrmRef.current?.humanoid?.getNormalizedBoneNode("head");
     if (head && headBaseRotationRef.current) {
