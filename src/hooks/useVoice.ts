@@ -1,17 +1,13 @@
-import { useState, useCallback, useRef } from "react";
-import { useAudioAnalyser } from "./useAudioAnalyser";
+import { useState, useCallback, useRef, useEffect } from "react";
 import { transcribeVoice, transcribeVoiceLocal } from "../api/tauri";
 
 const SAMPLE_RATE = 16000;
 
 // VAD constants
-const SILENCE_THRESHOLD = 0.012;   // RMS below this = silence
-const SILENCE_MS = 1200;           // stop after this much silence
-const MIN_SPEECH_CHUNKS = 4;       // ignore brief noise (~0.25s)
+const SILENCE_THRESHOLD = 0.012;
+const SILENCE_MS = 1200;
+const MIN_SPEECH_CHUNKS = 4;
 
-// ⚡ Bolt: Optimized base64 encoding for large audio arrays
-// Impact: Reduces encoding time for 60s of audio from ~1500ms to ~160ms (~90% faster)
-// Measurement: Benchmarked against naive character-by-character concatenation using `console.time`
 function float32ToBase64(samples: Float32Array): string {
   const bytes = new Uint8Array(samples.length * 4);
   const view = new DataView(bytes.buffer);
@@ -19,8 +15,6 @@ function float32ToBase64(samples: Float32Array): string {
     view.setFloat32(i * 4, samples[i], true);
   }
   let binary = "";
-  // ⚡ Bolt: Chunked conversion avoids O(N^2) memory reallocation overhead of character-by-character concatenation
-  // and prevents "Maximum call stack size exceeded" errors associated with large spread operations.
   const CHUNK_SIZE = 0x8000;
   for (let i = 0; i < bytes.length; i += CHUNK_SIZE) {
     const chunk = bytes.subarray(i, i + CHUNK_SIZE);
@@ -71,24 +65,19 @@ function blobToBase64(blob: Blob): Promise<string> {
 
 export function useVoice() {
   const [listening, setListening] = useState(false);
-  const [speaking, setSpeaking] = useState(false);
-  const [ttsLoading, setTtsLoading] = useState(false);
   const recognitionRef = useRef<any>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const mediaStreamRef = useRef<MediaStream | null>(null);
   const recordedChunksRef = useRef<Blob[]>([]);
   const onResultRef = useRef<((text: string) => void) | null>(null);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
-  const { connectAudio, getAudioLevels, disconnect } = useAudioAnalyser();
 
-  // PCM capture refs
   const pcmContextRef = useRef<AudioContext | null>(null);
   const pcmScriptNodeRef = useRef<ScriptProcessorNode | null>(null);
+  const pcmGainNodeRef = useRef<GainNode | null>(null);
   const pcmChunksRef = useRef<Float32Array[]>([]);
   const pcmSourceRef = useRef<MediaStreamAudioSourceNode | null>(null);
   const pcmStreamRef = useRef<MediaStream | null>(null);
 
-  // VAD state
   const speechDetectedRef = useRef(false);
   const speechChunkCountRef = useRef(0);
   const lastLoudTimeRef = useRef(0);
@@ -101,24 +90,49 @@ export function useVoice() {
   const stopPcmCapture = useCallback(() => {
     pcmScriptNodeRef.current?.disconnect();
     pcmSourceRef.current?.disconnect();
-    pcmContextRef.current?.close();
+    pcmGainNodeRef.current?.disconnect();
+    pcmContextRef.current?.close().catch(() => {});
     pcmStreamRef.current?.getTracks().forEach((track) => track.stop());
     pcmScriptNodeRef.current = null;
     pcmSourceRef.current = null;
+    pcmGainNodeRef.current = null;
     pcmContextRef.current = null;
     pcmStreamRef.current = null;
   }, []);
 
+  const stopListening = useCallback(() => {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
+      mediaRecorderRef.current.stop();
+      return;
+    }
+    recognitionRef.current?.stop();
+    stopMediaTracks();
+    stopPcmCapture();
+    setListening(false);
+  }, [stopMediaTracks, stopPcmCapture]);
+
+  useEffect(() => {
+    return () => {
+      recognitionRef.current?.stop();
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
+        mediaRecorderRef.current.stop();
+      }
+      stopMediaTracks();
+      stopPcmCapture();
+      setListening(false);
+    };
+  }, [stopMediaTracks, stopPcmCapture]);
+
   const startSpeechRecognitionFallback = useCallback(
     (onResult: (text: string) => void) => {
-      const SpeechRecognition =
+      const SpeechRecognitionCtor =
         window.SpeechRecognition || window.webkitSpeechRecognition;
-      if (!SpeechRecognition) {
+      if (!SpeechRecognitionCtor) {
         console.error("Speech recognition not supported");
         return;
       }
 
-      const recognition = new SpeechRecognition();
+      const recognition = new SpeechRecognitionCtor();
       recognition.continuous = false;
       recognition.interimResults = false;
       recognition.lang = "en-US";
@@ -160,12 +174,10 @@ export function useVoice() {
       try {
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
 
-        // --- Reset VAD state ---
         speechDetectedRef.current = false;
         speechChunkCountRef.current = 0;
         lastLoudTimeRef.current = Date.now();
 
-        // --- PCM capture for local whisper + VAD ---
         pcmStreamRef.current = stream;
         pcmChunksRef.current = [];
 
@@ -178,6 +190,10 @@ export function useVoice() {
         const scriptNode = pcmCtx.createScriptProcessor(4096, 1, 1);
         pcmScriptNodeRef.current = scriptNode;
 
+        const gainNode = pcmCtx.createGain();
+        gainNode.gain.value = 0;
+        pcmGainNodeRef.current = gainNode;
+
         let autoStopped = false;
 
         scriptNode.onaudioprocess = (e) => {
@@ -185,7 +201,6 @@ export function useVoice() {
           const input = e.inputBuffer.getChannelData(0);
           pcmChunksRef.current.push(new Float32Array(input));
 
-          // --- VAD: check volume ---
           const volume = rms(input);
           const now = Date.now();
 
@@ -196,7 +211,6 @@ export function useVoice() {
             }
             lastLoudTimeRef.current = now;
           } else if (speechDetectedRef.current && now - lastLoudTimeRef.current >= SILENCE_MS) {
-            // Silence after speech: auto stop
             autoStopped = true;
             if (
               mediaRecorderRef.current &&
@@ -208,9 +222,9 @@ export function useVoice() {
         };
 
         source.connect(scriptNode);
-        scriptNode.connect(pcmCtx.destination);
+        scriptNode.connect(gainNode);
+        gainNode.connect(pcmCtx.destination);
 
-        // --- MediaRecorder for API fallback ---
         const mimeType = pickRecordingMimeType();
         const recorder = mimeType
           ? new MediaRecorder(stream, { mimeType })
@@ -245,7 +259,6 @@ export function useVoice() {
 
           if (chunks.length === 0) return;
 
-          // --- Try local whisper first ---
           try {
             const pcmData = mergePcmChunks();
             if (pcmData.length > SAMPLE_RATE / 2) {
@@ -260,7 +273,6 @@ export function useVoice() {
             console.warn("Local whisper failed, falling back to API:", err);
           }
 
-          // --- Fallback to API transcription ---
           try {
             const blob = new Blob(chunks, {
               type: recorder.mimeType || mimeType || "audio/webm",
@@ -304,92 +316,9 @@ export function useVoice() {
     [listening, startSpeechRecognitionFallback, stopMediaTracks, stopPcmCapture]
   );
 
-  const stopListening = useCallback(() => {
-    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
-      mediaRecorderRef.current.stop();
-      return;
-    }
-    recognitionRef.current?.stop();
-    stopMediaTracks();
-    stopPcmCapture();
-    setListening(false);
-  }, [stopMediaTracks, stopPcmCapture]);
-
-  const playAudio = useCallback(
-    (base64Audio: string): Promise<void> => {
-      return new Promise((resolve) => {
-        disconnect();
-
-        const audio = new Audio(`data:audio/mp3;base64,${base64Audio}`);
-        audio.crossOrigin = "anonymous";
-        audioRef.current = audio;
-
-        audio.oncanplay = () => {
-          connectAudio(audio);
-        };
-
-        audio.onplay = () => {
-          setSpeaking(true);
-        };
-
-        audio.onended = () => {
-          setSpeaking(false);
-          disconnect();
-          resolve();
-        };
-
-        audio.onerror = () => {
-          setSpeaking(false);
-          disconnect();
-          resolve();
-        };
-
-        audio.play().catch(() => {
-          const resumePlay = () => {
-            audio.play().catch(() => {});
-            document.removeEventListener("click", resumePlay);
-            document.removeEventListener("keydown", resumePlay);
-          };
-          document.addEventListener("click", resumePlay, { once: true });
-          document.addEventListener("keydown", resumePlay, { once: true });
-        });
-      });
-    },
-    [connectAudio, disconnect]
-  );
-
-  const fetchAndPlayTTS = useCallback(
-    async (text: string, voice: string): Promise<void> => {
-      setTtsLoading(true);
-      try {
-        const res = await fetch("/api/tts", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ text, voice }),
-        });
-
-        if (!res.ok) return;
-
-        const data = await res.json();
-        if (data.audio) {
-          await playAudio(data.audio);
-        }
-      } catch (err) {
-        console.error("TTS error:", err);
-      } finally {
-        setTtsLoading(false);
-      }
-    },
-    [playAudio]
-  );
-
   return {
     listening,
-    speaking,
-    ttsLoading,
     startListening,
     stopListening,
-    fetchAndPlayTTS,
-    getAudioLevels,
   };
 }

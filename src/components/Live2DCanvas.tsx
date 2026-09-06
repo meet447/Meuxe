@@ -1,4 +1,4 @@
-import { useRef, useEffect, useState, memo } from "react";
+import { useRef, useEffect, useState, memo, useMemo } from "react";
 import { useLive2D } from "../hooks/useLive2D";
 import type { ModelMapping } from "../types";
 import { LoadingOverlay } from "./LoadingOverlay";
@@ -35,21 +35,38 @@ export const Live2DCanvas = memo(function Live2DCanvas({
   const { loadModel, setExpression, startLipSync, stopLipSync, setViewport, setTypingReaction } =
     useLive2D(canvasRef);
   const prevModelPath = useRef<string | null>(null);
+  const prevMappingKey = useRef<string>("");
   const prevExpression = useRef<string>("");
   const [modelLoading, setModelLoading] = useState(false);
   const dragOffset = { x: 0, y: 0 };
+  const mappingKey = useMemo(() => JSON.stringify(modelMapping), [modelMapping]);
 
   useEffect(() => {
-    if (modelPath && modelPath !== prevModelPath.current) {
-      prevModelPath.current = modelPath;
-      setModelLoading(true);
-      loadModel(modelPath, modelMapping || undefined).then(() => {
-        setViewport(zoom, framing, dragOffset.x, dragOffset.y);
-      }).finally(() => setModelLoading(false));
-    }
-    // Intentionally disabling lint rule - loading state is necessary for model loading UX
-    // eslint-disable-next-line react-hooks/set-state-in-effect, react-hooks/set-state-syntax-use-give-error-message
-  }, [modelPath, modelMapping, loadModel]);
+    if (!modelPath) return;
+
+    const pathChanged = modelPath !== prevModelPath.current;
+    const mappingChanged = mappingKey !== prevMappingKey.current;
+    if (!pathChanged && !mappingChanged) return;
+
+    prevModelPath.current = modelPath;
+    prevMappingKey.current = mappingKey;
+
+    let cancelled = false;
+    setModelLoading(true);
+    loadModel(modelPath, modelMapping || undefined)
+      .then(() => {
+        if (!cancelled) {
+          setViewport(zoom, framing, dragOffset.x, dragOffset.y);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setModelLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [modelPath, mappingKey, modelMapping, loadModel, setViewport, zoom, framing]);
 
   useEffect(() => {
     if (expression && expression !== prevExpression.current) {

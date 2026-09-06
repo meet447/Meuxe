@@ -83,8 +83,10 @@ export function Onboarding({ onComplete }: { onComplete: () => void }) {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const previewUrlRef = useRef<string | null>(null);
   const [agentSetup, setAgentSetup] = useState<AgentSetupStatusResponse | null>(null);
   const [agentSetupLoading, setAgentSetupLoading] = useState(false);
+  const [agentSetupError, setAgentSetupError] = useState<string | null>(null);
 
   const ttsPresets = TTS_PRESETS_UI;
 
@@ -135,12 +137,22 @@ export function Onboarding({ onComplete }: { onComplete: () => void }) {
     if (step !== 4 || form.agent.preset === "custom") {
       setAgentSetup(null);
       setAgentSetupLoading(false);
+      setAgentSetupError(null);
     }
   }, [step, form.agent.preset]);
 
-  const handleAgentSetupStatus = (status: AgentSetupStatusResponse | null, loading: boolean) => {
+  const handleAgentSetupStatus = (
+    status: AgentSetupStatusResponse | null,
+    loading: boolean,
+    error?: string,
+  ) => {
     setAgentSetup(status);
     setAgentSetupLoading(loading);
+    if (error) {
+      setAgentSetupError(error);
+    } else if (status) {
+      setAgentSetupError(null);
+    }
   };
 
   const updateForm = (section: keyof FormData, field: string, value: string) => {
@@ -175,6 +187,10 @@ export function Onboarding({ onComplete }: { onComplete: () => void }) {
       audioRef.current.pause();
       audioRef.current = null;
     }
+    if (previewUrlRef.current) {
+      URL.revokeObjectURL(previewUrlRef.current);
+      previewUrlRef.current = null;
+    }
     setPreviewError("");
     setPreviewing(true);
     try {
@@ -185,8 +201,12 @@ export function Onboarding({ onComplete }: { onComplete: () => void }) {
       }
       const blob = new Blob([new Uint8Array(data)], { type: "audio/mp3" });
       const url = URL.createObjectURL(blob);
+      previewUrlRef.current = url;
       const audio = new Audio(url);
-      audio.addEventListener("ended", () => URL.revokeObjectURL(url));
+      audio.addEventListener("ended", () => {
+        URL.revokeObjectURL(url);
+        if (previewUrlRef.current === url) previewUrlRef.current = null;
+      });
       audioRef.current = audio;
       await audio.play();
     } catch (err: unknown) {
@@ -196,6 +216,19 @@ export function Onboarding({ onComplete }: { onComplete: () => void }) {
       setPreviewing(false);
     }
   };
+
+  useEffect(() => {
+    return () => {
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current = null;
+      }
+      if (previewUrlRef.current) {
+        URL.revokeObjectURL(previewUrlRef.current);
+        previewUrlRef.current = null;
+      }
+    };
+  }, []);
 
   const canProceed = (): boolean => {
     switch (step) {
@@ -213,11 +246,18 @@ export function Onboarding({ onComplete }: { onComplete: () => void }) {
         }
         if (agentSetupLoading) return false;
         if (agentSetup?.agent.ready) return true;
+        if (agentSetupError || agentSetup === null) return true;
         return agentSetup?.prerequisites.node_available === true;
       default:
         return false;
     }
   };
+
+  const agentSetupWarning =
+    step === 4 &&
+    form.agent.preset !== "custom" &&
+    !agentSetupLoading &&
+    (agentSetupError || agentSetup === null);
 
   const stepHint = (): string | null => {
     if (step === 4 && form.agent.preset !== "custom" && !canProceed() && !agentSetupLoading) {
@@ -522,6 +562,12 @@ export function Onboarding({ onComplete }: { onComplete: () => void }) {
             />
           )}
         </>
+      )}
+
+      {agentSetupWarning && (
+        <Notice tone="warning" className="mt-4">
+          Could not verify the assistant setup. You can finish now and fix this later in Settings.
+        </Notice>
       )}
 
       {error && (

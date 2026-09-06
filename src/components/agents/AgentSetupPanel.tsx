@@ -13,7 +13,7 @@ export function AgentSetupPanel({
   friendly,
 }: {
   preset: AcpAgentPresetId;
-  onStatusChange?: (status: AgentSetupStatusResponse | null, loading: boolean) => void;
+  onStatusChange?: (status: AgentSetupStatusResponse | null, loading: boolean, error?: string) => void;
   /** Shorter, non-technical copy for onboarding */
   friendly?: boolean;
 }) {
@@ -41,7 +41,11 @@ export function AgentSetupPanel({
         }
       })
       .catch((err) => {
-        if (!cancelled) setError(err?.message || String(err));
+        if (!cancelled) {
+          const message = err?.message || String(err);
+          setError(message);
+          onStatusChange?.(null, false, message);
+        }
       })
       .finally(() => {
         if (!cancelled) setLoading(false);

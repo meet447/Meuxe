@@ -48,6 +48,7 @@ export function CharacterSelect({
           {characters.map((char) => (
             <button
               key={char.id}
+              type="button"
               onClick={() => {
                 onSelect(char.id);
                 onToggle();
@@ -74,6 +75,7 @@ export function CharacterSelect({
             </button>
           ))}
           <button
+            type="button"
             onClick={() => {
               onToggle();
               onAddCharacter();

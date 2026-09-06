@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type KeyboardEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import {
   addMemoryFact,
   clearChat,
@@ -130,25 +130,34 @@ export function MemoryStatePanel({ characterId, characterName, onConversationCle
   const [addingFact, setAddingFact] = useState(false);
   const [busyAction, setBusyAction] = useState<null | "conversation" | "reset">(null);
   const [confirmReset, setConfirmReset] = useState(false);
+  const refreshGenerationRef = useRef(0);
 
   const refresh = useCallback(async () => {
     if (!characterId) return;
+    const generation = ++refreshGenerationRef.current;
     setLoading(true);
     setError("");
     try {
       const data = await getMemorySnapshot(characterId);
+      if (generation !== refreshGenerationRef.current) return;
       setSnapshot(data);
     } catch (err) {
+      if (generation !== refreshGenerationRef.current) return;
       console.error("Memory panel refresh error:", err);
       setSnapshot(null);
       setError("Couldn't load memory. Try again in a moment.");
     } finally {
-      setLoading(false);
+      if (generation === refreshGenerationRef.current) {
+        setLoading(false);
+      }
     }
   }, [characterId]);
 
   useEffect(() => {
     refresh();
+    return () => {
+      refreshGenerationRef.current += 1;
+    };
   }, [refresh]);
 
   const groupedFacts = useMemo(() => {
@@ -403,6 +412,7 @@ export function MemoryStatePanel({ characterId, characterName, onConversationCle
                           onEditChange={setEditingText}
                           onEditKeyDown={handleEditKeyDown}
                           onSaveEdit={() => void saveEditing()}
+                          onCancelEdit={cancelEditing}
                           onForget={() => void handleForgetFact(fact.id)}
                         />
                       ))}
@@ -500,6 +510,7 @@ function FactRow({
   onEditChange,
   onEditKeyDown,
   onSaveEdit,
+  onCancelEdit,
   onForget,
 }: {
   fact: MemoryFact;
@@ -509,6 +520,7 @@ function FactRow({
   onEditChange: (text: string) => void;
   onEditKeyDown: (event: KeyboardEvent<HTMLInputElement>) => void;
   onSaveEdit: () => void;
+  onCancelEdit: () => void;
   onForget: () => void;
 }) {
   const meta = factMeta(fact);
@@ -522,7 +534,14 @@ function FactRow({
               value={editingText}
               onChange={(e) => onEditChange(e.target.value)}
               onKeyDown={onEditKeyDown}
-              onBlur={onSaveEdit}
+              onBlur={() => {
+                const trimmed = editingText.trim();
+                if (!trimmed || trimmed === fact.text) {
+                  onCancelEdit();
+                  return;
+                }
+                onSaveEdit();
+              }}
               autoFocus
               className="text-sm"
             />
@@ -539,11 +558,23 @@ function FactRow({
         </div>
         <div className="flex shrink-0 gap-0.5">
           {!editing && (
-            <IconButton label="Edit" size="sm" variant="ghost" onClick={onStartEdit}>
+            <IconButton
+              label="Edit"
+              size="sm"
+              variant="ghost"
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={onStartEdit}
+            >
               <EditIcon className="h-4 w-4" />
             </IconButton>
           )}
-          <IconButton label="Forget" size="sm" variant="ghost" onClick={onForget}>
+          <IconButton
+            label="Forget"
+            size="sm"
+            variant="ghost"
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={onForget}
+          >
             <TrashIcon className="h-4 w-4" />
           </IconButton>
         </div>

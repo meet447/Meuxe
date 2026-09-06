@@ -1,9 +1,12 @@
-import type {
-  InputHTMLAttributes,
-  LabelHTMLAttributes,
-  ReactNode,
-  SelectHTMLAttributes,
-  TextareaHTMLAttributes,
+import {
+  cloneElement,
+  isValidElement,
+  useId,
+  type InputHTMLAttributes,
+  type LabelHTMLAttributes,
+  type ReactNode,
+  type SelectHTMLAttributes,
+  type TextareaHTMLAttributes,
 } from "react";
 import { cn } from "./cn";
 import { ChevronDownIcon } from "./icons";
@@ -67,6 +70,7 @@ export function Field({
   hint,
   error,
   optional,
+  id,
   htmlFor,
   className,
   children,
@@ -75,18 +79,27 @@ export function Field({
   hint?: ReactNode;
   error?: ReactNode;
   optional?: boolean;
+  id?: string;
   htmlFor?: string;
   className?: string;
   children: ReactNode;
 }) {
+  const autoId = useId();
+  const controlId = htmlFor ?? id ?? autoId;
+  const control = isValidElement(children)
+    ? cloneElement(children as React.ReactElement<{ id?: string }>, {
+        id: (children.props as { id?: string }).id ?? controlId,
+      })
+    : children;
+
   return (
     <div className={cn("mb-4 last:mb-0", className)}>
       {label && (
-        <Label htmlFor={htmlFor} optional={optional}>
+        <Label htmlFor={controlId} optional={optional}>
           {label}
         </Label>
       )}
-      {children}
+      {control}
       {error ? <FieldError>{error}</FieldError> : hint ? <Hint>{hint}</Hint> : null}
     </div>
   );

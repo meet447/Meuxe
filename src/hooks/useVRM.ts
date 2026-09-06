@@ -3,7 +3,7 @@ import * as THREE from "three";
 import { ACESFilmicToneMapping, SRGBColorSpace } from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { FBXLoader } from "three/examples/jsm/loaders/FBXLoader.js";
-import { VRMLoaderPlugin, VRM, VRMExpressionPresetName } from "@pixiv/three-vrm";
+import { VRMLoaderPlugin, VRM, VRMExpressionPresetName, VRMUtils } from "@pixiv/three-vrm";
 import { VRMAnimationLoaderPlugin, createVRMAnimationClip } from "@pixiv/three-vrm-animation";
 import { mixamoVRMRigMap } from "../utils/mixamoRigMap";
 import { resolveAssetUrl } from "../api/tauri";
@@ -47,6 +47,7 @@ export function useVRM(canvasRef: React.RefObject<HTMLCanvasElement | null>) {
   const mouthValueRef = useRef(0);
   const speakingRef = useRef(false);
   const speakStartRef = useRef(0);
+  const headBaseRotationRef = useRef<{ x: number; y: number; z: number } | null>(null);
 
   // Debug cache
   const availableExpressionsRef = useRef<string[]>([]);
@@ -59,12 +60,40 @@ export function useVRM(canvasRef: React.RefObject<HTMLCanvasElement | null>) {
   const blinkValueRef = useRef(0);
   const blinkClosingRef = useRef(false);
 
+  const disposeSceneResources = useCallback(() => {
+    animatingRef.current = false;
+    if (animFrameRef.current) {
+      cancelAnimationFrame(animFrameRef.current);
+      animFrameRef.current = 0;
+    }
+
+    if (vrmRef.current) {
+      VRMUtils.deepDispose(vrmRef.current.scene);
+      vrmRef.current.scene.removeFromParent();
+      vrmRef.current = null;
+    }
+
+    if (rendererRef.current) {
+      rendererRef.current.dispose();
+      rendererRef.current = null;
+    }
+
+    sceneRef.current = null;
+    cameraRef.current = null;
+    pivotRef.current = null;
+    clockRef.current = null;
+    mixerRef.current = null;
+    clipsRef.current.clear();
+    currentActionRef.current = null;
+    currentClipNameRef.current = "";
+    headBaseRotationRef.current = null;
+  }, []);
+
   useEffect(() => {
     return () => {
-      animatingRef.current = false;
-      if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
+      disposeSceneResources();
     };
-  }, []);
+  }, [disposeSceneResources]);
 
   const applyViewport = useCallback(() => {
     if (!cameraRef.current) return;
@@ -328,9 +357,17 @@ export function useVRM(canvasRef: React.RefObject<HTMLCanvasElement | null>) {
         if (speakingRef.current) {
           const head = vrm.humanoid?.getNormalizedBoneNode("head");
           if (head) {
+            if (!headBaseRotationRef.current) {
+              headBaseRotationRef.current = {
+                x: head.rotation.x,
+                y: head.rotation.y,
+                z: head.rotation.z,
+              };
+            }
             const elapsed = (now - speakStartRef.current) / 1000;
-            head.rotation.y += Math.sin(elapsed * 1.8) * 0.02;
-            head.rotation.x += Math.sin(elapsed * 2.3) * 0.015;
+            const base = headBaseRotationRef.current;
+            head.rotation.y = base.y + Math.sin(elapsed * 1.8) * 0.02;
+            head.rotation.x = base.x + Math.sin(elapsed * 2.3) * 0.015;
           }
         }
       } else {
@@ -388,8 +425,8 @@ export function useVRM(canvasRef: React.RefObject<HTMLCanvasElement | null>) {
       }
 
       lastErrorRef.current = "";
-      // Clean up previous
       if (vrmRef.current) {
+        VRMUtils.deepDispose(vrmRef.current.scene);
         vrmRef.current.scene.removeFromParent();
         vrmRef.current = null;
       }
@@ -397,6 +434,7 @@ export function useVRM(canvasRef: React.RefObject<HTMLCanvasElement | null>) {
       clipsRef.current.clear();
       currentActionRef.current = null;
       currentClipNameRef.current = "";
+      headBaseRotationRef.current = null;
 
       // Create renderer once
       if (!rendererRef.current) {
@@ -618,6 +656,7 @@ export function useVRM(canvasRef: React.RefObject<HTMLCanvasElement | null>) {
     lipSyncActiveRef.current = true;
     speakingRef.current = true;
     speakStartRef.current = Date.now();
+    headBaseRotationRef.current = null;
     if (getAudioLevels) audioLevelsGetterRef.current = getAudioLevels;
 
     // Play talking animation if available
@@ -634,6 +673,14 @@ export function useVRM(canvasRef: React.RefObject<HTMLCanvasElement | null>) {
     speakingRef.current = false;
     audioLevelsGetterRef.current = null;
     mouthValueRef.current = 0;
+
+    const head = vrmRef.current?.humanoid?.getNormalizedBoneNode("head");
+    if (head && headBaseRotationRef.current) {
+      head.rotation.x = headBaseRotationRef.current.x;
+      head.rotation.y = headBaseRotationRef.current.y;
+      head.rotation.z = headBaseRotationRef.current.z;
+    }
+    headBaseRotationRef.current = null;
 
     // Return to idle animation
     const idleNames = ["idle", "breathingidle", "breathing_idle", "standing", "default"];

@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useCallback, memo, useMemo } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import type { ChatMessage, ChatTimelineItem } from "../types";
+import { openExternalUrl } from "../lib/openExternal";
 import { MicButton } from "./MicButton";
 import { ToolCallBubble } from "./ToolCallBubble";
 import {
@@ -33,6 +34,36 @@ interface Props {
 }
 
 // Markdown component config: shared between messages and streaming
+const ALLOWED_LINK_PROTOCOLS = /^(https?:|mailto:)/i;
+
+function SafeMarkdownLink({
+  href,
+  children,
+}: {
+  href?: string;
+  children?: React.ReactNode;
+}) {
+  const safeHref = href?.trim() ?? "";
+  const isAllowed = ALLOWED_LINK_PROTOCOLS.test(safeHref);
+
+  if (!isAllowed) {
+    return <span>{children}</span>;
+  }
+
+  return (
+    <a
+      href={safeHref}
+      className="text-accent-600 underline decoration-accent-300 underline-offset-2 hover:text-accent-700"
+      onClick={(event) => {
+        event.preventDefault();
+        void openExternalUrl(safeHref);
+      }}
+    >
+      {children}
+    </a>
+  );
+}
+
 const markdownComponents = {
   p: ({ children }: { children?: React.ReactNode }) => (
     <p className="mb-2 last:mb-0 leading-relaxed">{children}</p>
@@ -78,16 +109,7 @@ const markdownComponents = {
       {children}
     </blockquote>
   ),
-  a: ({ href, children }: { href?: string; children?: React.ReactNode }) => (
-    <a
-      href={href}
-      className="text-accent-600 underline decoration-accent-300 underline-offset-2 hover:text-accent-700"
-      target="_blank"
-      rel="noopener noreferrer"
-    >
-      {children}
-    </a>
-  ),
+  a: SafeMarkdownLink,
   h1: ({ children }: { children?: React.ReactNode }) => (
     <h1 className="text-lg font-bold text-ink mb-2 mt-3 first:mt-0">{children}</h1>
   ),

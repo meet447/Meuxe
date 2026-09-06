@@ -13,6 +13,7 @@ export function MicButton({ listening, onToggle, variant = "default" }: Props) {
     <button
       type="button"
       onClick={onToggle}
+      aria-label={listening ? "Stop listening" : "Start voice input"}
       className={cn(
         "flex items-center justify-center rounded-full transition-all",
         stage ? "h-9 w-9" : "h-10 w-10",

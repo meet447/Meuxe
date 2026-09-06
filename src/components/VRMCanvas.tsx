@@ -49,16 +49,29 @@ export const VRMCanvas = memo(function VRMCanvas({
   const [modelLoading, setModelLoading] = useState(false);
 
   useEffect(() => {
-    if (modelPath && modelPath !== prevModelPath.current) {
-      prevModelPath.current = modelPath;
-      setModelLoading(true);
-      loadModel(modelPath, animations).then(() => {
-        setViewport(zoom, framing);
-      }).finally(() => setModelLoading(false));
-    }
-    // Intentionally disabling lint rule - loading state is necessary for model loading UX
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-  }, [modelPath, animations, loadModel]);
+    if (!modelPath) return;
+
+    const pathChanged = modelPath !== prevModelPath.current;
+    if (!pathChanged) return;
+
+    prevModelPath.current = modelPath;
+
+    let cancelled = false;
+    setModelLoading(true);
+    loadModel(modelPath, animations)
+      .then(() => {
+        if (!cancelled) {
+          setViewport(zoom, framing);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setModelLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [modelPath, animations, loadModel, setViewport, zoom, framing]);
 
   useEffect(() => {
     if (expression && expression !== prevExpression.current) {

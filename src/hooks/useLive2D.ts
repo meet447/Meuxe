@@ -82,12 +82,45 @@ export function useLive2D(canvasRef: React.RefObject<HTMLCanvasElement | null>) 
     return mappingRef.current?.params || DEFAULT_PARAMS;
   }, []);
 
+  const disposeLive2DResources = useCallback(() => {
+    lipSyncActiveRef.current = false;
+    mouseCleanupRef.current?.();
+    mouseCleanupRef.current = null;
+
+    const model = modelRef.current;
+    if (model) {
+      if (idleHandlerRef.current) {
+        model.internalModel.off("beforeModelUpdate", idleHandlerRef.current);
+        idleHandlerRef.current = null;
+      }
+      if (lipSyncHandlerRef.current) {
+        model.internalModel.off("beforeModelUpdate", lipSyncHandlerRef.current);
+        lipSyncHandlerRef.current = null;
+      }
+      if (speakingHandlerRef.current) {
+        model.internalModel.off("beforeModelUpdate", speakingHandlerRef.current);
+        speakingHandlerRef.current = null;
+      }
+      if (typingReactionRef.current) {
+        model.internalModel.off("beforeModelUpdate", typingReactionRef.current);
+        typingReactionRef.current = null;
+      }
+      model.destroy();
+      modelRef.current = null;
+      modelSizeRef.current = { width: 0, height: 0 };
+    }
+
+    if (appRef.current) {
+      appRef.current.destroy(true, { children: true, texture: true, baseTexture: true });
+      appRef.current = null;
+    }
+  }, []);
+
   useEffect(() => {
     return () => {
-      lipSyncActiveRef.current = false;
-      mouseCleanupRef.current?.();
+      disposeLive2DResources();
     };
-  }, []);
+  }, [disposeLive2DResources]);
 
   const applyModelLayout = useCallback(() => {
     const model = modelRef.current;

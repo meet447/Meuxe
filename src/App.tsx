@@ -41,6 +41,7 @@ function App() {
 
   // Refs for global shortcut callbacks (so they always see latest state)
   const selectedCharIdRef = useRef("");
+  const historyGenerationRef = useRef(0);
 
   // Trigger to open mini composer from global shortcut
   const [miniComposerTrigger, setMiniComposerTrigger] = useState(0);
@@ -52,12 +53,13 @@ function App() {
   // Global shortcuts: registered once from main window, work in all modes
   // Actions are dispatched via Tauri events so both windows can respond
   useEffect(() => {
-    if (isMiniMode) return; // only main window registers shortcuts
+    if (isMiniMode) return;
 
     const TOGGLE = "CommandOrControl+Shift+E";
     const TEXT = "CommandOrControl+Shift+Space";
     const MIC = "CommandOrControl+Shift+M";
     const registered: string[] = [];
+    let cancelled = false;
 
     const setup = async () => {
       const broadcast = (event: string) => invoke("broadcast_event", { event }).catch(() => {});
@@ -68,6 +70,10 @@ function App() {
             toggleMini(selectedCharIdRef.current || undefined);
           }
         });
+        if (cancelled) {
+          await unregister(TOGGLE).catch(() => {});
+          return;
+        }
         registered.push(TOGGLE);
       } catch (err) {
         console.error("Failed to register toggle shortcut:", err);
@@ -79,6 +85,10 @@ function App() {
             broadcast("shortcut:text");
           }
         });
+        if (cancelled) {
+          await unregister(TEXT).catch(() => {});
+          return;
+        }
         registered.push(TEXT);
       } catch (err) {
         console.error("Failed to register text shortcut:", err);
@@ -90,6 +100,10 @@ function App() {
             broadcast("shortcut:mic");
           }
         });
+        if (cancelled) {
+          await unregister(MIC).catch(() => {});
+          return;
+        }
         registered.push(MIC);
       } catch (err) {
         console.error("Failed to register mic shortcut:", err);
@@ -98,6 +112,7 @@ function App() {
 
     void setup();
     return () => {
+      cancelled = true;
       for (const s of registered) {
         unregister(s).catch(() => {});
       }
@@ -173,6 +188,7 @@ function App() {
 
   const loadHistory = useCallback(
     async (characterId: string) => {
+      const generation = ++historyGenerationRef.current;
       try {
         const history = (await getChatHistory(characterId)) as Array<{
           role: "user" | "assistant";
@@ -180,6 +196,7 @@ function App() {
           text?: string;
           expression?: string;
         }>;
+        if (generation !== historyGenerationRef.current) return;
         setMessages(
           history.map((m) => ({
             role: m.role,
@@ -204,29 +221,27 @@ function App() {
     [setMessages]
   );
 
-  const refreshCharacters = useCallback(
-    async (preferredId?: string) => {
-      try {
-        const data = await listCharacters();
-        const chars = data as Character[];
-        setCharacters(chars);
+  const refreshCharacters = useCallback(async (preferredId?: string) => {
+    try {
+      const data = await listCharacters();
+      const chars = data as Character[];
+      setCharacters(chars);
 
-        if (preferredId && chars.some((char) => char.id === preferredId)) {
-          setSelectedCharId(preferredId);
-          return;
-        }
-
-        if (!selectedCharId && chars.length > 0) {
-          setSelectedCharId(chars[0].id);
-        } else if (selectedCharId && !chars.some((char) => char.id === selectedCharId) && chars.length > 0) {
-          setSelectedCharId(chars[0].id);
-        }
-      } catch (err) {
-        console.error("Character list load error:", err);
+      if (preferredId && chars.some((char) => char.id === preferredId)) {
+        setSelectedCharId(preferredId);
+        return;
       }
-    },
-    [selectedCharId]
-  );
+
+      const currentId = selectedCharIdRef.current;
+      if (!currentId && chars.length > 0) {
+        setSelectedCharId(chars[0].id);
+      } else if (currentId && !chars.some((char) => char.id === currentId) && chars.length > 0) {
+        setSelectedCharId(chars[0].id);
+      }
+    } catch (err) {
+      console.error("Character list load error:", err);
+    }
+  }, []);
 
   // Wire audio queue events to model
   useEffect(() => {
@@ -397,9 +412,29 @@ function App() {
 
   useEffect(() => {
     if (!selectedCharId) return;
+    const generation = ++historyGenerationRef.current;
     setMessages([]);
-    loadHistory(selectedCharId);
-  }, [selectedCharId, loadHistory, setMessages]);
+    void (async () => {
+      try {
+        const history = (await getChatHistory(selectedCharId)) as Array<{
+          role: "user" | "assistant";
+          content?: string;
+          text?: string;
+          expression?: string;
+        }>;
+        if (generation !== historyGenerationRef.current) return;
+        setMessages(
+          history.map((m) => ({
+            role: m.role,
+            content: m.content ?? m.text ?? "",
+            expression: m.expression,
+          }))
+        );
+      } catch (err) {
+        console.error("History load error:", err);
+      }
+    })();
+  }, [selectedCharId, setMessages]);
 
   // Reload chat history when switching from mini mode back to full mode
   useEffect(() => {

@@ -193,6 +193,7 @@ export function Settings({
   const [voices, setVoices] = useState<Voice[]>([]);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   const isMac = navigator.platform.toUpperCase().includes("MAC");
 
@@ -264,6 +265,7 @@ export function Settings({
 
   const handleSave = async () => {
     setSaving(true);
+    setSaveError(null);
     const update: any = {
       user: { name: userName, about: userAbout },
       tts: { provider: ttsProvider, voice: ttsVoice },
@@ -280,13 +282,14 @@ export function Settings({
       const freshConfig: any = await getConfig();
       setConfig(freshConfig);
       deriveConfigured(freshConfig);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
     } catch (err) {
       console.error("Failed to save config:", err);
+      setSaveError(err instanceof Error ? err.message : "Failed to save settings. Please try again.");
+    } finally {
+      setSaving(false);
     }
-
-    setSaving(false);
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
   };
 
   const handleResetAll = async () => {
@@ -590,7 +593,6 @@ export function Settings({
           modelId={modelId}
           onPreviewExpression={onPreviewExpression || (() => {})}
           onSaved={onExpressionsSaved}
-          onClose={() => {}}
         />
       );
     }
@@ -673,7 +675,12 @@ export function Settings({
             </IconButton>
           </header>
 
-          <div className="scrollbar-thin min-h-0 flex-1 overflow-y-auto px-8 pb-8">{renderPageContent()}</div>
+          <div className="scrollbar-thin min-h-0 flex-1 overflow-y-auto px-8 pb-8">
+            {saveError && (
+              <Notice tone="danger" className="mb-4">{saveError}</Notice>
+            )}
+            {renderPageContent()}
+          </div>
         </div>
       </Surface>
     </div>
