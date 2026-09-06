@@ -145,16 +145,19 @@ export function useChat() {
   );
 
   const tearDownListeners = useCallback((keepAudio = false) => {
-    for (const unlisten of unlistenersRef.current) {
+    // Audio listeners outlive the turn so late TTS chunks still play; dedupe so a
+    // kept listener is never unlistened twice.
+    const toRemove = new Set(unlistenersRef.current);
+    if (!keepAudio) {
+      for (const unlisten of audioUnlistenersRef.current) toRemove.add(unlisten);
+      audioUnlistenersRef.current = [];
+    } else {
+      for (const unlisten of audioUnlistenersRef.current) toRemove.delete(unlisten);
+    }
+    for (const unlisten of toRemove) {
       unlisten();
     }
     unlistenersRef.current = keepAudio ? audioUnlistenersRef.current : [];
-    if (!keepAudio) {
-      for (const unlisten of audioUnlistenersRef.current) {
-        unlisten();
-      }
-      audioUnlistenersRef.current = [];
-    }
   }, []);
 
   const commitStreamingSegment = useCallback(() => {
@@ -385,7 +388,15 @@ export function useChat() {
       ];
       audioUnlistenersRef.current = [unlistenAudio, unlistenAudioFailed];
 
-      await sendChat(characterId, message, requestId);
+      try {
+        await sendChat(characterId, message, requestId);
+      } catch (err) {
+        // The command itself failed (no chat:error will follow), so unwind here.
+        handleError({
+          request_id: requestId,
+          message: err instanceof Error ? err.message : String(err),
+        });
+      }
     },
     [isStreaming, commitStreamingSegment, upsertToolCall, tearDownListeners, scheduleStreamingTextUpdate, flushStreamingText],
   );
