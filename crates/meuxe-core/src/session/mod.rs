@@ -48,15 +48,26 @@ impl SessionStore {
         let file = fs::File::open(&path)?;
         let reader = BufReader::new(file);
         let mut messages: Vec<SessionMessage> = Vec::new();
+        let mut line_number = 0u64;
 
         for line in reader.lines() {
+            line_number += 1;
             let line = line?;
             let trimmed = line.trim();
             if trimmed.is_empty() {
                 continue;
             }
-            let msg: SessionMessage = serde_json::from_str(trimmed)?;
-            messages.push(msg);
+            match serde_json::from_str::<SessionMessage>(trimmed) {
+                Ok(msg) => messages.push(msg),
+                Err(e) => {
+                    eprintln!(
+                        "session: skipping corrupt line {} in {}: {}",
+                        line_number,
+                        path.display(),
+                        e
+                    );
+                }
+            }
         }
 
         if let Some(n) = limit {
@@ -186,5 +197,30 @@ mod tests {
 
         let history = store.load_history("char1", "user1", None).unwrap();
         assert!(history.is_empty());
+    }
+
+    #[test]
+    fn test_load_skips_corrupt_lines() {
+        let tmp = TempDir::new().unwrap();
+        let store = SessionStore::new(tmp.path());
+        let path = tmp.path().join("data/users/user1/sessions/char1.jsonl");
+        std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+
+        let valid1 = serde_json::json!({
+            "ts": "2026-01-01T00:00:00Z",
+            "role": "user",
+            "content": "first"
+        });
+        let valid2 = serde_json::json!({
+            "ts": "2026-01-01T00:01:00Z",
+            "role": "assistant",
+            "content": "second"
+        });
+        std::fs::write(&path, format!("{valid1}\nNOT VALID JSON\n{valid2}\n")).unwrap();
+
+        let history = store.load_history("char1", "user1", None).unwrap();
+        assert_eq!(history.len(), 2);
+        assert_eq!(history[0].content, "first");
+        assert_eq!(history[1].content, "second");
     }
 }

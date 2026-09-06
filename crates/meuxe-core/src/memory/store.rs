@@ -7,6 +7,7 @@ use std::path::{Path, PathBuf};
 use std::sync::RwLock;
 use uuid::Uuid;
 
+use crate::fs_util::write_atomic;
 use crate::{MeuxeError, Result};
 
 use super::types::{
@@ -16,7 +17,7 @@ use super::types::{
 
 const FACT_CAP: usize = 300;
 const THREAD_CAP: usize = 8;
-const MOMENT_SNAPSHOT_CAP: usize = 50;
+const MOMENT_CAP: usize = 50;
 const CLOSENESS_BASELINE: f64 = 0.002;
 const CLOSENESS_STEP: f64 = 0.015;
 const CLOSENESS_DRIFT_PER_DAY: f64 = 0.005;
@@ -76,7 +77,7 @@ impl CompanionMemory {
         if changed {
             self.write_bond(&dir, &bond)?;
         }
-        let snapshot_moments = cap_moments_newest_first(&moments, MOMENT_SNAPSHOT_CAP);
+        let snapshot_moments = cap_moments_newest_first(&moments, MOMENT_CAP);
         Ok(MemorySnapshot {
             bond: BondView::new(bond, now),
             facts,
@@ -170,7 +171,7 @@ impl CompanionMemory {
 
         self.persist_all(&dir, &bond, &facts, &moments)?;
 
-        let snapshot_moments = cap_moments_newest_first(&moments, MOMENT_SNAPSHOT_CAP);
+        let snapshot_moments = cap_moments_newest_first(&moments, MOMENT_CAP);
         Ok(MemorySnapshot {
             bond: BondView::new(bond, now),
             facts,
@@ -364,6 +365,8 @@ impl CompanionMemory {
             }
         }
 
+        enforce_fact_cap(facts);
+
         Ok(())
     }
 
@@ -391,9 +394,26 @@ impl CompanionMemory {
             return Ok(vec![]);
         }
         let mut moments = Vec::new();
-        for line in read_jsonl_lines(&path)? {
-            if let Ok(moment) = serde_json::from_str::<Moment>(&line) {
-                moments.push(moment);
+        let file = std::fs::File::open(&path)?;
+        let reader = std::io::BufReader::new(file);
+        let mut line_number = 0u64;
+        for line in reader.lines() {
+            line_number += 1;
+            let line = line?;
+            let trimmed = line.trim();
+            if trimmed.is_empty() {
+                continue;
+            }
+            match serde_json::from_str::<Moment>(trimmed) {
+                Ok(moment) => moments.push(moment),
+                Err(e) => {
+                    eprintln!(
+                        "memory: skipping corrupt moment line {} in {}: {}",
+                        line_number,
+                        path.display(),
+                        e
+                    );
+                }
             }
         }
         Ok(moments)
@@ -431,20 +451,14 @@ impl CompanionMemory {
 
     fn write_moments(&self, dir: &Path, moments: &[Moment]) -> Result<()> {
         let path = dir.join("moments.jsonl");
+        let capped = cap_moments_newest_first(moments, MOMENT_CAP);
         let mut body = String::new();
-        for moment in moments {
+        for moment in &capped {
             body.push_str(&serde_json::to_string(moment)?);
             body.push('\n');
         }
         write_atomic(&path, &body)
     }
-}
-
-fn write_atomic(path: &Path, contents: &str) -> Result<()> {
-    let tmp = path.with_extension("tmp");
-    std::fs::write(&tmp, contents)?;
-    std::fs::rename(tmp, path)?;
-    Ok(())
 }
 
 fn read_jsonl_lines(path: &Path) -> Result<Vec<String>> {
@@ -1112,5 +1126,59 @@ mod tests {
         assert_eq!(snap.facts.len(), 0);
         assert_eq!(snap.bond.bond.turns, 0);
         assert_eq!(snap.bond.bond.closeness, 0.0);
+    }
+
+    #[test]
+    fn legacy_import_enforces_fact_cap() {
+        let tmp = tempfile::tempdir().unwrap();
+        let legacy_dir = tmp.path().join("data/rika/user1/memory");
+        std::fs::create_dir_all(&legacy_dir).unwrap();
+
+        let mut lines = String::new();
+        for i in 0..305 {
+            let row = LegacyMemory {
+                id: format!("s{i}"),
+                ts: Utc.with_ymd_and_hms(2026, 1, 1, 0, 0, 0).unwrap(),
+                memory_type: "semantic".into(),
+                summary: format!("Unique legacy fact number {i}"),
+                importance: 0.5,
+                tags: vec![],
+                metadata: serde_json::Value::Null,
+            };
+            lines.push_str(&serde_json::to_string(&row).unwrap());
+            lines.push('\n');
+        }
+        std::fs::write(legacy_dir.join("semantic.jsonl"), lines).unwrap();
+
+        let store = CompanionMemory::new(tmp.path());
+        let snap = store.snapshot("rika", "user1").unwrap();
+        assert_eq!(snap.facts.len(), FACT_CAP);
+    }
+
+    #[test]
+    fn moment_cap_persisted_on_disk() {
+        let (_tmp, store) = mem();
+        let t0 = Utc.with_ymd_and_hms(2026, 1, 1, 0, 0, 0).unwrap();
+        for i in 0..55 {
+            store
+                .apply_turn_at(
+                    "rika",
+                    "user1",
+                    "",
+                    Some(TurnNotes {
+                        moment: Some(format!("Moment number {i}")),
+                        ..Default::default()
+                    }),
+                    t0 + chrono::Duration::minutes(i),
+                )
+                .unwrap();
+        }
+        let dir = store.snapshot("rika", "user1").unwrap().memory_dir;
+        let on_disk = std::fs::read_to_string(Path::new(&dir).join("moments.jsonl"))
+            .unwrap()
+            .lines()
+            .filter(|l| !l.trim().is_empty())
+            .count();
+        assert_eq!(on_disk, MOMENT_CAP);
     }
 }

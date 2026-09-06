@@ -2,6 +2,7 @@ pub mod types;
 
 pub use types::*;
 
+use crate::fs_util::write_atomic;
 use crate::Result;
 use std::path::{Path, PathBuf};
 
@@ -36,12 +37,8 @@ impl ConfigManager {
     }
 
     fn save_fresh(&self, config: &AppConfig) -> Result<()> {
-        if let Some(parent) = self.config_path.parent() {
-            std::fs::create_dir_all(parent)?;
-        }
         let json = serde_json::to_string_pretty(config)?;
-        std::fs::write(&self.config_path, json)?;
-        Ok(())
+        write_atomic(&self.config_path, &json)
     }
 
     pub fn load(&self) -> Result<AppConfig> {
@@ -105,12 +102,8 @@ impl ConfigManager {
             }
         }
 
-        if let Some(parent) = self.config_path.parent() {
-            std::fs::create_dir_all(parent)?;
-        }
         let json = serde_json::to_string_pretty(&merged)?;
-        std::fs::write(&self.config_path, json)?;
-        Ok(())
+        write_atomic(&self.config_path, &json)
     }
 
     pub fn mask_config(config: &AppConfig) -> AppConfig {

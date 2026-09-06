@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::RwLock;
 
+use crate::fs_util::write_atomic;
 use crate::Result;
 
 pub const GLOBAL_EXPRESSIONS: &[&str] = &[
@@ -83,7 +84,7 @@ impl ExpressionManager {
 
         let path = self.mappings_dir.join(format!("{model_id}.json"));
         let json = serde_json::to_string_pretty(&mapping)?;
-        std::fs::write(&path, json)?;
+        write_atomic(&path, &json)?;
 
         let mut cache = self.cache.write().unwrap();
         cache.insert(model_id.to_string(), mapping);
