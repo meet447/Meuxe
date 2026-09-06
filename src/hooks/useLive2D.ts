@@ -134,7 +134,9 @@ export function useLive2D(canvasRef: React.RefObject<HTMLCanvasElement | null>) 
     }
 
     if (appRef.current) {
-      appRef.current.destroy(true, { children: true, texture: true, baseTexture: true });
+      // removeView must stay false: the <canvas> is rendered by React, and letting PIXI
+      // detach it makes React's next insertBefore throw NotFoundError.
+      appRef.current.destroy(false, { children: true, texture: true, baseTexture: true });
       appRef.current = null;
     }
   }, []);
