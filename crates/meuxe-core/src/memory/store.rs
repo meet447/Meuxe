@@ -8,6 +8,7 @@ use std::sync::RwLock;
 use uuid::Uuid;
 
 use crate::fs_util::write_atomic;
+use crate::ids::validate_id;
 use crate::{MeuxeError, Result};
 
 use super::types::{
@@ -71,7 +72,7 @@ impl CompanionMemory {
         now: DateTime<Utc>,
     ) -> Result<MemorySnapshot> {
         let _guard = self.lock_read()?;
-        let dir = self.companion_dir(user_id, character_id);
+        let dir = self.companion_dir(user_id, character_id)?;
         let (mut bond, facts, moments) = self.load_or_import(&dir, character_id, user_id)?;
         let changed = apply_time_rules(&mut bond, now);
         if changed {
@@ -105,7 +106,7 @@ impl CompanionMemory {
         now: DateTime<Utc>,
     ) -> Result<MemorySnapshot> {
         let _guard = self.lock_write()?;
-        let dir = self.companion_dir(user_id, character_id);
+        let dir = self.companion_dir(user_id, character_id)?;
         let (mut bond, mut facts, mut moments) =
             self.load_or_import(&dir, character_id, user_id)?;
 
@@ -186,7 +187,7 @@ impl CompanionMemory {
             return Err(MeuxeError::Memory("Fact text cannot be empty".into()));
         }
         let _guard = self.lock_write()?;
-        let dir = self.companion_dir(user_id, character_id);
+        let dir = self.companion_dir(user_id, character_id)?;
         let (bond, mut facts, moments) = self.load_or_import(&dir, character_id, user_id)?;
         let now = Utc::now();
         let fact = upsert_fact(&mut facts, trimmed, FactSource::User, now);
@@ -206,7 +207,7 @@ impl CompanionMemory {
             return Err(MeuxeError::Memory("Fact text cannot be empty".into()));
         }
         let _guard = self.lock_write()?;
-        let dir = self.companion_dir(user_id, character_id);
+        let dir = self.companion_dir(user_id, character_id)?;
         let (bond, mut facts, moments) = self.load_or_import(&dir, character_id, user_id)?;
         let fact = facts
             .iter_mut()
@@ -222,7 +223,7 @@ impl CompanionMemory {
 
     pub fn forget_fact(&self, character_id: &str, user_id: &str, fact_id: &str) -> Result<()> {
         let _guard = self.lock_write()?;
-        let dir = self.companion_dir(user_id, character_id);
+        let dir = self.companion_dir(user_id, character_id)?;
         let (bond, mut facts, moments) = self.load_or_import(&dir, character_id, user_id)?;
         let before = facts.len();
         facts.retain(|f| f.id != fact_id);
@@ -235,7 +236,7 @@ impl CompanionMemory {
 
     pub fn forget_moment(&self, character_id: &str, user_id: &str, moment_id: &str) -> Result<()> {
         let _guard = self.lock_write()?;
-        let dir = self.companion_dir(user_id, character_id);
+        let dir = self.companion_dir(user_id, character_id)?;
         let (bond, facts, mut moments) = self.load_or_import(&dir, character_id, user_id)?;
         let before = moments.len();
         moments.retain(|m| m.id != moment_id);
@@ -248,7 +249,7 @@ impl CompanionMemory {
 
     pub fn reset(&self, character_id: &str, user_id: &str) -> Result<()> {
         let _guard = self.lock_write()?;
-        let dir = self.companion_dir(user_id, character_id);
+        let dir = self.companion_dir(user_id, character_id)?;
         if dir.exists() {
             std::fs::remove_dir_all(&dir)?;
         }
@@ -261,21 +262,27 @@ impl CompanionMemory {
         Ok(())
     }
 
-    fn companion_dir(&self, user_id: &str, character_id: &str) -> PathBuf {
-        self.data_dir
+    fn companion_dir(&self, user_id: &str, character_id: &str) -> Result<PathBuf> {
+        validate_id(user_id)?;
+        validate_id(character_id)?;
+        Ok(self
+            .data_dir
             .join("data")
             .join("users")
             .join(user_id)
             .join("companions")
-            .join(character_id)
+            .join(character_id))
     }
 
-    fn legacy_memory_dir(&self, character_id: &str, user_id: &str) -> PathBuf {
-        self.data_dir
+    fn legacy_memory_dir(&self, character_id: &str, user_id: &str) -> Result<PathBuf> {
+        validate_id(character_id)?;
+        validate_id(user_id)?;
+        Ok(self
+            .data_dir
             .join("data")
             .join(character_id)
             .join(user_id)
-            .join("memory")
+            .join("memory"))
     }
 
     fn lock_read(&self) -> Result<std::sync::RwLockReadGuard<'_, ()>> {
@@ -327,7 +334,7 @@ impl CompanionMemory {
         facts: &mut Vec<Fact>,
         moments: &mut Vec<Moment>,
     ) -> Result<()> {
-        let legacy_dir = self.legacy_memory_dir(character_id, user_id);
+        let legacy_dir = self.legacy_memory_dir(character_id, user_id)?;
         if !legacy_dir.exists() {
             return Ok(());
         }
@@ -831,6 +838,13 @@ mod tests {
             remember: vec![text.into()],
             ..Default::default()
         }
+    }
+
+    #[test]
+    fn rejects_invalid_ids() {
+        let (_tmp, store) = mem();
+        assert!(store.snapshot("../x", "user1").is_err());
+        assert!(store.add_fact("rika", "", "fact").is_err());
     }
 
     #[test]

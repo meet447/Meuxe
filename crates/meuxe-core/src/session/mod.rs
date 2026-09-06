@@ -2,6 +2,7 @@ pub mod types;
 
 pub use types::SessionMessage;
 
+use crate::ids::validate_id;
 use crate::Result;
 use std::fs;
 use std::io::{BufRead, BufReader, Write};
@@ -21,12 +22,15 @@ impl SessionStore {
         }
     }
 
-    fn session_path(&self, character_id: &str, user_id: &str) -> PathBuf {
-        self.data_dir
+    fn session_path(&self, character_id: &str, user_id: &str) -> Result<PathBuf> {
+        validate_id(character_id)?;
+        validate_id(user_id)?;
+        Ok(self
+            .data_dir
             .join("users")
             .join(user_id)
             .join("sessions")
-            .join(format!("{character_id}.jsonl"))
+            .join(format!("{character_id}.jsonl")))
     }
 
     pub fn load_history(
@@ -40,7 +44,7 @@ impl SessionStore {
             .read()
             .map_err(|e| std::io::Error::other(e.to_string()))?;
 
-        let path = self.session_path(character_id, user_id);
+        let path = self.session_path(character_id, user_id)?;
         if !path.exists() {
             return Ok(Vec::new());
         }
@@ -92,7 +96,7 @@ impl SessionStore {
             .write()
             .map_err(|e| std::io::Error::other(e.to_string()))?;
 
-        let path = self.session_path(character_id, user_id);
+        let path = self.session_path(character_id, user_id)?;
         if let Some(parent) = path.parent() {
             fs::create_dir_all(parent)?;
         }
@@ -121,7 +125,7 @@ impl SessionStore {
             .write()
             .map_err(|e| std::io::Error::other(e.to_string()))?;
 
-        let path = self.session_path(character_id, user_id);
+        let path = self.session_path(character_id, user_id)?;
         if path.exists() {
             fs::remove_file(&path)?;
         }
@@ -197,6 +201,14 @@ mod tests {
 
         let history = store.load_history("char1", "user1", None).unwrap();
         assert!(history.is_empty());
+    }
+
+    #[test]
+    fn test_load_rejects_invalid_ids() {
+        let tmp = TempDir::new().unwrap();
+        let store = SessionStore::new(tmp.path());
+        assert!(store.load_history("../x", "user1", None).is_err());
+        assert!(store.load_history("char1", "a/b", None).is_err());
     }
 
     #[test]

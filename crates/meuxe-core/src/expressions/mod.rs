@@ -3,6 +3,7 @@ use std::path::{Path, PathBuf};
 use std::sync::RwLock;
 
 use crate::fs_util::write_atomic;
+use crate::ids::validate_id;
 use crate::Result;
 
 pub const GLOBAL_EXPRESSIONS: &[&str] = &[
@@ -51,6 +52,9 @@ impl ExpressionManager {
     /// Get the expression mapping for a model. Returns cached version if available,
     /// otherwise loads from `{model_id}.json` on disk and caches the result.
     pub fn get_mapping(&self, model_id: &str) -> HashMap<String, String> {
+        if validate_id(model_id).is_err() {
+            return HashMap::new();
+        }
         // Check cache first
         {
             let cache = self.cache.read().unwrap();
@@ -80,6 +84,7 @@ impl ExpressionManager {
     /// Save an expression mapping for a model. Creates the mappings directory if needed,
     /// writes pretty JSON, and updates the cache.
     pub fn save_mapping(&self, model_id: &str, mapping: HashMap<String, String>) -> Result<()> {
+        validate_id(model_id)?;
         std::fs::create_dir_all(&self.mappings_dir)?;
 
         let path = self.mappings_dir.join(format!("{model_id}.json"));
@@ -164,6 +169,13 @@ mod tests {
         let mgr = ExpressionManager::new(tmp.path());
         assert_eq!(mgr.resolve("utsuwa", "happy"), "happy");
         assert_eq!(mgr.resolve("utsuwa", "neutral"), "relaxed");
+    }
+
+    #[test]
+    fn test_save_mapping_rejects_invalid_model_id() {
+        let tmp = TempDir::new().unwrap();
+        let mgr = ExpressionManager::new(tmp.path());
+        assert!(mgr.save_mapping("../evil", HashMap::new()).is_err());
     }
 
     #[test]

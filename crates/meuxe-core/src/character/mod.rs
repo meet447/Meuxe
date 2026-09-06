@@ -2,6 +2,7 @@ pub mod types;
 
 pub use types::*;
 
+use crate::ids::validate_id;
 use crate::{MeuxeError, Result};
 use regex::Regex;
 use std::collections::HashMap;
@@ -97,6 +98,7 @@ impl CharacterLoader {
 
     /// Load a full character, using a cache invalidated by file mtime.
     pub fn load_character(&self, character_id: &str) -> Result<Character> {
+        validate_id(character_id)?;
         let sources = self.iter_character_sources()?;
         let source = sources
             .into_iter()
@@ -671,6 +673,7 @@ fn list_vrm_animations(model_dir: &Path, model_id: &str) -> Option<Vec<Animation
 /// Read the available expression names from a Live2D model's model3.json file
 /// or the standard blend-shape set for VRM models.
 pub fn get_model_expressions(data_dir: &Path, model_id: &str) -> Result<Vec<String>> {
+    validate_id(model_id)?;
     for models_dir in model_scan_roots(data_dir) {
         let live2d_dir = models_dir.join("live2d").join(model_id);
         if live2d_dir.exists() {

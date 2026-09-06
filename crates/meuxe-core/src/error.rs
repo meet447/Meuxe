@@ -12,6 +12,8 @@ pub enum MeuxeError {
     Http(#[from] reqwest::Error),
     #[error("Character not found: {0}")]
     CharacterNotFound(String),
+    #[error("Invalid id: {0}")]
+    InvalidId(String),
     #[error("Invalid config: {0}")]
     InvalidConfig(String),
     #[error("TTS error: {0}")]
