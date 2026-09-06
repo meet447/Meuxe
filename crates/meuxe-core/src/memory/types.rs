@@ -115,17 +115,40 @@ impl Serialize for BondView {
     }
 }
 
+#[derive(Deserialize)]
+struct BondViewData {
+    closeness: f64,
+    #[serde(default)]
+    #[allow(dead_code)]
+    stage: String,
+    mood: Mood,
+    threads: Vec<Thread>,
+    last_talked_at: Option<DateTime<Utc>>,
+    #[serde(default)]
+    seconds_since_last_talk: Option<i64>,
+    turns: u64,
+    updated_at: DateTime<Utc>,
+}
+
 impl<'de> Deserialize<'de> for BondView {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: Deserializer<'de>,
     {
-        let bond = Bond::deserialize(deserializer)?;
+        let data = BondViewData::deserialize(deserializer)?;
+        let bond = Bond {
+            closeness: data.closeness,
+            mood: data.mood,
+            threads: data.threads,
+            last_talked_at: data.last_talked_at,
+            turns: data.turns,
+            updated_at: data.updated_at,
+        };
         let stage = stage_for(bond.closeness);
         Ok(Self {
-            seconds_since_last_talk: None,
-            stage,
             bond,
+            stage,
+            seconds_since_last_talk: data.seconds_since_last_talk,
         })
     }
 }
@@ -209,4 +232,67 @@ pub fn is_negative_mood(name: &str) -> bool {
 
 pub fn is_neutral_mood(name: &str) -> bool {
     name.eq_ignore_ascii_case("neutral")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use chrono::TimeZone;
+
+    #[test]
+    fn bond_view_json_round_trip_preserves_bond() {
+        let now = Utc.with_ymd_and_hms(2026, 9, 1, 12, 0, 0).unwrap();
+        let view = BondView::new(
+            Bond {
+                closeness: 0.42,
+                mood: Mood {
+                    name: "warm".into(),
+                    intensity: 0.55,
+                    cause: Some("they were honest".into()),
+                    wants: None,
+                    since: now,
+                },
+                threads: vec![Thread {
+                    id: "t1".into(),
+                    text: "Ask about the interview".into(),
+                    opened_at: now,
+                }],
+                last_talked_at: Some(now - chrono::Duration::hours(3)),
+                turns: 7,
+                updated_at: now,
+            },
+            now,
+        );
+
+        let json = serde_json::to_string(&view).unwrap();
+        let restored: BondView = serde_json::from_str(&json).unwrap();
+
+        assert_eq!(restored.bond, view.bond);
+        assert_eq!(
+            restored.seconds_since_last_talk,
+            view.seconds_since_last_talk
+        );
+        assert_eq!(restored.stage, view.stage);
+    }
+
+    #[test]
+    fn bond_view_deserialize_uses_defaults_for_derived_fields() {
+        let now = Utc.with_ymd_and_hms(2026, 9, 1, 12, 0, 0).unwrap();
+        let json = serde_json::json!({
+            "closeness": 0.2,
+            "mood": {
+                "name": "neutral",
+                "intensity": 0.0,
+                "since": now.to_rfc3339()
+            },
+            "threads": [],
+            "turns": 1,
+            "updated_at": now.to_rfc3339()
+        });
+
+        let view: BondView = serde_json::from_value(json).unwrap();
+        assert_eq!(view.bond.closeness, 0.2);
+        assert_eq!(view.stage, "getting to know each other");
+        assert_eq!(view.seconds_since_last_talk, None);
+    }
 }
