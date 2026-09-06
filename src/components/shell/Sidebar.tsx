@@ -32,7 +32,7 @@ export function Sidebar({
 }) {
   return (
     <nav className="flex w-16 shrink-0 flex-col items-center py-2">
-      <MeuxeMark className="mb-2 h-10 w-10" />
+      <MeuxeMark bare className="mb-2 h-10 w-10" />
 
       <div className="flex flex-col items-center gap-1">
         <IconButton
