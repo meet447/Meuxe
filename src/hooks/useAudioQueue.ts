@@ -28,9 +28,17 @@ export function unlockAudioPlayback() {
   }
 }
 
+function wordCount(text: string): number {
+  return text.trim().split(/\s+/).filter(Boolean).length;
+}
+
 function captionHoldMs(text: string): number {
-  const words = text.trim().split(/\s+/).filter(Boolean).length;
-  return Math.min(4000, Math.max(1400, words * 280));
+  return Math.min(4000, Math.max(1400, wordCount(text) * 280));
+}
+
+/** How long the final caption stays visible after the companion stops speaking. */
+export function captionLingerMs(text: string): number {
+  return Math.min(5000, Math.max(2500, wordCount(text) * 200));
 }
 
 interface CurrentPlayback {
@@ -48,7 +56,28 @@ export function useAudioQueue() {
   const onExpressionChangeRef = useRef<((expr: string) => void) | null>(null);
   const onAudioDoneRef = useRef<((requestId: string) => void) | null>(null);
   const neutralExpressionRef = useRef("neutral");
+  const lastSentenceRef = useRef<string | null>(null);
+  const captionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { connectAudio, getAudioLevels, disconnect } = useAudioAnalyser();
+
+  const cancelCaptionClear = useCallback(() => {
+    if (captionTimerRef.current !== null) {
+      clearTimeout(captionTimerRef.current);
+      captionTimerRef.current = null;
+    }
+  }, []);
+
+  // The face keeps its last expression, but the subtitle should not sit on
+  // screen forever once the reply has been fully spoken.
+  const scheduleCaptionClear = useCallback(() => {
+    cancelCaptionClear();
+    const text = lastSentenceRef.current;
+    if (!text) return;
+    captionTimerRef.current = setTimeout(() => {
+      captionTimerRef.current = null;
+      setSpeakingSentence(null);
+    }, captionLingerMs(text));
+  }, [cancelCaptionClear]);
 
   const connectRef = useRef(connectAudio);
   const disconnectRef = useRef(disconnect);
@@ -153,11 +182,13 @@ export function useAudioQueue() {
           queueRef.current.acknowledgeComplete(action.requestId);
           setSpeechSessionActive(false);
           onAudioDoneRef.current?.(action.requestId);
+          scheduleCaptionClear();
           break;
         }
         if (action.kind === "skip") {
           if (action.task) {
             setSpeaking(true);
+            lastSentenceRef.current = action.task.text;
             setSpeakingSentence(action.task.text);
             onExpressionChangeRef.current?.(action.task.expression);
             const holdMs =
@@ -172,6 +203,7 @@ export function useAudioQueue() {
         }
 
         setSpeaking(true);
+        lastSentenceRef.current = action.task.text;
         setSpeakingSentence(action.task.text);
         onExpressionChangeRef.current?.(action.task.expression);
         await playAudioChunk(action.audio);
@@ -181,14 +213,14 @@ export function useAudioQueue() {
     } finally {
       playingRef.current = false;
       setSpeaking(false);
-      // Keep the last caption and face until the next user turn. Resetting to
-      // idle here made the avatar go blank the instant TTS (or the no-TTS hold)
-      // finished, which is how most replies look in the desktop app.
+      // Do not reset the face or caption here: the caption lingers briefly via
+      // scheduleCaptionClear and the expression stays until the next user turn.
+      // Resetting to idle instantly made the avatar go blank as TTS finished.
       if (queueRef.current.peekNext().kind !== "wait") {
         queueMicrotask(() => processQueueRef.current());
       }
     }
-  }, [playAudioChunk]);
+  }, [playAudioChunk, scheduleCaptionClear]);
 
   const processQueueRef = useRef(processQueue);
   useEffect(() => {
@@ -201,13 +233,15 @@ export function useAudioQueue() {
   }, []);
 
   const beginRequest = useCallback((requestId: string) => {
+    cancelCaptionClear();
     stopCurrentAudio();
     queueRef.current.begin(requestId);
     setSpeaking(false);
+    lastSentenceRef.current = null;
     setSpeakingSentence(null);
     setSpeechSessionActive(true);
     processQueueRef.current();
-  }, [stopCurrentAudio]);
+  }, [cancelCaptionClear, stopCurrentAudio]);
 
   const addSentence = useCallback((requestId: string, task: SentenceTask) => {
     return processAcceptedMutation(queueRef.current.addSentence(requestId, task));
@@ -234,18 +268,21 @@ export function useAudioQueue() {
   }, [processAcceptedMutation]);
 
   const clearQueue = useCallback(() => {
+    cancelCaptionClear();
     stopCurrentAudio();
     queueRef.current.clear();
     setSpeaking(false);
+    lastSentenceRef.current = null;
     setSpeakingSentence(null);
     setSpeechSessionActive(false);
     onExpressionChangeRef.current?.(neutralExpressionRef.current);
-  }, [stopCurrentAudio]);
+  }, [cancelCaptionClear, stopCurrentAudio]);
 
   useEffect(() => () => {
+    cancelCaptionClear();
     stopCurrentAudio();
     queueRef.current.clear();
-  }, [stopCurrentAudio]);
+  }, [cancelCaptionClear, stopCurrentAudio]);
 
   const setOnExpressionChange = useCallback((cb: (expr: string) => void) => {
     onExpressionChangeRef.current = cb;

@@ -1,7 +1,7 @@
 import { act, renderHook } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { FakeAudio, installFakeAudio } from "../test/fakeAudio";
-import { useAudioQueue } from "./useAudioQueue";
+import { captionLingerMs, useAudioQueue } from "./useAudioQueue";
 
 vi.mock("./useAudioAnalyser", () => ({
   useAudioAnalyser: () => ({
@@ -21,6 +21,10 @@ describe("useAudioQueue", () => {
   beforeEach(() => {
     FakeAudio.reset();
     installFakeAudio();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   it("skips a failed middle sentence and plays index 2", async () => {
@@ -129,5 +133,70 @@ describe("useAudioQueue", () => {
     expect(result.current.speaking).toBe(false);
     expect(onExpression).toHaveBeenCalledWith("expr-0");
     expect(onExpression).not.toHaveBeenCalledWith("neutral");
+  });
+
+  it("clears the final caption after it lingers, keeping the expression", async () => {
+    vi.useFakeTimers();
+    const onExpression = vi.fn();
+    const { result } = renderHook(() => useAudioQueue());
+
+    act(() => {
+      result.current.setOnExpressionChange(onExpression);
+      result.current.beginRequest("r1");
+      result.current.addSentence("r1", sentence(0));
+      result.current.addAudio("r1", 0, "a0");
+      result.current.markTextDone("r1");
+    });
+
+    await act(async () => {
+      FakeAudio.instances[0].finish();
+      await Promise.resolve();
+    });
+
+    expect(result.current.speakingSentence).toBe("sentence-0");
+    expect(result.current.speaking).toBe(false);
+
+    await act(async () => {
+      vi.advanceTimersByTime(captionLingerMs("sentence-0") - 1);
+    });
+    expect(result.current.speakingSentence).toBe("sentence-0");
+
+    await act(async () => {
+      vi.advanceTimersByTime(1);
+    });
+    expect(result.current.speakingSentence).toBeNull();
+    expect(onExpression).not.toHaveBeenCalledWith("neutral");
+  });
+
+  it("does not clear a new reply's caption because of the previous linger timer", async () => {
+    vi.useFakeTimers();
+    const { result } = renderHook(() => useAudioQueue());
+
+    act(() => {
+      result.current.beginRequest("r1");
+      result.current.addSentence("r1", sentence(0));
+      result.current.failAudio("r1", 0);
+      result.current.markTextDone("r1");
+    });
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(result.current.speakingSentence).toBe("sentence-0");
+
+    const second = { index: 0, expression: "expr-second", text: "second reply" };
+    act(() => {
+      result.current.beginRequest("r2");
+      result.current.addSentence("r2", second);
+      result.current.addAudio("r2", 0, "a-second");
+    });
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(result.current.speakingSentence).toBe("second reply");
+
+    await act(async () => {
+      vi.advanceTimersByTime(captionLingerMs("sentence-0") + 10);
+    });
+    expect(result.current.speakingSentence).toBe("second reply");
   });
 });
