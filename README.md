@@ -15,7 +15,7 @@
 </p>
 
 > [!WARNING]
-> **Early development.** Reddit Copilot is actively changing. Expect rough edges, breaking config/API changes, and incomplete features. Feedback and issues are welcome — production use is at your own risk.
+> **Early development.** Meuxe is actively changing. Expect rough edges, breaking config/API changes, and incomplete features. Feedback and issues are welcome — production use is at your own risk.
 
 <p align="center">
   <a href="docs/DIRECTION.md">Direction</a> · <a href="docs/ROADMAP.md">Roadmap</a> · <a href="docs/DESIGN.md">Design</a> · <a href="docs/acp-agents.md">Agents</a> · <a href="CONTRIBUTING.md">Contributing</a>
