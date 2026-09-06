@@ -57,7 +57,13 @@ function lerp(a: number, b: number, t: number): number {
   return a + (b - a) * t;
 }
 
-export function useLive2D(canvasRef: React.RefObject<HTMLCanvasElement | null>) {
+/**
+ * Drives a Live2D model inside `hostRef`. The hook creates and owns the <canvas>:
+ * PIXI's destroy() loses the WebGL context and detaches the view, so it must
+ * never be a React-rendered node (React would crash on its next insertBefore).
+ */
+export function useLive2D(hostRef: React.RefObject<HTMLElement | null>) {
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const appRef = useRef<PIXI.Application | null>(null);
   const modelRef = useRef<any>(null);
   const baseScaleRef = useRef(1);
@@ -105,7 +111,23 @@ export function useLive2D(canvasRef: React.RefObject<HTMLCanvasElement | null>) 
     return mappingRef.current?.params || DEFAULT_PARAMS;
   }, []);
 
+  const ensureCanvas = useCallback((): HTMLCanvasElement | null => {
+    const host = hostRef.current;
+    if (!host) return null;
+    const existing = canvasRef.current;
+    if (existing && existing.parentElement === host) return existing;
+    existing?.remove();
+    const canvas = document.createElement("canvas");
+    canvas.className = "block h-full w-full cursor-default";
+    canvas.style.touchAction = "none";
+    host.appendChild(canvas);
+    canvasRef.current = canvas;
+    return canvas;
+  }, [hostRef]);
+
   const disposeLive2DResources = useCallback(() => {
+    // Abort any in-flight loadModel so it never touches the destroyed app.
+    loadGenerationRef.current += 1;
     lipSyncActiveRef.current = false;
     mouseCleanupRef.current?.();
     mouseCleanupRef.current = null;
@@ -134,11 +156,12 @@ export function useLive2D(canvasRef: React.RefObject<HTMLCanvasElement | null>) 
     }
 
     if (appRef.current) {
-      // removeView must stay false: the <canvas> is rendered by React, and letting PIXI
-      // detach it makes React's next insertBefore throw NotFoundError.
-      appRef.current.destroy(false, { children: true, texture: true, baseTexture: true });
+      appRef.current.destroy(true, { children: true, texture: true, baseTexture: true });
       appRef.current = null;
     }
+    // destroy() lost this canvas's WebGL context; a fresh one is created on next load.
+    canvasRef.current?.remove();
+    canvasRef.current = null;
   }, []);
 
   useEffect(() => {
@@ -152,7 +175,7 @@ export function useLive2D(canvasRef: React.RefObject<HTMLCanvasElement | null>) 
     const app = appRef.current;
     if (!model || !app) return;
 
-    const parent = canvasRef.current?.parentElement;
+    const parent = hostRef.current;
     if (parent) {
       const w = parent.clientWidth;
       const h = parent.clientHeight;
@@ -190,13 +213,12 @@ export function useLive2D(canvasRef: React.RefObject<HTMLCanvasElement | null>) 
     model.scale.set(targetScale);
     model.x = screenW / 2 + offsetX;
     model.y = targetY;
-  }, [canvasRef]);
+  }, [hostRef]);
 
   applyModelLayoutRef.current = applyModelLayout;
 
   useEffect(() => {
-    const canvas = canvasRef.current;
-    const parent = canvas?.parentElement;
+    const parent = hostRef.current;
     if (!parent) return;
 
     const observer = new ResizeObserver(() => {
@@ -206,7 +228,7 @@ export function useLive2D(canvasRef: React.RefObject<HTMLCanvasElement | null>) 
     });
     observer.observe(parent);
     return () => observer.disconnect();
-  }, [canvasRef]);
+  }, [hostRef]);
 
   // ========================================
   // IDLE ANIMATION SYSTEM
@@ -371,7 +393,7 @@ export function useLive2D(canvasRef: React.RefObject<HTMLCanvasElement | null>) 
   // ========================================
   const loadModel = useCallback(
     async (modelPath: string, mapping?: ModelMapping) => {
-      if (!canvasRef.current) return;
+      if (!hostRef.current) return;
 
       const generation = ++loadGenerationRef.current;
 
@@ -413,14 +435,16 @@ export function useLive2D(canvasRef: React.RefObject<HTMLCanvasElement | null>) 
 
       let app = appRef.current;
       if (!app) {
+        const canvas = ensureCanvas();
+        if (!canvas) return;
         app = new PIXI.Application({
-          view: canvasRef.current,
-          width: canvasRef.current.clientWidth,
-          height: canvasRef.current.clientHeight,
+          view: canvas,
+          width: canvas.clientWidth,
+          height: canvas.clientHeight,
           backgroundAlpha: 0,
           resolution: Math.min(window.devicePixelRatio || 1, 2),
           autoDensity: true,
-          resizeTo: canvasRef.current.parentElement || window,
+          resizeTo: hostRef.current,
         });
         // Cap PIXI ticker to 30 FPS
         app.ticker.maxFPS = 30;
@@ -485,6 +509,7 @@ export function useLive2D(canvasRef: React.RefObject<HTMLCanvasElement | null>) 
 
         // Cursor tracking
         const canvas = canvasRef.current;
+        if (!canvas) return;
         const onMouseMove = (e: MouseEvent) => {
           if (!modelRef.current || !canvas) return;
           try {
@@ -516,7 +541,7 @@ export function useLive2D(canvasRef: React.RefObject<HTMLCanvasElement | null>) 
         console.error("Failed to load Live2D model:", err);
       }
     },
-    [canvasRef, startIdleAnimations]
+    [hostRef, ensureCanvas, startIdleAnimations]
   );
 
   // ========================================

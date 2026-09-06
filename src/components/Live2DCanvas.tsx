@@ -31,11 +31,20 @@ export const Live2DCanvas = memo(function Live2DCanvas({
   framing,
   getAudioLevels,
 }: Props) {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const hostRef = useRef<HTMLDivElement>(null);
   const { loadModel, setExpression, startLipSync, stopLipSync, setViewport, setTypingReaction } =
-    useLive2D(canvasRef);
+    useLive2D(hostRef);
   const prevModelPath = useRef<string | null>(null);
   const prevMappingKey = useRef<string>("");
+
+  // The hook disposes its renderer on unmount; forget what was loaded so a remount
+  // (including React StrictMode's simulated one in dev) loads the model again.
+  useEffect(() => {
+    return () => {
+      prevModelPath.current = null;
+      prevMappingKey.current = "";
+    };
+  }, []);
   const prevExpression = useRef<string>("");
   const expressionRef = useRef(expression);
   expressionRef.current = expression;
@@ -123,10 +132,10 @@ export const Live2DCanvas = memo(function Live2DCanvas({
           <p className="text-lg text-ink-3">No Live2D model loaded</p>
         </div>
       )}
-      <canvas
-        ref={canvasRef}
-        className="w-full h-full cursor-default"
-        style={{ display: modelPath ? "block" : "none", touchAction: "none" }}
+      <div
+        ref={hostRef}
+        className="h-full w-full"
+        style={{ display: modelPath ? "block" : "none" }}
       />
     </div>
   );

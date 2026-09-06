@@ -110,6 +110,8 @@ export function useVRM(canvasRef: React.RefObject<HTMLCanvasElement | null>) {
   const lastErrorRef = useRef("");
 
   const disposeSceneResources = useCallback(() => {
+    // Abort any in-flight loadModel so it never touches the disposed scene/renderer.
+    loadGenerationRef.current += 1;
     loopGenerationRef.current += 1;
     animatingRef.current = false;
     if (animFrameRef.current) {

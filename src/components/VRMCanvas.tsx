@@ -45,6 +45,14 @@ export const VRMCanvas = memo(function VRMCanvas({
     handlePointerCancel,
   } = useVRM(canvasRef);
   const prevModelPath = useRef<string | null>(null);
+
+  // The hook disposes its renderer on unmount; forget what was loaded so a remount
+  // (including React StrictMode's simulated one in dev) loads the model again.
+  useEffect(() => {
+    return () => {
+      prevModelPath.current = null;
+    };
+  }, []);
   const prevExpression = useRef<string>("");
   const expressionRef = useRef(expression);
   expressionRef.current = expression;
