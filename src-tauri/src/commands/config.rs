@@ -43,6 +43,7 @@ pub fn config_reset_all(state: State<Arc<AppState>>) -> Result<(), String> {
 
     reset::reset_app_data(&state.data_dir).map_err(|e| e.to_string())?;
     state.characters.clear_cache();
+    state.memory.invalidate_all();
     state.config.reset_to_default().map_err(|e| e.to_string())?;
     invalidate_acp(&state);
     Ok(())
