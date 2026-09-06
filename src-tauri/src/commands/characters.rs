@@ -1,6 +1,8 @@
+use crate::commands::require_id;
 use crate::AppState;
 use meuxe_core::character::slugify;
 use meuxe_core::character::types::{Character, CharacterSummary, ModelInfo};
+use meuxe_core::MeuxeError;
 use rfd::FileDialog;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -17,10 +19,25 @@ pub fn characters_list(state: State<Arc<AppState>>) -> Result<Vec<CharacterSumma
 
 #[tauri::command]
 pub fn characters_get(state: State<Arc<AppState>>, id: String) -> Result<Character, String> {
+    require_id(&id)?;
+
     state
         .characters
         .load_character(&id)
         .map_err(|e| e.to_string())
+}
+
+pub(crate) fn map_character_create_error(err: MeuxeError) -> String {
+    match err {
+        MeuxeError::CharacterExists(_) => {
+            "A companion with that name already exists. Pick a different name.".into()
+        }
+        MeuxeError::InvalidId(_) => "That name can't be used. Try letters and numbers.".into(),
+        MeuxeError::InvalidConfig(msg) if msg.contains("letters or numbers") => {
+            "That name can't be used. Try letters and numbers.".into()
+        }
+        other => other.to_string(),
+    }
 }
 
 #[tauri::command]
@@ -37,6 +54,8 @@ pub fn characters_create(
     user_name: String,
     user_about: String,
 ) -> Result<String, String> {
+    require_id(&model_id)?;
+
     state
         .characters
         .create_character(
@@ -50,7 +69,7 @@ pub fn characters_create(
             &user_name,
             &user_about,
         )
-        .map_err(|e| e.to_string())
+        .map_err(map_character_create_error)
 }
 
 #[tauri::command]
@@ -216,4 +235,39 @@ fn contains_live2d_model(dir: &Path) -> bool {
     }
 
     false
+}
+
+#[cfg(test)]
+mod tests {
+    use super::map_character_create_error;
+    use meuxe_core::MeuxeError;
+
+    #[test]
+    fn map_character_create_error_duplicate_name() {
+        let msg = map_character_create_error(MeuxeError::CharacterExists("luna".into()));
+        assert_eq!(
+            msg,
+            "A companion with that name already exists. Pick a different name."
+        );
+    }
+
+    #[test]
+    fn map_character_create_error_invalid_id() {
+        let msg = map_character_create_error(MeuxeError::InvalidId("bad id".into()));
+        assert_eq!(msg, "That name can't be used. Try letters and numbers.");
+    }
+
+    #[test]
+    fn map_character_create_error_empty_slug() {
+        let msg = map_character_create_error(MeuxeError::InvalidConfig(
+            "Character name must contain letters or numbers".into(),
+        ));
+        assert_eq!(msg, "That name can't be used. Try letters and numbers.");
+    }
+
+    #[test]
+    fn map_character_create_error_other() {
+        let msg = map_character_create_error(MeuxeError::Io(std::io::Error::other("disk")));
+        assert!(msg.contains("disk"));
+    }
 }

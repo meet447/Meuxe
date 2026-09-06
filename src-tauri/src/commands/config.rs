@@ -1,5 +1,5 @@
-use crate::acp::invalidate_acp;
-use crate::acp::invalidate_acp_if_agent_changed;
+use crate::acp::{invalidate_acp, invalidate_acp_if_agent_changed};
+use crate::commands::require_id;
 use crate::AppState;
 use meuxe_core::config::types::AppConfig;
 use meuxe_core::reset;
@@ -24,6 +24,8 @@ pub fn config_set_active_character(
     state: State<Arc<AppState>>,
     character_id: String,
 ) -> Result<(), String> {
+    require_id(&character_id)?;
+
     state
         .config
         .set_active_character(&character_id)

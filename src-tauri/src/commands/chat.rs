@@ -1,3 +1,4 @@
+use crate::commands::require_id;
 use crate::commands::user::derive_user_id;
 use crate::AppState;
 use regex::Regex;
@@ -527,6 +528,8 @@ pub async fn chat_send(
     message: String,
     request_id: String,
 ) -> Result<(), String> {
+    require_id(&character_id)?;
+
     let state = Arc::clone(&state);
     let app_handle = app.clone();
 
@@ -820,6 +823,8 @@ pub fn chat_history(
     state: State<Arc<AppState>>,
     character_id: String,
 ) -> Result<Vec<serde_json::Value>, String> {
+    require_id(&character_id)?;
+
     let config = state.config.load().map_err(|e| e.to_string())?;
     let user_id = derive_user_id(&config);
 
@@ -838,6 +843,8 @@ pub fn chat_history(
 
 #[tauri::command]
 pub fn chat_clear(state: State<Arc<AppState>>, character_id: String) -> Result<(), String> {
+    require_id(&character_id)?;
+
     let config = state.config.load().map_err(|e| e.to_string())?;
     let user_id = derive_user_id(&config);
 
