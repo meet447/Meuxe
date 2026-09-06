@@ -1,7 +1,7 @@
 import { act, renderHook } from "@testing-library/react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { FakeAudio, installFakeAudio } from "../test/fakeAudio";
-import { captionLingerMs, useAudioQueue } from "./useAudioQueue";
+import { useAudioQueue } from "./useAudioQueue";
 
 vi.mock("./useAudioAnalyser", () => ({
   useAudioAnalyser: () => ({
@@ -21,10 +21,6 @@ describe("useAudioQueue", () => {
   beforeEach(() => {
     FakeAudio.reset();
     installFakeAudio();
-  });
-
-  afterEach(() => {
-    vi.useRealTimers();
   });
 
   it("skips a failed middle sentence and plays index 2", async () => {
@@ -113,7 +109,7 @@ describe("useAudioQueue", () => {
     expect(FakeAudio.instances).toHaveLength(0);
   });
 
-  it("keeps the last caption and expression after a no-audio reply", async () => {
+  it("clears the caption after a no-audio reply but keeps the expression", async () => {
     const onExpression = vi.fn();
     const { result } = renderHook(() => useAudioQueue());
 
@@ -129,14 +125,13 @@ describe("useAudioQueue", () => {
       await Promise.resolve();
     });
 
-    expect(result.current.speakingSentence).toBe("sentence-0");
+    expect(result.current.speakingSentence).toBeNull();
     expect(result.current.speaking).toBe(false);
     expect(onExpression).toHaveBeenCalledWith("expr-0");
     expect(onExpression).not.toHaveBeenCalledWith("neutral");
   });
 
-  it("clears the final caption after it lingers, keeping the expression", async () => {
-    vi.useFakeTimers();
+  it("shows a caption only while its sentence is playing", async () => {
     const onExpression = vi.fn();
     const { result } = renderHook(() => useAudioQueue());
 
@@ -144,59 +139,31 @@ describe("useAudioQueue", () => {
       result.current.setOnExpressionChange(onExpression);
       result.current.beginRequest("r1");
       result.current.addSentence("r1", sentence(0));
+      result.current.addSentence("r1", sentence(1));
       result.current.addAudio("r1", 0, "a0");
-      result.current.markTextDone("r1");
     });
+    expect(result.current.speakingSentence).toBe("sentence-0");
 
+    // Sentence 0 finishes before sentence 1's audio has arrived: no stale caption.
     await act(async () => {
       FakeAudio.instances[0].finish();
       await Promise.resolve();
     });
+    expect(result.current.speakingSentence).toBeNull();
 
-    expect(result.current.speakingSentence).toBe("sentence-0");
-    expect(result.current.speaking).toBe(false);
-
-    await act(async () => {
-      vi.advanceTimersByTime(captionLingerMs("sentence-0") - 1);
+    act(() => {
+      result.current.addAudio("r1", 1, "a1");
     });
-    expect(result.current.speakingSentence).toBe("sentence-0");
+    expect(result.current.speakingSentence).toBe("sentence-1");
 
     await act(async () => {
-      vi.advanceTimersByTime(1);
+      FakeAudio.instances[1].finish();
+      result.current.markTextDone("r1");
+      await Promise.resolve();
     });
     expect(result.current.speakingSentence).toBeNull();
+    expect(result.current.speaking).toBe(false);
+    expect(onExpression).toHaveBeenLastCalledWith("expr-1");
     expect(onExpression).not.toHaveBeenCalledWith("neutral");
-  });
-
-  it("does not clear a new reply's caption because of the previous linger timer", async () => {
-    vi.useFakeTimers();
-    const { result } = renderHook(() => useAudioQueue());
-
-    act(() => {
-      result.current.beginRequest("r1");
-      result.current.addSentence("r1", sentence(0));
-      result.current.failAudio("r1", 0);
-      result.current.markTextDone("r1");
-    });
-    await act(async () => {
-      await Promise.resolve();
-    });
-    expect(result.current.speakingSentence).toBe("sentence-0");
-
-    const second = { index: 0, expression: "expr-second", text: "second reply" };
-    act(() => {
-      result.current.beginRequest("r2");
-      result.current.addSentence("r2", second);
-      result.current.addAudio("r2", 0, "a-second");
-    });
-    await act(async () => {
-      await Promise.resolve();
-    });
-    expect(result.current.speakingSentence).toBe("second reply");
-
-    await act(async () => {
-      vi.advanceTimersByTime(captionLingerMs("sentence-0") + 10);
-    });
-    expect(result.current.speakingSentence).toBe("second reply");
   });
 });
