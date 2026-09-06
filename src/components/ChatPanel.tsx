@@ -1,12 +1,18 @@
-import { useState, useRef, useEffect, memo, useMemo } from "react";
+import { useState, useRef, useEffect, memo, useMemo, useCallback } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import type { ChatTimelineItem } from "../types";
 import { openExternalUrl } from "../lib/openExternal";
+import {
+  CHAT_TIMELINE_WINDOW,
+  shouldShowEarlierControl,
+  sliceWindow,
+} from "../lib/chatTimelineWindow";
 import { ToolCallBubble } from "./ToolCallBubble";
 import { ChatComposer } from "./chat/ChatComposer";
 import {
   AsciiAccent,
+  Button,
   Dots,
   Mascot,
   Pill,
@@ -260,9 +266,34 @@ export function ChatPanel({
 }: Props) {
   const dark = appearance === "dark";
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
   const internalInputRef = useRef<HTMLTextAreaElement>(null);
   const inputRef = externalInputRef || internalInputRef;
   const scrollRafRef = useRef<number | null>(null);
+  const [windowSize, setWindowSize] = useState(CHAT_TIMELINE_WINDOW);
+
+  useEffect(() => {
+    if (timeline.length === 0) {
+      setWindowSize(CHAT_TIMELINE_WINDOW);
+    }
+  }, [timeline.length]);
+
+  const { visible: visibleTimeline, hiddenCount } = useMemo(
+    () => sliceWindow(timeline, windowSize),
+    [timeline, windowSize],
+  );
+
+  const showEarlier = shouldShowEarlierControl(hiddenCount, timeline.length, windowSize);
+
+  const handleShowEarlier = useCallback(() => {
+    const container = scrollContainerRef.current;
+    const previousHeight = container?.scrollHeight ?? 0;
+    setWindowSize((current) => current + CHAT_TIMELINE_WINDOW);
+    requestAnimationFrame(() => {
+      if (!container) return;
+      container.scrollTop += container.scrollHeight - previousHeight;
+    });
+  }, []);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -300,7 +331,7 @@ export function ChatPanel({
   // ⚡ Bolt: Memoize the mapping of the timeline to prevent O(N) React element
   // recreation on every streaming token update.
   const renderedTimeline = useMemo(() => {
-    return timeline.map((item) => {
+    return visibleTimeline.map((item) => {
       if (item.kind === "tool") {
         return (
           <ToolCallBubble key={item.id} call={item.call} onConfirm={onToolConfirm} />
@@ -320,12 +351,20 @@ export function ChatPanel({
         />
       );
     });
-  }, [timeline, onToolConfirm, characterName, dark]);
+  }, [visibleTimeline, onToolConfirm, characterName, dark]);
 
   return (
     <div className="flex-1 flex flex-col bg-transparent relative h-full">
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto px-5 py-5 space-y-4 scrollbar-thin">
+      <div ref={scrollContainerRef} className="flex-1 overflow-y-auto px-5 py-5 space-y-4 scrollbar-thin">
+        {showEarlier && (
+          <div className="flex justify-center pb-1">
+            <Button variant="ghost" size="sm" onClick={handleShowEarlier}>
+              Show earlier messages ({hiddenCount} earlier messages)
+            </Button>
+          </div>
+        )}
+
         {timeline.length === 0 && !streamingText && (
           <div className="mt-16 flex flex-col items-center text-center">
             <Mascot mood="neutral" className="h-16 w-16" />
