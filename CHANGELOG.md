@@ -6,6 +6,22 @@ The GitHub Release workflow uses the version in `package.json` / `src-tauri/taur
 
 ## [Unreleased]
 
+## [0.1.5] - 2026-09-26
+
+### Added
+- Scroll or pinch on the VRM to zoom toward that part of the model. The camera stays centered, a face scroll can close in, and scrolling off the model does nothing.
+- Add companion is now Name, Look, then Personality, with progress dots, a compact marketplace, and look names in the companion switcher.
+- Settings → Avatar explains zoom and adds Reset view. Zoom ranges from 30% to 450%.
+
+### Changed
+- The half/full crop button ignores the current zoom and returns to the starting view. Half body frames a little closer on the face.
+- Setup prompts no longer cover the avatar. Assistant setup stays in the composer, and the speech-model prompt is a single row.
+
+### Known limits
+- macOS builds are not signed or notarized. After dragging the app to Applications, run `xattr -c /Applications/Meuxe.app`.
+- Intel Macs and Windows are not built for this release.
+- Chat requires an ACP-compatible agent. Model selection depends on the models the agent exposes and its sign-in state.
+
 ## [0.1.4] - 2026-09-09
 
 ### Added
