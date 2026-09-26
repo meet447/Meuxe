@@ -9,13 +9,13 @@ The GitHub Release workflow uses the version in `package.json` / `src-tauri/taur
 ## [0.1.5] - 2026-09-26
 
 ### Added
-- Scroll or pinch on the VRM to zoom toward that part of the model. The camera stays centered, a face scroll can close in, and scrolling off the model does nothing.
-- Add companion is now Name, Look, then Personality, with progress dots, a compact marketplace, and look names in the companion switcher.
-- Settings → Avatar explains zoom and adds Reset view. Zoom ranges from 30% to 450%.
+- Get closer to your companion. Scroll or pinch on them and the view comes in on that spot. Rest the pointer on their face for a close portrait. Scrolling on the empty space around them does nothing.
+- Creating a companion is three short steps: name, look, then personality. The look you pick is named on the card, and your companion list uses that name too.
+- Settings → Avatar can reset the view. Zoom runs from a small full-body view up to a close portrait.
 
 ### Changed
-- The half/full crop button ignores the current zoom and returns to the starting view. Half body frames a little closer on the face.
-- Setup prompts no longer cover the avatar. Assistant setup stays in the composer, and the speech-model prompt is a single row.
+- The crop button above Settings switches between the full figure and a closer half-body view of the face. It always starts fresh, so a zoom you already made is not kept in the crop.
+- Setup messages no longer sit on top of your companion. If an assistant is not ready yet, that note stays in the message field. The speech download is one line just above it.
 
 ### Known limits
 - macOS builds are not signed or notarized. After dragging the app to Applications, run `xattr -c /Applications/Meuxe.app`.
