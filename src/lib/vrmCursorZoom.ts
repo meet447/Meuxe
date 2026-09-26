@@ -37,7 +37,7 @@ export interface WebKitGestureEventLike extends Event {
 export function framingRig(framing: VrmFraming): FramingRig {
   // Half ignores wheel zoom: a fixed bust crop, a little closer on the face than full body.
   return framing === "half"
-    ? { baseDistance: 1.7, yPos: 1.55, lookY: 1.42 }
+    ? { baseDistance: 1.95, yPos: 1.5, lookY: 1.38 }
     : { baseDistance: 4.5, yPos: 1.3, lookY: 1.0 };
 }
 

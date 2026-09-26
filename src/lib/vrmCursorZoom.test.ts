@@ -76,7 +76,7 @@ describe("vrmCursorZoom", () => {
   it("half framing centres the hit", () => {
     const s = { zoom: 1.0, framing: "half" as const, panX: 0, panY: 0 };
     const next = zoomVrmTowardHit(s, 1.5, 100);
-    expect(next.panY).toBeCloseTo(1.5 - 1.42);
+    expect(next.panY).toBeCloseTo(1.5 - 1.38);
   });
 
   it("zoomForFraming ignores the current zoom", () => {
