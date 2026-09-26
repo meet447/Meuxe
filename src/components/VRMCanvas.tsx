@@ -164,7 +164,8 @@ export const VRMCanvas = memo(function VRMCanvas({
     const onWheel = (e: WheelEvent) => {
       e.preventDefault();
       const factor = wheelZoomFactor(e, canvas.clientHeight);
-      emitZoom(zoomAtClientPointRef.current(factor, e.clientX, e.clientY));
+      const next = zoomAtClientPointRef.current(factor, e.clientX, e.clientY);
+      if (next !== null) emitZoom(next);
     };
 
     const onGestureStart = (e: Event) => {
@@ -177,7 +178,8 @@ export const VRMCanvas = memo(function VRMCanvas({
       const g = e as WebKitGestureEventLike;
       const factor = lastScale === 0 ? 1 : g.scale / lastScale;
       lastScale = g.scale;
-      emitZoom(zoomAtClientPointRef.current(factor, g.clientX, g.clientY));
+      const next = zoomAtClientPointRef.current(factor, g.clientX, g.clientY);
+      if (next !== null) emitZoom(next);
     };
 
     canvas.addEventListener("wheel", onWheel, { passive: false });

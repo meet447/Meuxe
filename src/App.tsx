@@ -561,7 +561,7 @@ function App() {
 
             <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20 flex flex-col items-center px-4 pb-6 pt-16">
               {timeline.length === 0 && !streamingText && !isStreaming && (
-                <div className="mb-6">
+                <div className="mb-3 w-full max-w-xl">
                   <StageEmptyState
                     characterName={charName}
                     agentReady={agentReady}
@@ -572,6 +572,7 @@ function App() {
               {needsWhisperDownload && (
                 <div className="pointer-events-auto mb-3 w-full max-w-xl">
                   <WhisperDownloadCard
+                    compact
                     progress={downloadProgress}
                     error={voiceError}
                     downloading={downloading}

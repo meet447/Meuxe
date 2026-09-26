@@ -2,7 +2,7 @@ import { render, waitFor } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { VRMCanvas } from "./VRMCanvas";
 
-const zoomAtClientPoint = vi.fn<(factor: number, x: number, y: number) => number>(() => 1.2);
+const zoomAtClientPoint = vi.fn<(factor: number, x: number, y: number) => number | null>(() => 1.2);
 const setViewport = vi.fn();
 const resetPan = vi.fn();
 
@@ -63,6 +63,25 @@ describe("VRMCanvas wheel zoom", () => {
     await waitFor(() => {
       expect(onZoomChange).toHaveBeenCalledWith(1.2);
     });
+  });
+
+  it("wheel miss does not emit", async () => {
+    zoomAtClientPoint.mockReturnValue(null);
+    const onZoomChange = vi.fn();
+    const { container } = render(
+      <VRMCanvas {...baseProps} onZoomChange={onZoomChange} />,
+    );
+    const canvas = container.querySelector("canvas");
+    const wheel = new WheelEvent("wheel", { deltaY: 100, bubbles: true, cancelable: true });
+    canvas!.dispatchEvent(wheel);
+
+    expect(wheel.defaultPrevented).toBe(true);
+    expect(zoomAtClientPoint).toHaveBeenCalled();
+
+    await new Promise<void>((resolve) => {
+      requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+    });
+    expect(onZoomChange).not.toHaveBeenCalled();
   });
 
   it("wheelZoom false does not zoom or prevent default", () => {

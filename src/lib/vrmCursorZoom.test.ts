@@ -3,18 +3,19 @@ import * as THREE from "three";
 import {
   clampZoom,
   wheelZoomFactor,
-  zoomVrmCameraAtPoint,
+  zoomVrmTowardHit,
   clientToNdc,
   applyVrmCamera,
-  intersectModelPlane,
-  MAX_CAMERA_PAN,
+  raycastVrmHitY,
+  visibleHalfHeightAtModel,
   VRM_ZOOM_MAX,
+  FOCUS_FRAME_MARGIN,
 } from "./vrmCursorZoom";
 
 describe("vrmCursorZoom", () => {
   it("clampZoom bounds and passthrough", () => {
     expect(clampZoom(0.1)).toBe(0.3);
-    expect(clampZoom(5)).toBe(2);
+    expect(clampZoom(5)).toBe(4.5);
     expect(clampZoom(1.1)).toBe(1.1);
   });
 
@@ -43,55 +44,80 @@ describe("vrmCursorZoom", () => {
     return new THREE.PerspectiveCamera(30, 16 / 9, 0.1, 20);
   }
 
-  it("zoomVrmCameraAtPoint keeps world point under cursor (full, zoom in)", () => {
-    const camera = makeCamera();
-    const ndc = { x: 0.4, y: -0.3 };
-    const state = { zoom: 1, framing: "full" as const, panX: 0, panY: 0 };
-    const before = new THREE.Vector3();
-    const after = new THREE.Vector3();
-    applyVrmCamera(camera, state);
-    intersectModelPlane(camera, ndc, before);
-    const next = zoomVrmCameraAtPoint(camera, state, ndc, 1.25);
-    applyVrmCamera(camera, next);
-    intersectModelPlane(camera, ndc, after);
-    expect(before.distanceTo(after)).toBeLessThan(1e-6);
+  it("miss returns same state", () => {
+    const s = { zoom: 1.1, framing: "full" as const, panX: 0, panY: 0 };
+    expect(zoomVrmTowardHit(s, null, 1.25)).toBe(s);
   });
 
-  it("zoomVrmCameraAtPoint keeps world point under cursor (half, zoom out)", () => {
-    const camera = makeCamera();
-    const ndc = { x: 0.4, y: -0.3 };
-    const state = { zoom: 1, framing: "half" as const, panX: 0, panY: 0 };
-    const before = new THREE.Vector3();
-    const after = new THREE.Vector3();
-    applyVrmCamera(camera, state);
-    intersectModelPlane(camera, ndc, before);
-    const next = zoomVrmCameraAtPoint(camera, state, ndc, 0.8);
-    applyVrmCamera(camera, next);
-    intersectModelPlane(camera, ndc, after);
-    expect(before.distanceTo(after)).toBeLessThan(1e-6);
+  it("at max returns same state", () => {
+    const s = { zoom: VRM_ZOOM_MAX, framing: "full" as const, panX: 0, panY: 0 };
+    expect(zoomVrmTowardHit(s, 1.45, 1.5)).toBe(s);
   });
 
-  it("center ndc keeps pan at zero", () => {
-    const camera = makeCamera();
-    const state = { zoom: 1, framing: "full" as const, panX: 0, panY: 0 };
-    const next = zoomVrmCameraAtPoint(camera, state, { x: 0, y: 0 }, 1.25);
-    expect(next.panX).toBeCloseTo(0);
-    expect(next.panY).toBeCloseTo(0);
+  it("panX never moves on zoom in", () => {
+    const s = { zoom: 1.1, framing: "full" as const, panX: 0, panY: 0 };
+    const next = zoomVrmTowardHit(s, 1.45, 1.2);
+    expect(next.zoom).toBeCloseTo(1.32);
+    expect(next.panX).toBe(0);
+    expect(next.panY).toBeCloseTo(0.45 * 0.22 / 3.4);
+    expect(next.panY).toBeLessThan(0.45);
   });
 
-  it("at max zoom, factor 1.5 returns same state", () => {
-    const camera = makeCamera();
-    const state = { zoom: VRM_ZOOM_MAX, framing: "full" as const, panX: 0, panY: 0 };
-    const next = zoomVrmCameraAtPoint(camera, state, { x: 0.5, y: 0.5 }, 1.5);
-    expect(next).toBe(state);
+  it("max zoom centres the hit", () => {
+    const s = { zoom: 1.1, framing: "full" as const, panX: 0, panY: 0 };
+    const next = zoomVrmTowardHit(s, 1.45, 100);
+    expect(next.zoom).toBe(4.5);
+    expect(next.panY).toBeCloseTo(0.45);
   });
 
-  it("pan stays within MAX_CAMERA_PAN on big off-centre zoom-out", () => {
+  it("half framing centres the hit", () => {
+    const s = { zoom: 1.0, framing: "half" as const, panX: 0, panY: 0 };
+    const next = zoomVrmTowardHit(s, 1.5, 100);
+    expect(next.panY).toBeCloseTo(0.15);
+  });
+
+  it("zoom out eases panY", () => {
+    let s = { zoom: 4.5, framing: "full" as const, panX: 0, panY: 0.45 };
+    const mid = zoomVrmTowardHit(s, 1.45, 0.5);
+    expect(mid.zoom).toBeCloseTo(2.25);
+    expect(mid.panY).toBeCloseTo(0.45 * 1.25 / 3.5);
+    s = { ...mid };
+    const out = zoomVrmTowardHit(s, 1.45, 0.4);
+    expect(out.zoom).toBeCloseTo(0.9);
+    expect(out.panY).toBe(0);
+  });
+
+  it("in-frame guard on a low hit", () => {
+    const s = { zoom: 1.1, framing: "full" as const, panX: 0, panY: 0 };
+    const next = zoomVrmTowardHit(s, 0.05, 2.0);
+    expect(next.zoom).toBeCloseTo(2.2);
+    const half = visibleHalfHeightAtModel("full", 2.2) * FOCUS_FRAME_MARGIN;
+    expect(Math.abs(0.05 - (1.0 + next.panY))).toBeLessThanOrEqual(half + 1e-6);
+  });
+
+  it("raycastVrmHitY hit and miss", () => {
     const camera = makeCamera();
-    const state = { zoom: 1.5, framing: "full" as const, panX: 1.99, panY: 0 };
-    const next = zoomVrmCameraAtPoint(camera, state, { x: -0.9, y: 0.8 }, 0.5);
-    expect(next.panX).toBeLessThanOrEqual(MAX_CAMERA_PAN);
-    expect(next.panX).toBeGreaterThanOrEqual(-MAX_CAMERA_PAN);
+    applyVrmCamera(camera, { zoom: 1, framing: "full", panX: 0, panY: 0 });
+
+    const root = new THREE.Group();
+    const mesh = new THREE.Mesh(
+      new THREE.BoxGeometry(0.3, 0.3, 0.3),
+      new THREE.MeshBasicMaterial(),
+    );
+    mesh.position.set(0, 1.45, 0);
+    root.add(mesh);
+    root.updateMatrixWorld(true);
+
+    const centre = new THREE.Vector3(0, 1.45, 0).project(camera);
+    const hitY = raycastVrmHitY(camera, { x: centre.x, y: centre.y }, root);
+    expect(hitY).not.toBeNull();
+    expect(hitY!).toBeCloseTo(1.45, 1);
+
+    expect(raycastVrmHitY(camera, { x: 0.9, y: 0.9 }, root)).toBeNull();
+  });
+
+  it("visibleHalfHeightAtModel(full, 4.5)", () => {
+    expect(visibleHalfHeightAtModel("full", 4.5)).toBeCloseTo(0.268, 2);
   });
 
   it("clientToNdc maps corners", () => {

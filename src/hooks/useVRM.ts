@@ -15,7 +15,9 @@ import { resolveVrmExpressionName } from "../utils/vrmExpressions";
 import {
   applyVrmCamera,
   clientToNdc,
-  zoomVrmCameraAtPoint,
+  raycastVrmHitY,
+  zoomVrmTowardHit,
+  VRM_CAMERA_FOV_DEG,
   type VrmViewState,
 } from "../lib/vrmCursorZoom";
 import {
@@ -659,7 +661,7 @@ export function useVRM(
       if (!cameraRef.current) {
         const { w, h } = readCanvasSize();
         const camera = new THREE.PerspectiveCamera(
-          30,
+          VRM_CAMERA_FOV_DEG,
           w > 0 && h > 0 ? w / h : 1,
           0.1,
           20,
@@ -878,23 +880,25 @@ export function useVRM(
   }, [syncStageLayout]);
 
   const zoomAtClientPoint = useCallback(
-    (factor: number, clientX: number, clientY: number) => {
+    (factor: number, clientX: number, clientY: number): number | null => {
       const camera = cameraRef.current;
       const canvas = canvasRef.current;
       const vrm = vrmRef.current;
-      if (!camera || !canvas || !vrm) return viewportRef.current.zoom;
+      if (!camera || !canvas || !vrm) return null;
 
-      const rect = canvas.getBoundingClientRect();
-      const ndc = clientToNdc(clientX, clientY, rect);
+      const ndc = clientToNdc(clientX, clientY, canvas.getBoundingClientRect());
       const { zoom, framing, offsetX, offsetY, panX, panY } = viewportRef.current;
       const viewState: VrmViewState = { zoom, framing, panX, panY };
-      const next = zoomVrmCameraAtPoint(camera, viewState, ndc, factor);
+      applyVrmCamera(camera, viewState);
+      const hitY = raycastVrmHitY(camera, ndc, vrm.scene);
+      const next = zoomVrmTowardHit(viewState, hitY, factor);
+      if (next === viewState) return null;
       viewportRef.current = {
         zoom: next.zoom,
         framing,
         offsetX,
         offsetY,
-        panX: next.panX,
+        panX: 0,
         panY: next.panY,
       };
       syncStageLayout();

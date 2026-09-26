@@ -1,8 +1,11 @@
 import * as THREE from "three";
 
 export const VRM_ZOOM_MIN = 0.3;
-export const VRM_ZOOM_MAX = 2.0;
+export const VRM_ZOOM_MAX = 4.5;
 export const DEFAULT_AVATAR_ZOOM = 1.1;
+export const VRM_CAMERA_FOV_DEG = 30;
+export const ZOOM_FOCUS_START = 1.0;
+export const FOCUS_FRAME_MARGIN = 0.8;
 export const MAX_CAMERA_PAN = 2.0;
 export const WHEEL_ZOOM_SENSITIVITY = 0.0015;
 export const PINCH_ZOOM_SENSITIVITY = 0.01;
@@ -68,38 +71,56 @@ export function applyVrmCamera(camera: THREE.PerspectiveCamera, s: VrmViewState)
 }
 
 const _raycaster = new THREE.Raycaster();
-const _plane = new THREE.Plane(new THREE.Vector3(0, 0, 1), 0);
+const _ndcVec = new THREE.Vector2();
 
-export function intersectModelPlane(
-  camera: THREE.PerspectiveCamera,
-  ndc: { x: number; y: number },
-  out: THREE.Vector3,
-): THREE.Vector3 | null {
-  _raycaster.setFromCamera(new THREE.Vector2(ndc.x, ndc.y), camera);
-  return _raycaster.ray.intersectPlane(_plane, out);
+export function visibleHalfHeightAtModel(framing: VrmFraming, zoom: number): number {
+  const rig = framingRig(framing);
+  const halfFovRad = (VRM_CAMERA_FOV_DEG / 2) * (Math.PI / 180);
+  return (rig.baseDistance / zoom) * Math.tan(halfFovRad);
 }
 
-export function zoomVrmCameraAtPoint(
+export function raycastVrmHitY(
   camera: THREE.PerspectiveCamera,
-  state: VrmViewState,
   ndc: { x: number; y: number },
+  root: THREE.Object3D,
+): number | null {
+  _ndcVec.set(ndc.x, ndc.y);
+  _raycaster.setFromCamera(_ndcVec, camera);
+  const hits = _raycaster.intersectObject(root, true);
+  return hits[0]?.point.y ?? null;
+}
+
+export function zoomVrmTowardHit(
+  state: VrmViewState,
+  hitY: number | null,
   factor: number,
 ): VrmViewState {
+  if (hitY === null) return state;
+
   const nextZoom = clampZoom(state.zoom * factor);
   if (nextZoom === state.zoom) return state;
-  const before = new THREE.Vector3();
-  const after = new THREE.Vector3();
-  applyVrmCamera(camera, state);
-  const beforeHit = intersectModelPlane(camera, ndc, before);
-  const zoomed = { ...state, zoom: nextZoom };
-  applyVrmCamera(camera, zoomed);
-  const afterHit = intersectModelPlane(camera, ndc, after);
-  if (!beforeHit || !afterHit) return zoomed;
-  const next = {
-    ...zoomed,
-    panX: clampPan(state.panX + (before.x - after.x)),
-    panY: clampPan(state.panY + (before.y - after.y)),
-  };
-  applyVrmCamera(camera, next);
-  return next;
+
+  const lookY = framingRig(state.framing).lookY;
+  const target = hitY - lookY;
+
+  let panY = state.panY;
+  if (nextZoom > state.zoom) {
+    const denom = VRM_ZOOM_MAX - state.zoom;
+    const s = denom > 0 ? Math.min(1, Math.max(0, (nextZoom - state.zoom) / denom)) : 1;
+    panY = state.panY + (target - state.panY) * s;
+    const half = visibleHalfHeightAtModel(state.framing, nextZoom) * FOCUS_FRAME_MARGIN;
+    panY = Math.min(target + half, Math.max(target - half, panY));
+  } else {
+    if (nextZoom <= ZOOM_FOCUS_START || state.zoom <= ZOOM_FOCUS_START) {
+      panY = 0;
+    } else {
+      panY =
+        state.panY *
+        (nextZoom - ZOOM_FOCUS_START) /
+        (state.zoom - ZOOM_FOCUS_START);
+    }
+  }
+
+  panY = clampPan(panY);
+  return { zoom: nextZoom, framing: state.framing, panX: 0, panY };
 }

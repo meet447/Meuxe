@@ -40,8 +40,9 @@ export function AvatarViewportSettings({
   return (
     <div className="space-y-6">
       <p className="text-sm text-ink-2">
-        Scroll or pinch over your companion to zoom toward the cursor. Drag sideways to turn them.
-        Use the framing button in the left sidebar to switch between full and half body.
+        Scroll or pinch on your companion to zoom in on that part — the model stays centered. Zoom
+        does nothing if the pointer is off the model. Drag sideways to turn them. Use the framing
+        button in the left sidebar to switch between full and half body.
       </p>
 
       <Surface tone="raised" className="p-5">
