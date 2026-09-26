@@ -924,6 +924,7 @@ export function useVRM(
     setViewport,
     zoomAtClientPoint,
     resetPan,
+    resetOrbit: resetOrbitRotation,
     setTypingReaction,
     handlePointerDown,
     handlePointerMove,

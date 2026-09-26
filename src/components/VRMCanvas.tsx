@@ -48,6 +48,7 @@ export const VRMCanvas = memo(function VRMCanvas({
     setViewport,
     zoomAtClientPoint,
     resetPan,
+    resetOrbit,
     setTypingReaction,
     handlePointerDown,
     handlePointerMove,
@@ -140,12 +141,15 @@ export const VRMCanvas = memo(function VRMCanvas({
 
   const resetPanRef = useRef(resetPan);
   resetPanRef.current = resetPan;
+  const resetOrbitRef = useRef(resetOrbit);
+  resetOrbitRef.current = resetOrbit;
   const viewRef = useRef({ zoom, framing });
   viewRef.current = { zoom, framing };
 
   useEffect(() => {
     if (!viewResetTick) return;
     resetPanRef.current();
+    resetOrbitRef.current();
     const { zoom: nextZoom, framing: nextFraming } = viewRef.current;
     setViewportRef.current(nextZoom, nextFraming);
   }, [viewResetTick]);

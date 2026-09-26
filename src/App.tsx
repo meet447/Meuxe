@@ -27,7 +27,7 @@ import {
   resolveAssetUrl,
   resolveLive2DModelUrl,
 } from "./api/tauri";
-import { DEFAULT_AVATAR_ZOOM } from "./lib/vrmCursorZoom";
+import { DEFAULT_AVATAR_ZOOM, zoomForFraming } from "./lib/vrmCursorZoom";
 import type { AppConfig, Character, ModelInfo } from "./types";
 
 const Live2DCanvas = lazy(() =>
@@ -384,6 +384,11 @@ function App() {
   );
 
   const [framing, setFraming] = useState<"full" | "half">("full");
+  const handleFramingChange = useCallback((next: "full" | "half") => {
+    setFraming(next);
+    setZoom(zoomForFraming(next));
+    setViewResetTick((tick) => tick + 1);
+  }, []);
 
   const canvasProps = useMemo(
     () => ({
@@ -398,10 +403,10 @@ function App() {
       viewResetTick,
       onZoomChange: setZoom,
       onBackgroundChange: setBackground,
-      onFramingChange: setFraming,
+      onFramingChange: handleFramingChange,
       getAudioLevels,
     }),
-    [modelPath, currentExpression, speaking, userTyping, isMiniMode, background, zoom, framing, viewResetTick, getAudioLevels]
+    [modelPath, currentExpression, speaking, userTyping, isMiniMode, background, zoom, framing, viewResetTick, getAudioLevels, handleFramingChange]
   );
 
   const avatarCanvas = (
@@ -506,7 +511,7 @@ function App() {
           }}
           charSelectOpen={charSelectOpen}
           framing={framing}
-          onFramingChange={setFraming}
+          onFramingChange={handleFramingChange}
         />
       )}
 

@@ -5,6 +5,7 @@ import { VRMCanvas } from "./VRMCanvas";
 const zoomAtClientPoint = vi.fn<(factor: number, x: number, y: number) => number | null>(() => 1.2);
 const setViewport = vi.fn();
 const resetPan = vi.fn();
+const resetOrbit = vi.fn();
 
 vi.mock("../hooks/useVRM", () => ({
   useVRM: () => ({
@@ -15,6 +16,7 @@ vi.mock("../hooks/useVRM", () => ({
     setViewport,
     zoomAtClientPoint,
     resetPan,
+    resetOrbit,
     setTypingReaction: vi.fn(),
     handlePointerDown: vi.fn(),
     handlePointerMove: vi.fn(),
@@ -134,6 +136,7 @@ describe("VRMCanvas wheel zoom", () => {
     setViewport.mockClear();
     rerender(<VRMCanvas {...baseProps} viewResetTick={1} />);
     expect(resetPan).toHaveBeenCalled();
+    expect(resetOrbit).toHaveBeenCalled();
     expect(setViewport).toHaveBeenCalledWith(1.1, "full");
   });
 });

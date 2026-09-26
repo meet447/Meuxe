@@ -9,6 +9,7 @@ import {
   raycastVrmHitY,
   focusYForHit,
   visibleHalfHeightAtModel,
+  zoomForFraming,
   VRM_ZOOM_MAX,
   FOCUS_FRAME_MARGIN,
   FACE_BELOW_HEAD,
@@ -75,7 +76,12 @@ describe("vrmCursorZoom", () => {
   it("half framing centres the hit", () => {
     const s = { zoom: 1.0, framing: "half" as const, panX: 0, panY: 0 };
     const next = zoomVrmTowardHit(s, 1.5, 100);
-    expect(next.panY).toBeCloseTo(0.15);
+    expect(next.panY).toBeCloseTo(1.5 - 1.42);
+  });
+
+  it("zoomForFraming ignores the current zoom", () => {
+    expect(zoomForFraming("full")).toBe(1.1);
+    expect(zoomForFraming("half")).toBe(1.1);
   });
 
   it("zoom out eases panY", () => {
