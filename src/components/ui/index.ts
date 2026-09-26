@@ -14,6 +14,7 @@ export type { MascotMood, MascotTone } from "./Mascot";
 export { MeuxeMark } from "./MeuxeMark";
 export { AsciiAccent } from "./AsciiAccent";
 export { Dots } from "./Dots";
+export { StepDots } from "./StepDots";
 export { KeyCombo } from "./Kbd";
 export { VibeGlyph } from "./VibeGlyph";
 export * from "./icons";

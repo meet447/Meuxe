@@ -8,22 +8,24 @@ import {
 } from "../api/tauri";
 import { buildCompanionPersonalityDraft } from "../lib/companionCharacterDraft";
 import { COMPANION_VIBE_PACKS } from "../lib/companionVibes";
+import { displayNameForModelId, lookLabelForModelId, MARKETPLACE_LISTINGS } from "../lib/marketplaceCatalog";
 import { DEFAULT_TTS_VOICE } from "../lib/ttsPresets";
 import type { AppConfig, ModelInfo } from "../types";
 import { CompanionAvatarPreview } from "./onboarding/CompanionAvatarPreview";
 import { ModelMarketplace } from "./marketplace/ModelMarketplace";
-import { MARKETPLACE_LISTINGS } from "../lib/marketplaceCatalog";
 import {
+  BackIcon,
   Button,
-  ChevronDownIcon,
+  ChevronRightIcon,
   ChoiceCard,
   CloseIcon,
-  cn,
   Field,
   IconButton,
   Input,
   Notice,
+  Pill,
   Select,
+  StepDots,
   Surface,
   Textarea,
   VibeGlyph,
@@ -32,6 +34,14 @@ import {
 
 const RELATIONSHIP_OPTIONS = ["Gentle", "Teasing", "Protective", "Devoted", "Chaotic"] as const;
 const SPEECH_OPTIONS = ["Poetic", "Playful", "Calm", "Sharp", "Intimate"] as const;
+
+const STEPS = ["Name", "Look", "Personality"] as const;
+const STEP_HEADINGS = ["What should they be called?", "Pick their look", "How they come across"];
+const STEP_SUBTITLES = [
+  "They'll use your current voice settings. You can change that later in Settings.",
+  "Choose an installed look, install a free one, or import your own files.",
+  "Pick a vibe, then read what we'll tell them about themselves.",
+];
 
 function defaultModelId(models: ModelInfo[]): string {
   if (models.some((m) => m.id === "haru")) return "haru";
@@ -61,7 +71,8 @@ export function AddCharacterModal({
   const [livePreviewArmed, setLivePreviewArmed] = useState(false);
   const [personality, setPersonality] = useState("");
   const [personalityTouched, setPersonalityTouched] = useState(false);
-  const [advancedOpen, setAdvancedOpen] = useState(false);
+  const [step, setStep] = useState(0);
+  const [draftEditing, setDraftEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [importing, setImporting] = useState<null | "live2d" | "vrm">(null);
   const [importMessage, setImportMessage] = useState("");
@@ -69,6 +80,8 @@ export function AddCharacterModal({
 
   useEffect(() => {
     if (!open) return;
+
+    setStep(0);
 
     getConfig()
       .then((cfg: AppConfig) => {
@@ -100,6 +113,12 @@ export function AddCharacterModal({
     setImportMessage("");
     setLivePreviewArmed(false);
   }, [open]);
+
+  useEffect(() => {
+    if (step === 2 && models.some((m) => m.id === modelId)) {
+      setLivePreviewArmed(true);
+    }
+  }, [step, modelId, models]);
 
   const selectLook = (id: string) => {
     setModelId(id);
@@ -153,6 +172,13 @@ export function AddCharacterModal({
     setSpeechStyle(pack.speech_style);
   };
 
+  const canProceed =
+    step === 0
+      ? Boolean(name.trim())
+      : step === 1
+        ? Boolean(modelId)
+        : Boolean(personality.trim());
+
   const handleImportModel = async (kind: "live2d" | "vrm") => {
     setImporting(kind);
     setError("");
@@ -168,7 +194,7 @@ export function AddCharacterModal({
       setModels(refreshed);
       if (imported.id) {
         selectLook(imported.id);
-        setImportMessage(`Imported model "${imported.id}" and selected it.`);
+        setImportMessage(`Imported ${displayNameForModelId(imported.id)} and selected it.`);
       } else {
         setImportMessage("Model imported successfully.");
       }
@@ -188,7 +214,9 @@ export function AddCharacterModal({
     setModelId("haru");
     setLivePreviewArmed(false);
     setPersonalityTouched(false);
-    setAdvancedOpen(false);
+    setStep(0);
+    setDraftEditing(false);
+    setImportMessage("");
     setError("");
     onClose();
   };
@@ -230,6 +258,23 @@ export function AddCharacterModal({
     }
   };
 
+  const goNext = () => {
+    if (!canProceed) return;
+    setStep((s) => Math.min(s + 1, 2));
+  };
+
+  useEffect(() => {
+    if (!open) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        resetAndClose();
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [open]);
+
   if (!open) return null;
 
   return (
@@ -242,14 +287,19 @@ export function AddCharacterModal({
         radius="sheet"
         tone="surface"
         elevation="pop"
-        className="relative z-[101] flex h-[min(860px,92vh)] w-full max-w-5xl animate-fade-in flex-col overflow-hidden"
+        className="relative z-[101] flex h-[min(720px,90vh)] w-full max-w-4xl animate-fade-in flex-col overflow-hidden"
       >
-        <div className="flex shrink-0 items-start justify-between gap-4 px-7 pb-4 pt-6">
-          <div>
-            <h2 className="text-[22px] font-bold tracking-tight text-ink">Add a companion</h2>
-            <p className="mt-1 text-sm text-ink-2">
-              Name them, pick a look, and tune their personality. They use your current voice settings.
+        <div className="flex shrink-0 items-start justify-between gap-4 px-7 pb-3 pt-6">
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-3">
+              <h2 className="text-[22px] font-bold tracking-tight text-ink">Add a companion</h2>
+              <StepDots count={3} current={step} />
+            </div>
+            <p className="mt-1 text-[12px] text-ink-3">
+              Step {step + 1} of 3 · {STEPS[step]}
             </p>
+            <h3 className="mt-3 text-[20px] font-semibold tracking-tight text-ink">{STEP_HEADINGS[step]}</h3>
+            <p className="mt-1 text-sm text-ink-2">{STEP_SUBTITLES[step]}</p>
           </div>
           <IconButton label="Close" size="sm" onClick={resetAndClose}>
             <CloseIcon className="h-4 w-4" />
@@ -257,164 +307,230 @@ export function AddCharacterModal({
         </div>
 
         <div className="min-h-0 flex-1 overflow-hidden">
-          <div className="grid h-full min-h-0 grid-rows-1 gap-6 px-7 lg:grid-cols-[minmax(0,1fr)_minmax(260px,360px)] lg:gap-8">
-            <div className="min-h-0 space-y-6 overflow-y-auto overscroll-contain pb-2 pr-1 scrollbar-thin">
-              <div className="lg:hidden">
+          {step === 0 ? (
+            <div className="h-full overflow-y-auto px-7 py-6 scrollbar-thin">
+              <div className="mx-auto w-full max-w-[480px]">
+                <Field
+                  label="Companion name"
+                  hint="This is how they appear in chat and in your companions list."
+                >
+                  <Input
+                    type="text"
+                    autoFocus
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    placeholder="e.g. Mira"
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && canProceed) goNext();
+                    }}
+                  />
+                </Field>
+                {error ? <Notice tone="danger">{error}</Notice> : null}
+              </div>
+            </div>
+          ) : (
+            <div className="grid h-full min-h-0 grid-rows-1 gap-6 px-7 py-6 lg:grid-cols-[minmax(0,1fr)_minmax(260px,340px)] lg:gap-8">
+              <div className="min-h-0 space-y-6 overflow-y-auto overscroll-contain pb-2 pr-1 scrollbar-thin">
+                <div className="lg:hidden">
+                  <CompanionAvatarPreview
+                    model={previewModel}
+                    companionName={name}
+                    vibeLabel={selectedVibePack?.title}
+                    thumbnailUrl={previewThumbnailUrl}
+                    className="h-[220px]"
+                  />
+                </div>
+
+                {step === 1 ? (
+                  <>
+                    <ModelMarketplace
+                      compact
+                      installedModels={models}
+                      selectedId={modelId}
+                      onSelect={selectLook}
+                      onInstalled={async (model) => {
+                        const refreshed = await listModels();
+                        setModels(refreshed);
+                        selectLook(model.id);
+                        setImportMessage(`Installed ${displayNameForModelId(model.id)} and selected it.`);
+                      }}
+                      onImportLive2D={() => handleImportModel("live2d")}
+                      onImportVRM={() => handleImportModel("vrm")}
+                      importing={importing}
+                    />
+                    {importMessage ? (
+                      <Notice tone="success">{importMessage}</Notice>
+                    ) : null}
+                    <p className="text-sm text-ink-2">
+                      Selected: {lookLabelForModelId(modelId, selectedModel?.type)}
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <Field label="Vibe">
+                      <div className="grid grid-cols-2 gap-2.5">
+                        {COMPANION_VIBE_PACKS.map((pack) => (
+                          <ChoiceCard
+                            key={pack.id}
+                            compact
+                            selected={vibe === pack.id}
+                            onClick={() => selectVibePack(pack.id)}
+                            leading={<VibeGlyph id={pack.id} />}
+                            title={pack.title}
+                            description={pack.subtitle}
+                          />
+                        ))}
+                      </div>
+                    </Field>
+
+                    <Field label="Fine-tune">
+                      <div className="grid gap-4 sm:grid-cols-2">
+                        <Field label="Relationship">
+                          <Select
+                            value={relationshipStyle}
+                            onChange={(e) => setRelationshipStyle(e.target.value)}
+                          >
+                            {RELATIONSHIP_OPTIONS.map((opt) => (
+                              <option key={opt} value={opt}>
+                                {opt}
+                              </option>
+                            ))}
+                          </Select>
+                        </Field>
+                        <Field label="Speech style">
+                          <Select
+                            value={speechStyle}
+                            onChange={(e) => setSpeechStyle(e.target.value)}
+                          >
+                            {SPEECH_OPTIONS.map((opt) => (
+                              <option key={opt} value={opt}>
+                                {opt}
+                              </option>
+                            ))}
+                          </Select>
+                        </Field>
+                      </div>
+                    </Field>
+
+                    <Field
+                      label="Personality draft"
+                      hint="Built from your picks. Edit it if you want something more specific."
+                    >
+                      {draftEditing ? (
+                        <>
+                          <Textarea
+                            value={personality}
+                            onChange={(e) => {
+                              setPersonalityTouched(true);
+                              setPersonality(e.target.value);
+                            }}
+                            rows={10}
+                          />
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="mt-3"
+                            onClick={() => setDraftEditing(false)}
+                          >
+                            Done editing
+                          </Button>
+                        </>
+                      ) : (
+                        <>
+                          <Surface tone="well" elevation="none" className="overflow-hidden">
+                            <pre className="max-h-56 overflow-y-auto whitespace-pre-wrap p-4 font-sans text-xs leading-relaxed text-ink-2 scrollbar-thin">
+                              {personality}
+                            </pre>
+                          </Surface>
+                          <div className="mt-3 flex flex-wrap items-center gap-2">
+                            <Button
+                              variant="secondary"
+                              size="sm"
+                              onClick={() => setDraftEditing(true)}
+                            >
+                              Edit draft
+                            </Button>
+                            {personalityTouched ? (
+                              <>
+                                <Pill tone="honey">Edited</Pill>
+                                <Button
+                                  variant="soft"
+                                  size="sm"
+                                  leading={<WandIcon className="h-4 w-4" />}
+                                  onClick={() => {
+                                    setPersonalityTouched(false);
+                                    setPersonality(buildCompanionPersonalityDraft(draftInput));
+                                  }}
+                                >
+                                  Regenerate from picks
+                                </Button>
+                              </>
+                            ) : null}
+                          </div>
+                        </>
+                      )}
+                    </Field>
+                  </>
+                )}
+
+                {error ? <Notice tone="danger">{error}</Notice> : null}
+              </div>
+
+              <div className="hidden min-h-0 lg:block">
                 <CompanionAvatarPreview
                   model={previewModel}
                   companionName={name}
                   vibeLabel={selectedVibePack?.title}
                   thumbnailUrl={previewThumbnailUrl}
-                  className="h-[220px]"
+                  className="h-full min-h-0 rounded-panel"
                 />
               </div>
-
-              <Field label="Companion name">
-                <Input
-                  type="text"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder="What should they be called?"
-                />
-              </Field>
-
-              <Field
-                label="Look"
-                hint="Browse the marketplace, install a free look, or import your own files."
-              >
-                <ModelMarketplace
-                  installedModels={models}
-                  selectedId={modelId}
-                  onSelect={selectLook}
-                  onInstalled={async (model) => {
-                    const refreshed = await listModels();
-                    setModels(refreshed);
-                    selectLook(model.id);
-                    setImportMessage(`Installed "${model.id}" and selected it.`);
-                  }}
-                  onImportLive2D={() => handleImportModel("live2d")}
-                  onImportVRM={() => handleImportModel("vrm")}
-                  importing={importing}
-                />
-                {importMessage ? (
-                  <Notice tone="success" className="mt-3">
-                    {importMessage}
-                  </Notice>
-                ) : null}
-              </Field>
-
-              <Field label="Personality">
-                <div className="grid grid-cols-2 gap-2.5">
-                  {COMPANION_VIBE_PACKS.map((pack) => (
-                    <ChoiceCard
-                      key={pack.id}
-                      compact
-                      selected={vibe === pack.id}
-                      onClick={() => selectVibePack(pack.id)}
-                      leading={<VibeGlyph id={pack.id} />}
-                      title={pack.title}
-                      description={pack.subtitle}
-                    />
-                  ))}
-                </div>
-              </Field>
-
-              <Surface tone="well" elevation="none" className="overflow-hidden">
-                <button
-                  type="button"
-                  onClick={() => setAdvancedOpen((v) => !v)}
-                  className="flex w-full items-center justify-between px-5 py-4 text-left text-sm font-semibold text-ink"
-                >
-                  Advanced personality
-                  <ChevronDownIcon
-                    className={cn(
-                      "h-4 w-4 text-ink-3 transition-transform",
-                      advancedOpen && "rotate-180",
-                    )}
-                  />
-                </button>
-                {advancedOpen ? (
-                  <div className="space-y-4 border-t border-line px-5 pb-5 pt-4">
-                    <div className="grid gap-4 sm:grid-cols-2">
-                      <Field label="Relationship">
-                        <Select
-                          value={relationshipStyle}
-                          onChange={(e) => setRelationshipStyle(e.target.value)}
-                        >
-                          {RELATIONSHIP_OPTIONS.map((opt) => (
-                            <option key={opt} value={opt}>
-                              {opt}
-                            </option>
-                          ))}
-                        </Select>
-                      </Field>
-                      <Field label="Speech style">
-                        <Select
-                          value={speechStyle}
-                          onChange={(e) => setSpeechStyle(e.target.value)}
-                        >
-                          {SPEECH_OPTIONS.map((opt) => (
-                            <option key={opt} value={opt}>
-                              {opt}
-                            </option>
-                          ))}
-                        </Select>
-                      </Field>
-                    </div>
-                    <Field label="Personality draft">
-                      <Textarea
-                        value={personality}
-                        onChange={(e) => {
-                          setPersonalityTouched(true);
-                          setPersonality(e.target.value);
-                        }}
-                        rows={8}
-                      />
-                      <Button
-                        size="sm"
-                        variant="soft"
-                        leading={<WandIcon className="h-4 w-4" />}
-                        className="mt-3"
-                        onClick={() => {
-                          setPersonalityTouched(false);
-                          setPersonality(buildCompanionPersonalityDraft(draftInput));
-                        }}
-                      >
-                        Regenerate from presets
-                      </Button>
-                    </Field>
-                  </div>
-                ) : null}
-              </Surface>
-
-              {error ? <Notice tone="danger">{error}</Notice> : null}
             </div>
-
-            <div className="hidden min-h-0 lg:block">
-              <CompanionAvatarPreview
-                model={previewModel}
-                companionName={name}
-                vibeLabel={selectedVibePack?.title}
-                thumbnailUrl={previewThumbnailUrl}
-                className="h-full min-h-0 rounded-panel"
-              />
-            </div>
-          </div>
+          )}
         </div>
 
         <div className="flex shrink-0 items-center justify-between gap-4 bg-well/50 px-7 py-5">
-          <Button variant="secondary" size="lg" onClick={resetAndClose}>
-            Cancel
-          </Button>
-          <Button
-            variant="primary"
-            size="lg"
-            loading={saving}
-            disabled={!name.trim() || !personality.trim()}
-            onClick={handleCreate}
-          >
-            Create companion
-          </Button>
+          <div>
+            {step === 0 ? (
+              <Button variant="secondary" size="lg" onClick={resetAndClose}>
+                Cancel
+              </Button>
+            ) : (
+              <Button
+                variant="ghost"
+                size="lg"
+                leading={<BackIcon className="h-4 w-4" />}
+                onClick={() => setStep((s) => s - 1)}
+              >
+                Back
+              </Button>
+            )}
+          </div>
+          <div>
+            {step < 2 ? (
+              <Button
+                variant="primary"
+                size="lg"
+                className="min-w-[160px]"
+                trailing={<ChevronRightIcon className="h-4 w-4" />}
+                disabled={!canProceed}
+                onClick={goNext}
+              >
+                Continue
+              </Button>
+            ) : (
+              <Button
+                variant="primary"
+                size="lg"
+                className="min-w-[160px]"
+                loading={saving}
+                disabled={!canProceed}
+                onClick={handleCreate}
+              >
+                Create companion
+              </Button>
+            )}
+          </div>
         </div>
       </Surface>
     </div>

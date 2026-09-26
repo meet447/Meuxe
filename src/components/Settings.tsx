@@ -173,6 +173,7 @@ export function Settings({
   avatarZoom,
   avatarBackground,
   onAvatarZoomChange,
+  onAvatarResetView,
   onAvatarBackgroundChange,
 }: {
   onClose: () => void;
@@ -187,6 +188,7 @@ export function Settings({
   avatarZoom?: number;
   avatarBackground?: string;
   onAvatarZoomChange?: (zoom: number) => void;
+  onAvatarResetView?: () => void;
   onAvatarBackgroundChange?: (bg: string) => void;
 }) {
   const [page, setPage] = useState<SettingsPage>("llm");
@@ -610,6 +612,7 @@ export function Settings({
             zoom={avatarZoom}
             background={avatarBackground}
             onZoomChange={onAvatarZoomChange}
+            onResetView={onAvatarResetView}
             onBackgroundChange={onAvatarBackgroundChange}
           />
         );

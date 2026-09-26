@@ -27,6 +27,7 @@ import {
   resolveAssetUrl,
   resolveLive2DModelUrl,
 } from "./api/tauri";
+import { DEFAULT_AVATAR_ZOOM } from "./lib/vrmCursorZoom";
 import type { AppConfig, Character, ModelInfo } from "./types";
 
 const Live2DCanvas = lazy(() =>
@@ -49,6 +50,7 @@ type AvatarStageProps = {
     background: string;
     zoom: number;
     framing: "full" | "half";
+    viewResetTick?: number;
     onZoomChange: (zoom: number) => void;
     onBackgroundChange: (bg: string) => void;
     onFramingChange: (framing: "full" | "half") => void;
@@ -109,7 +111,12 @@ function App() {
   const [addCharacterOpen, setAddCharacterOpen] = useState(false);
   const [currentExpression, setCurrentExpression] = useState("neutral");
   const [background, setBackground] = useState("transparent");
-  const [zoom, setZoom] = useState(1.1);
+  const [zoom, setZoom] = useState(DEFAULT_AVATAR_ZOOM);
+  const [viewResetTick, setViewResetTick] = useState(0);
+  const resetAvatarView = useCallback(() => {
+    setZoom(DEFAULT_AVATAR_ZOOM);
+    setViewResetTick((tick) => tick + 1);
+  }, []);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [expressionsConfigured, setExpressionsConfigured] = useState<boolean | null>(null);
@@ -351,7 +358,7 @@ function App() {
       setMessages([]);
       clearQueue();
       setCurrentExpression("neutral");
-      setZoom(1.1);
+      setZoom(DEFAULT_AVATAR_ZOOM);
       setActiveCharacter(id).catch(console.error);
     },
     [setMessages, clearQueue]
@@ -369,7 +376,7 @@ function App() {
       setMessages([]);
       clearQueue();
       setCurrentExpression("neutral");
-      setZoom(1.1);
+      setZoom(DEFAULT_AVATAR_ZOOM);
       setSettingsOpen(false);
       setActiveCharacter(characterId).catch(console.error);
     },
@@ -388,12 +395,13 @@ function App() {
       background,
       zoom,
       framing,
+      viewResetTick,
       onZoomChange: setZoom,
       onBackgroundChange: setBackground,
       onFramingChange: setFraming,
       getAudioLevels,
     }),
-    [modelPath, currentExpression, speaking, userTyping, isMiniMode, background, zoom, framing, getAudioLevels]
+    [modelPath, currentExpression, speaking, userTyping, isMiniMode, background, zoom, framing, viewResetTick, getAudioLevels]
   );
 
   const avatarCanvas = (
@@ -528,6 +536,7 @@ function App() {
             <CharacterSelect
               menuOnly
               characters={characters}
+              models={models}
               selected={selectedCharId}
               onSelect={handleCharacterChange}
               onAddCharacter={() => setAddCharacterOpen(true)}
@@ -663,6 +672,7 @@ function App() {
           avatarZoom={zoom}
           avatarBackground={background}
           onAvatarZoomChange={setZoom}
+          onAvatarResetView={resetAvatarView}
           onAvatarBackgroundChange={setBackground}
         />
       )}

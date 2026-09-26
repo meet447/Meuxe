@@ -2,6 +2,7 @@ import { useRef, useEffect, useState, memo } from "react";
 import { useVRM } from "../hooks/useVRM";
 import type { AnimationInfo } from "../types";
 import { LoadingOverlay } from "./LoadingOverlay";
+import { wheelZoomFactor, type WebKitGestureEventLike } from "../lib/vrmCursorZoom";
 
 interface Props {
   modelPath: string | null;
@@ -13,6 +14,9 @@ interface Props {
   background: string;
   zoom: number;
   framing: "full" | "half";
+  wheelZoom?: boolean;
+  /** Increment to re-center pan and apply the current zoom (Settings → Reset zoom). */
+  viewResetTick?: number;
   onZoomChange?: (zoom: number) => void;
   onFramingChange?: (framing: "full" | "half") => void;
   onBackgroundChange?: (bg: string) => void;
@@ -29,6 +33,9 @@ export const VRMCanvas = memo(function VRMCanvas({
   background,
   zoom,
   framing,
+  wheelZoom = true,
+  viewResetTick = 0,
+  onZoomChange,
   getAudioLevels,
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -39,6 +46,8 @@ export const VRMCanvas = memo(function VRMCanvas({
     startLipSync,
     stopLipSync,
     setViewport,
+    zoomAtClientPoint,
+    resetPan,
     setTypingReaction,
     handlePointerDown,
     handlePointerMove,
@@ -53,11 +62,34 @@ export const VRMCanvas = memo(function VRMCanvas({
   loadModelRef.current = loadModel;
   const setViewportRef = useRef(setViewport);
   setViewportRef.current = setViewport;
+  const zoomAtClientPointRef = useRef(zoomAtClientPoint);
+  zoomAtClientPointRef.current = zoomAtClientPoint;
   const setExpressionRef = useRef(setExpression);
   setExpressionRef.current = setExpression;
   const backgroundRef = useRef(background);
   backgroundRef.current = background;
+  const onZoomChangeRef = useRef(onZoomChange);
+  onZoomChangeRef.current = onZoomChange;
+  const echoRef = useRef(new Set<number>());
+  const framingRef = useRef(framing);
+  const zoomEmitRafRef = useRef<number | null>(null);
+  const pendingZoomRef = useRef<number | null>(null);
   const [modelLoading, setModelLoading] = useState(false);
+
+  const emitZoom = (nextZoom: number) => {
+    pendingZoomRef.current = nextZoom;
+    if (zoomEmitRafRef.current !== null) return;
+    zoomEmitRafRef.current = requestAnimationFrame(() => {
+      zoomEmitRafRef.current = null;
+      const value = pendingZoomRef.current;
+      if (value === null) return;
+      pendingZoomRef.current = null;
+      const echo = echoRef.current;
+      echo.add(value);
+      if (echo.size > 32) echo.clear();
+      onZoomChangeRef.current?.(value);
+    });
+  };
 
   useEffect(() => {
     if (!modelPath) return;
@@ -99,12 +131,69 @@ export const VRMCanvas = memo(function VRMCanvas({
   }, [speaking, startLipSync, stopLipSync, getAudioLevels]);
 
   useEffect(() => {
+    const prevFraming = framingRef.current;
+    const isEcho = echoRef.current.delete(zoom);
+    framingRef.current = framing;
+    if (isEcho && prevFraming === framing) return;
     setViewport(zoom, framing);
   }, [zoom, framing, setViewport]);
+
+  const resetPanRef = useRef(resetPan);
+  resetPanRef.current = resetPan;
+  const viewRef = useRef({ zoom, framing });
+  viewRef.current = { zoom, framing };
+
+  useEffect(() => {
+    if (!viewResetTick) return;
+    resetPanRef.current();
+    const { zoom: nextZoom, framing: nextFraming } = viewRef.current;
+    setViewportRef.current(nextZoom, nextFraming);
+  }, [viewResetTick]);
 
   useEffect(() => {
     setTypingReaction(userTyping);
   }, [userTyping, setTypingReaction]);
+
+  useEffect(() => {
+    if (!wheelZoom || !modelPath) return;
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    let lastScale = 1;
+
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      const factor = wheelZoomFactor(e, canvas.clientHeight);
+      emitZoom(zoomAtClientPointRef.current(factor, e.clientX, e.clientY));
+    };
+
+    const onGestureStart = (e: Event) => {
+      e.preventDefault();
+      lastScale = (e as WebKitGestureEventLike).scale || 1;
+    };
+
+    const onGestureChange = (e: Event) => {
+      e.preventDefault();
+      const g = e as WebKitGestureEventLike;
+      const factor = lastScale === 0 ? 1 : g.scale / lastScale;
+      lastScale = g.scale;
+      emitZoom(zoomAtClientPointRef.current(factor, g.clientX, g.clientY));
+    };
+
+    canvas.addEventListener("wheel", onWheel, { passive: false });
+    canvas.addEventListener("gesturestart", onGestureStart, { passive: false });
+    canvas.addEventListener("gesturechange", onGestureChange, { passive: false });
+
+    return () => {
+      canvas.removeEventListener("wheel", onWheel);
+      canvas.removeEventListener("gesturestart", onGestureStart);
+      canvas.removeEventListener("gesturechange", onGestureChange);
+      if (zoomEmitRafRef.current !== null) {
+        cancelAnimationFrame(zoomEmitRafRef.current);
+        zoomEmitRafRef.current = null;
+      }
+    };
+  }, [wheelZoom, modelPath]);
 
   const showMiniUi = uiMode === "mini";
 

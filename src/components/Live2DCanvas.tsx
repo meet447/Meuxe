@@ -14,6 +14,8 @@ interface Props {
   background: string;
   zoom: number;
   framing: "full" | "half";
+  /** VRM-only; accepted so stage canvas props can be shared. */
+  viewResetTick?: number;
   onZoomChange?: (zoom: number) => void;
   onFramingChange?: (framing: "full" | "half") => void;
   onBackgroundChange?: (bg: string) => void;

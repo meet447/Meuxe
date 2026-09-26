@@ -145,11 +145,18 @@ function ListingCard({
           </Pill>
         </div>
 
-        <p className="text-[11px] text-ink-3">{listing.license}</p>
+        {!compact && <p className="text-[11px] text-ink-3">{listing.license}</p>}
 
-        <p className="line-clamp-2 text-xs leading-relaxed text-ink-2">{listing.description}</p>
+        <p
+          className={cn(
+            "text-xs leading-relaxed text-ink-2",
+            compact ? "line-clamp-1" : "line-clamp-2",
+          )}
+        >
+          {listing.description}
+        </p>
 
-        <p className="text-xs text-ink-3">{listing.author}</p>
+        {!compact && <p className="text-xs text-ink-3">{listing.author}</p>}
 
         <div className="mt-auto flex flex-wrap gap-2 pt-1">
           {showUse && (
@@ -247,7 +254,7 @@ export function ModelMarketplace({
   return (
     <div className={cn("flex flex-col", compact ? "gap-3" : "gap-4")}>
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-        <Field label="Search models" className="min-w-0 flex-1">
+        <Field label={compact ? undefined : "Search models"} className="min-w-0 flex-1">
           <div className="relative">
             <SearchIcon className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-3" />
             <Input
@@ -255,6 +262,7 @@ export function ModelMarketplace({
               onChange={(event) => setQuery(event.target.value)}
               placeholder="Search by name, author, or tag…"
               className="pl-10"
+              aria-label={compact ? "Search models" : undefined}
             />
           </div>
         </Field>
@@ -325,15 +333,31 @@ export function ModelMarketplace({
       )}
 
       <Notice tone="info">
-        Free VRM looks from{" "}
-        <button
-          type="button"
-          className="font-semibold underline decoration-accent-300 underline-offset-2 hover:text-ink"
-          onClick={() => openExternalUrl("https://opensourceavatars.com")}
-        >
-          Open Source Avatars
-        </button>{" "}
-        (CC0) install in one click. Import your own Live2D or VRM files below.
+        {compact ? (
+          <>
+            Free VRM looks from{" "}
+            <button
+              type="button"
+              className="font-semibold underline decoration-accent-300 underline-offset-2 hover:text-ink"
+              onClick={() => openExternalUrl("https://opensourceavatars.com")}
+            >
+              Open Source Avatars
+            </button>{" "}
+            (CC0) install in one click.
+          </>
+        ) : (
+          <>
+            Free VRM looks from{" "}
+            <button
+              type="button"
+              className="font-semibold underline decoration-accent-300 underline-offset-2 hover:text-ink"
+              onClick={() => openExternalUrl("https://opensourceavatars.com")}
+            >
+              Open Source Avatars
+            </button>{" "}
+            (CC0) install in one click. Import your own Live2D or VRM files below.
+          </>
+        )}
       </Notice>
 
       {(onImportLive2D || onImportVRM) && (

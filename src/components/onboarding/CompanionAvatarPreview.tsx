@@ -147,6 +147,7 @@ export function CompanionAvatarPreview({
                 background={previewBg}
                 zoom={0.85}
                 framing="full"
+                wheelZoom={false}
                 onZoomChange={noop}
                 onFramingChange={noop}
                 onBackgroundChange={noop}
