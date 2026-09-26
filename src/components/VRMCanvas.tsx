@@ -75,16 +75,19 @@ export const VRMCanvas = memo(function VRMCanvas({
   const framingRef = useRef(framing);
   const zoomEmitRafRef = useRef<number | null>(null);
   const pendingZoomRef = useRef<number | null>(null);
+  const viewResetTickRef = useRef(viewResetTick);
+  viewResetTickRef.current = viewResetTick;
   const [modelLoading, setModelLoading] = useState(false);
 
   const emitZoom = (nextZoom: number) => {
+    const tick = viewResetTickRef.current;
     pendingZoomRef.current = nextZoom;
     if (zoomEmitRafRef.current !== null) return;
     zoomEmitRafRef.current = requestAnimationFrame(() => {
       zoomEmitRafRef.current = null;
       const value = pendingZoomRef.current;
-      if (value === null) return;
       pendingZoomRef.current = null;
+      if (value === null || viewResetTickRef.current !== tick) return;
       const echo = echoRef.current;
       echo.add(value);
       if (echo.size > 32) echo.clear();
@@ -148,6 +151,12 @@ export const VRMCanvas = memo(function VRMCanvas({
 
   useEffect(() => {
     if (!viewResetTick) return;
+    pendingZoomRef.current = null;
+    if (zoomEmitRafRef.current !== null) {
+      cancelAnimationFrame(zoomEmitRafRef.current);
+      zoomEmitRafRef.current = null;
+    }
+    echoRef.current.clear();
     resetPanRef.current();
     resetOrbitRef.current();
     const { zoom: nextZoom, framing: nextFraming } = viewRef.current;
