@@ -85,12 +85,15 @@ describe("vrmCursorZoom", () => {
   });
 
   it("zoom out eases panY", () => {
-    let s = { zoom: 4.5, framing: "full" as const, panX: 0, panY: 0.45 };
-    const mid = zoomVrmTowardHit(s, 1.45, 0.5);
+    const start = { zoom: 4.5, framing: "full" as const, panX: 0, panY: 0.45 };
+    const mid = zoomVrmTowardHit(start, 1.45, 0.5);
     expect(mid.zoom).toBeCloseTo(2.25);
     expect(mid.panY).toBeCloseTo(0.45 * 1.25 / 3.5);
-    s = { ...mid };
-    const out = zoomVrmTowardHit(s, 1.45, 0.4);
+    const out = zoomVrmTowardHit(
+      { zoom: mid.zoom, framing: "full" as const, panX: 0, panY: mid.panY },
+      1.45,
+      0.4,
+    );
     expect(out.zoom).toBeCloseTo(0.9);
     expect(out.panY).toBe(0);
   });

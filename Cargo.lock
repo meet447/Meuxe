@@ -2446,7 +2446,7 @@ dependencies = [
 
 [[package]]
 name = "meuxe-core"
-version = "0.1.4"
+version = "0.1.5"
 dependencies = [
  "base64 0.22.1",
  "chrono",
@@ -2464,7 +2464,7 @@ dependencies = [
 
 [[package]]
 name = "meuxe-desktop"
-version = "0.1.4"
+version = "0.1.5"
 dependencies = [
  "agent-client-protocol",
  "base64 0.22.1",

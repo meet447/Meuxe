@@ -6,6 +6,22 @@ The GitHub Release workflow uses the version in `package.json` / `src-tauri/taur
 
 ## [Unreleased]
 
+## [0.1.5] - 2026-09-26
+
+### Added
+- Get closer to your companion. Scroll or pinch on them and the view comes in on that spot. Rest the pointer on their face for a close portrait. Scrolling on the empty space around them does nothing.
+- Creating a companion is three short steps: name, look, then personality. The look you pick is named on the card, and your companion list uses that name too.
+- Settings → Avatar can reset the view. Zoom runs from a small full-body view up to a close portrait.
+
+### Changed
+- The crop button above Settings switches between the full figure and a closer half-body view of the face. It always starts fresh, so a zoom you already made is not kept in the crop.
+- Setup messages no longer sit on top of your companion. If an assistant is not ready yet, that note stays in the message field. The speech download is one line just above it.
+
+### Known limits
+- macOS builds are not signed or notarized. After dragging the app to Applications, run `xattr -c /Applications/Meuxe.app`.
+- Intel Macs and Windows are not built for this release.
+- Chat requires an ACP-compatible agent. Model selection depends on the models the agent exposes and its sign-in state.
+
 ## [0.1.4] - 2026-09-09
 
 ### Added
