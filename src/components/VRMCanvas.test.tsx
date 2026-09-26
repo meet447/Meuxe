@@ -2,7 +2,7 @@ import { render, waitFor } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { VRMCanvas } from "./VRMCanvas";
 
-const zoomAtClientPoint = vi.fn(() => 1.2);
+const zoomAtClientPoint = vi.fn<(factor: number, x: number, y: number) => number>(() => 1.2);
 const setViewport = vi.fn();
 const resetPan = vi.fn();
 

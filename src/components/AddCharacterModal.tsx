@@ -115,10 +115,10 @@ export function AddCharacterModal({
   }, [open]);
 
   useEffect(() => {
-    if (step === 2 && models.some((m) => m.id === modelId)) {
+    if ((step === 1 || step === 2) && modelId) {
       setLivePreviewArmed(true);
     }
-  }, [step, modelId, models]);
+  }, [step, modelId]);
 
   const selectLook = (id: string) => {
     setModelId(id);
@@ -287,7 +287,7 @@ export function AddCharacterModal({
         radius="sheet"
         tone="surface"
         elevation="pop"
-        className="relative z-[101] flex h-[min(720px,90vh)] w-full max-w-4xl animate-fade-in flex-col overflow-hidden"
+        className="relative z-[101] flex h-[min(800px,92vh)] w-full max-w-4xl animate-fade-in flex-col overflow-hidden"
       >
         <div className="flex shrink-0 items-start justify-between gap-4 px-7 pb-3 pt-6">
           <div className="min-w-0 flex-1">
@@ -329,20 +329,23 @@ export function AddCharacterModal({
               </div>
             </div>
           ) : (
-            <div className="grid h-full min-h-0 grid-rows-1 gap-6 px-7 py-6 lg:grid-cols-[minmax(0,1fr)_minmax(260px,340px)] lg:gap-8">
-              <div className="min-h-0 space-y-6 overflow-y-auto overscroll-contain pb-2 pr-1 scrollbar-thin">
+            <div className="grid h-full min-h-0 grid-rows-1 gap-6 px-7 py-5 lg:grid-cols-[minmax(0,1fr)_minmax(260px,340px)] lg:gap-8">
+              <div className="flex min-h-0 flex-col overflow-y-auto overscroll-contain pb-2 pr-1 scrollbar-thin">
                 <div className="lg:hidden">
                   <CompanionAvatarPreview
                     model={previewModel}
                     companionName={name}
                     vibeLabel={selectedVibePack?.title}
                     thumbnailUrl={previewThumbnailUrl}
-                    className="h-[220px]"
+                    className="mb-4 h-[180px]"
                   />
                 </div>
 
                 {step === 1 ? (
                   <>
+                    <p className="mb-3 text-sm text-ink-2">
+                      Selected: {lookLabelForModelId(modelId, selectedModel?.type)}
+                    </p>
                     <ModelMarketplace
                       compact
                       installedModels={models}
@@ -359,16 +362,15 @@ export function AddCharacterModal({
                       importing={importing}
                     />
                     {importMessage ? (
-                      <Notice tone="success">{importMessage}</Notice>
+                      <Notice tone="success" className="mt-3">
+                        {importMessage}
+                      </Notice>
                     ) : null}
-                    <p className="text-sm text-ink-2">
-                      Selected: {lookLabelForModelId(modelId, selectedModel?.type)}
-                    </p>
                   </>
                 ) : (
                   <>
-                    <Field label="Vibe">
-                      <div className="grid grid-cols-2 gap-2.5">
+                    <Field label="Vibe" className="mb-3">
+                      <div className="grid grid-cols-2 gap-2">
                         {COMPANION_VIBE_PACKS.map((pack) => (
                           <ChoiceCard
                             key={pack.id}
@@ -383,38 +385,37 @@ export function AddCharacterModal({
                       </div>
                     </Field>
 
-                    <Field label="Fine-tune">
-                      <div className="grid gap-4 sm:grid-cols-2">
-                        <Field label="Relationship">
-                          <Select
-                            value={relationshipStyle}
-                            onChange={(e) => setRelationshipStyle(e.target.value)}
-                          >
-                            {RELATIONSHIP_OPTIONS.map((opt) => (
-                              <option key={opt} value={opt}>
-                                {opt}
-                              </option>
-                            ))}
-                          </Select>
-                        </Field>
-                        <Field label="Speech style">
-                          <Select
-                            value={speechStyle}
-                            onChange={(e) => setSpeechStyle(e.target.value)}
-                          >
-                            {SPEECH_OPTIONS.map((opt) => (
-                              <option key={opt} value={opt}>
-                                {opt}
-                              </option>
-                            ))}
-                          </Select>
-                        </Field>
-                      </div>
-                    </Field>
+                    <div className="mb-3 grid gap-3 sm:grid-cols-2">
+                      <Field label="Relationship" className="mb-0">
+                        <Select
+                          value={relationshipStyle}
+                          onChange={(e) => setRelationshipStyle(e.target.value)}
+                        >
+                          {RELATIONSHIP_OPTIONS.map((opt) => (
+                            <option key={opt} value={opt}>
+                              {opt}
+                            </option>
+                          ))}
+                        </Select>
+                      </Field>
+                      <Field label="Speech style" className="mb-0">
+                        <Select
+                          value={speechStyle}
+                          onChange={(e) => setSpeechStyle(e.target.value)}
+                        >
+                          {SPEECH_OPTIONS.map((opt) => (
+                            <option key={opt} value={opt}>
+                              {opt}
+                            </option>
+                          ))}
+                        </Select>
+                      </Field>
+                    </div>
 
                     <Field
                       label="Personality draft"
                       hint="Built from your picks. Edit it if you want something more specific."
+                      className="mb-0 min-h-0 flex-1"
                     >
                       {draftEditing ? (
                         <>
@@ -424,7 +425,7 @@ export function AddCharacterModal({
                               setPersonalityTouched(true);
                               setPersonality(e.target.value);
                             }}
-                            rows={10}
+                            rows={8}
                           />
                           <Button
                             variant="ghost"
@@ -438,7 +439,7 @@ export function AddCharacterModal({
                       ) : (
                         <>
                           <Surface tone="well" elevation="none" className="overflow-hidden">
-                            <pre className="max-h-56 overflow-y-auto whitespace-pre-wrap p-4 font-sans text-xs leading-relaxed text-ink-2 scrollbar-thin">
+                            <pre className="max-h-48 min-h-36 overflow-y-auto whitespace-pre-wrap p-4 font-sans text-xs leading-relaxed text-ink-2 scrollbar-thin">
                               {personality}
                             </pre>
                           </Surface>
@@ -473,7 +474,7 @@ export function AddCharacterModal({
                   </>
                 )}
 
-                {error ? <Notice tone="danger">{error}</Notice> : null}
+                {error ? <Notice tone="danger" className="mt-3">{error}</Notice> : null}
               </div>
 
               <div className="hidden min-h-0 lg:block">

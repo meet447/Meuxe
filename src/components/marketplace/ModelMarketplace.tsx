@@ -98,9 +98,9 @@ function ListingCard({
   onInstall: () => void;
   onGetModel: () => void;
 }) {
-  const showUse = listing.installed;
+  const showUse = listing.installed || Boolean(listing.bundled);
   const showInstall = !listing.installed && listing.installable;
-  const showGetModel = !listing.installed && listing.sourceUrl && !listing.downloadUrl;
+  const showGetModel = !showUse && Boolean(listing.sourceUrl) && !listing.downloadUrl;
 
   return (
     <Surface

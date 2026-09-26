@@ -354,6 +354,21 @@ export function Settings({
   const renderPageContent = () => {
     if (page === "updates") return <UpdatesSection />;
 
+    if (page === "avatar") {
+      if (avatarZoom != null && avatarBackground && onAvatarZoomChange && onAvatarBackgroundChange) {
+        return (
+          <AvatarViewportSettings
+            zoom={avatarZoom}
+            background={avatarBackground}
+            onZoomChange={onAvatarZoomChange}
+            onResetView={onAvatarResetView}
+            onBackgroundChange={onAvatarBackgroundChange}
+          />
+        );
+      }
+      return <Notice tone="neutral">Avatar controls are not available in this view.</Notice>;
+    }
+
     if (!config) {
       return (
         <div className="flex flex-col items-center justify-center gap-3 py-16">
@@ -603,21 +618,6 @@ export function Settings({
           onConversationCleared={onConversationCleared}
         />
       );
-    }
-
-    if (page === "avatar") {
-      if (avatarZoom != null && avatarBackground && onAvatarZoomChange && onAvatarBackgroundChange) {
-        return (
-          <AvatarViewportSettings
-            zoom={avatarZoom}
-            background={avatarBackground}
-            onZoomChange={onAvatarZoomChange}
-            onResetView={onAvatarResetView}
-            onBackgroundChange={onAvatarBackgroundChange}
-          />
-        );
-      }
-      return <Notice tone="neutral">Avatar controls are not available in this view.</Notice>;
     }
 
     return null;
