@@ -4,6 +4,7 @@ import {
   displayNameForModelId,
   filterMarketplaceListings,
   isMarketplaceBrowseListing,
+  lookLabelForModelId,
   mergeMarketplaceWithInstalled,
 } from "./marketplaceCatalog";
 
@@ -103,5 +104,14 @@ describe("displayNameForModelId", () => {
   it("pretty-prints unknown ids", () => {
     expect(displayNameForModelId("osa-mint")).toBe("Mint");
     expect(displayNameForModelId("custom-avatar")).toBe("Custom-avatar");
+  });
+});
+
+describe("lookLabelForModelId", () => {
+  it("includes type labels for known and installed models", () => {
+    expect(lookLabelForModelId("haru")).toBe("Haru · Live2D");
+    expect(lookLabelForModelId("utsuwa")).toBe("Utsuwa · VRM");
+    expect(lookLabelForModelId("")).toBe("Default look");
+    expect(lookLabelForModelId("foo", "vrm")).toBe("Foo · VRM");
   });
 });

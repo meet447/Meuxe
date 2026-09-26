@@ -27,6 +27,7 @@ import {
   resolveAssetUrl,
   resolveLive2DModelUrl,
 } from "./api/tauri";
+import { DEFAULT_AVATAR_ZOOM, zoomForFraming } from "./lib/vrmCursorZoom";
 import type { AppConfig, Character, ModelInfo } from "./types";
 
 const Live2DCanvas = lazy(() =>
@@ -49,6 +50,7 @@ type AvatarStageProps = {
     background: string;
     zoom: number;
     framing: "full" | "half";
+    viewResetTick?: number;
     onZoomChange: (zoom: number) => void;
     onBackgroundChange: (bg: string) => void;
     onFramingChange: (framing: "full" | "half") => void;
@@ -109,7 +111,12 @@ function App() {
   const [addCharacterOpen, setAddCharacterOpen] = useState(false);
   const [currentExpression, setCurrentExpression] = useState("neutral");
   const [background, setBackground] = useState("transparent");
-  const [zoom, setZoom] = useState(1.1);
+  const [zoom, setZoom] = useState(DEFAULT_AVATAR_ZOOM);
+  const [viewResetTick, setViewResetTick] = useState(0);
+  const resetAvatarView = useCallback(() => {
+    setZoom(DEFAULT_AVATAR_ZOOM);
+    setViewResetTick((tick) => tick + 1);
+  }, []);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [expressionsConfigured, setExpressionsConfigured] = useState<boolean | null>(null);
@@ -351,7 +358,7 @@ function App() {
       setMessages([]);
       clearQueue();
       setCurrentExpression("neutral");
-      setZoom(1.1);
+      setZoom(DEFAULT_AVATAR_ZOOM);
       setActiveCharacter(id).catch(console.error);
     },
     [setMessages, clearQueue]
@@ -369,7 +376,7 @@ function App() {
       setMessages([]);
       clearQueue();
       setCurrentExpression("neutral");
-      setZoom(1.1);
+      setZoom(DEFAULT_AVATAR_ZOOM);
       setSettingsOpen(false);
       setActiveCharacter(characterId).catch(console.error);
     },
@@ -377,6 +384,11 @@ function App() {
   );
 
   const [framing, setFraming] = useState<"full" | "half">("full");
+  const handleFramingChange = useCallback((next: "full" | "half") => {
+    setFraming(next);
+    setZoom(zoomForFraming(next));
+    setViewResetTick((tick) => tick + 1);
+  }, []);
 
   const canvasProps = useMemo(
     () => ({
@@ -388,12 +400,13 @@ function App() {
       background,
       zoom,
       framing,
+      viewResetTick,
       onZoomChange: setZoom,
       onBackgroundChange: setBackground,
-      onFramingChange: setFraming,
+      onFramingChange: handleFramingChange,
       getAudioLevels,
     }),
-    [modelPath, currentExpression, speaking, userTyping, isMiniMode, background, zoom, framing, getAudioLevels]
+    [modelPath, currentExpression, speaking, userTyping, isMiniMode, background, zoom, framing, viewResetTick, getAudioLevels, handleFramingChange]
   );
 
   const avatarCanvas = (
@@ -498,7 +511,7 @@ function App() {
           }}
           charSelectOpen={charSelectOpen}
           framing={framing}
-          onFramingChange={setFraming}
+          onFramingChange={handleFramingChange}
         />
       )}
 
@@ -528,6 +541,7 @@ function App() {
             <CharacterSelect
               menuOnly
               characters={characters}
+              models={models}
               selected={selectedCharId}
               onSelect={handleCharacterChange}
               onAddCharacter={() => setAddCharacterOpen(true)}
@@ -551,11 +565,11 @@ function App() {
             </div>
 
             <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20 flex flex-col items-center px-4 pb-6 pt-16">
-              {timeline.length === 0 && !streamingText && !isStreaming && (
-                <div className="mb-6">
+              {timeline.length === 0 && !streamingText && !isStreaming && agentReady && (
+                <div className="mb-3 w-full max-w-xl">
                   <StageEmptyState
                     characterName={charName}
-                    agentReady={agentReady}
+                    agentReady
                     onOpenSettings={() => setSettingsOpen(true)}
                   />
                 </div>
@@ -563,6 +577,7 @@ function App() {
               {needsWhisperDownload && (
                 <div className="pointer-events-auto mb-3 w-full max-w-xl">
                   <WhisperDownloadCard
+                    compact
                     progress={downloadProgress}
                     error={voiceError}
                     downloading={downloading}
@@ -663,6 +678,7 @@ function App() {
           avatarZoom={zoom}
           avatarBackground={background}
           onAvatarZoomChange={setZoom}
+          onAvatarResetView={resetAvatarView}
           onAvatarBackgroundChange={setBackground}
         />
       )}

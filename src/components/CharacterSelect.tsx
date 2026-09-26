@@ -1,3 +1,4 @@
+import { lookLabelForModelId } from "../lib/marketplaceCatalog";
 import type { Character } from "../types";
 import {
   Button,
@@ -10,6 +11,7 @@ import {
 
 interface Props {
   characters: Character[];
+  models?: { id: string; type: string }[];
   selected: string;
   onSelect: (id: string) => void;
   onAddCharacter: () => void;
@@ -21,6 +23,7 @@ interface Props {
 
 export function CharacterSelect({
   characters,
+  models,
   selected,
   onSelect,
   onAddCharacter,
@@ -70,7 +73,12 @@ export function CharacterSelect({
               </div>
               <div className="min-w-0">
                 <div className="text-sm font-semibold">{char.name}</div>
-                <div className="mt-0.5 text-xs text-ink-3">{char.live2d_model || "default"}</div>
+                <div className="mt-0.5 text-xs text-ink-3">
+                  {lookLabelForModelId(
+                    char.live2d_model,
+                    models?.find((m) => m.id === char.live2d_model)?.type,
+                  )}
+                </div>
               </div>
             </button>
           ))}

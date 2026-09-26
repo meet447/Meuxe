@@ -103,7 +103,15 @@ export function CompanionAvatarPreview({
           {vibeLabel}
         </div>
       )}
-      {!model && (
+      {!model && thumbnailUrl && !thumbnailFailed && (
+        <img
+          src={thumbnailUrl}
+          alt=""
+          className="absolute inset-0 h-full w-full object-cover"
+          onError={() => setThumbnailFailed(true)}
+        />
+      )}
+      {!model && (!thumbnailUrl || thumbnailFailed) && (
         <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 px-6 text-center">
           <Mascot mood="sleepy" tone="light" className="h-12 w-12" />
           <p className="text-xs text-ink-3">Pick a look to preview it here</p>
@@ -147,6 +155,7 @@ export function CompanionAvatarPreview({
                 background={previewBg}
                 zoom={0.85}
                 framing="full"
+                wheelZoom={false}
                 onZoomChange={noop}
                 onFramingChange={noop}
                 onBackgroundChange={noop}

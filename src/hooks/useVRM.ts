@@ -13,6 +13,15 @@ import { VrmAnimationPlayer } from "../lib/vrmAnimations";
 import { ANIMATION_MAPPING_PREFIX } from "../lib/vrmAnimationOptions";
 import { resolveVrmExpressionName } from "../utils/vrmExpressions";
 import {
+  applyVrmCamera,
+  clientToNdc,
+  focusYForHit,
+  raycastVrmHitY,
+  zoomVrmTowardHit,
+  VRM_CAMERA_FOV_DEG,
+  type VrmViewState,
+} from "../lib/vrmCursorZoom";
+import {
   createBlinkScheduler,
   createLipSyncDriver,
   speakingHeadSway,
@@ -74,6 +83,7 @@ function applyEmotion(vrm: VRM, expressionName: string) {
 }
 
 const ORBIT_ROTATE_SPEED = 0.005;
+const _headWorld = new THREE.Vector3();
 
 export function useVRM(
   canvasRef: React.RefObject<HTMLCanvasElement | null>,
@@ -96,6 +106,8 @@ export function useVRM(
     framing: "full" as "full" | "half",
     offsetX: 0,
     offsetY: 0,
+    panX: 0,
+    panY: 0,
   });
   const applyViewportRef = useRef<() => void>(() => undefined);
 
@@ -173,19 +185,8 @@ export function useVRM(
   const applyViewport = useCallback(() => {
     if (!cameraRef.current) return;
 
-    const { zoom, framing, offsetX, offsetY } = viewportRef.current;
-    let zIdx = 4.5 / zoom;
-    let yPos = 1.3;
-    let lookY = 1.0;
-
-    if (framing === "half") {
-      zIdx = 2.0 / zoom;
-      yPos = 1.5;
-      lookY = 1.35;
-    }
-
-    cameraRef.current.position.set(0, yPos, zIdx);
-    cameraRef.current.lookAt(0, lookY, 0);
+    const { offsetX, offsetY } = viewportRef.current;
+    applyVrmCamera(cameraRef.current, viewportRef.current);
 
     if (vrmRef.current) {
       vrmRef.current.scene.position.x = offsetX * 0.0025;
@@ -291,6 +292,12 @@ export function useVRM(
   }, [layoutRendererSize, applyViewport]);
 
   applyViewportRef.current = syncStageLayout;
+
+  const resetPan = useCallback(() => {
+    viewportRef.current.panX = 0;
+    viewportRef.current.panY = 0;
+    syncStageLayout();
+  }, [syncStageLayout]);
 
   const applyOrbitRotation = useCallback(() => {
     const pivot = pivotRef.current;
@@ -656,7 +663,7 @@ export function useVRM(
       if (!cameraRef.current) {
         const { w, h } = readCanvasSize();
         const camera = new THREE.PerspectiveCamera(
-          30,
+          VRM_CAMERA_FOV_DEG,
           w > 0 && h > 0 ? w / h : 1,
           0.1,
           20,
@@ -696,6 +703,7 @@ export function useVRM(
         vrm.scene.rotation.y = version === "1" ? 0 : Math.PI;
         pivotRef.current?.add(vrm.scene);
         resetOrbitRotation();
+        resetPan();
         vrmRef.current = vrm;
 
         // Create animation mixer
@@ -776,6 +784,7 @@ export function useVRM(
       startAnimationLoop,
       retargetAnimation,
       resetOrbitRotation,
+      resetPan,
       loadVrmaClip,
       readCanvasSize,
       waitForCanvasLayout,
@@ -859,9 +868,49 @@ export function useVRM(
   }, []);
 
   const setViewport = useCallback((zoom: number, framing: "full" | "half", offsetX: number = 0, offsetY: number = 0) => {
-    viewportRef.current = { zoom, framing, offsetX, offsetY };
+    const prev = viewportRef.current;
+    const framingChanged = prev.framing !== framing;
+    viewportRef.current = {
+      zoom,
+      framing,
+      offsetX,
+      offsetY,
+      panX: framingChanged ? 0 : prev.panX,
+      panY: framingChanged ? 0 : prev.panY,
+    };
     syncStageLayout();
   }, [syncStageLayout]);
+
+  const zoomAtClientPoint = useCallback(
+    (factor: number, clientX: number, clientY: number): number | null => {
+      const camera = cameraRef.current;
+      const canvas = canvasRef.current;
+      const vrm = vrmRef.current;
+      if (!camera || !canvas || !vrm) return null;
+
+      const ndc = clientToNdc(clientX, clientY, canvas.getBoundingClientRect());
+      const { zoom, framing, offsetX, offsetY, panX, panY } = viewportRef.current;
+      const viewState: VrmViewState = { zoom, framing, panX, panY };
+      applyVrmCamera(camera, viewState);
+      const hitY = raycastVrmHitY(camera, ndc, vrm.scene);
+      if (hitY === null) return null;
+      const head = vrm.humanoid?.getNormalizedBoneNode("head");
+      const headY = head ? head.getWorldPosition(_headWorld).y : null;
+      const next = zoomVrmTowardHit(viewState, focusYForHit(hitY, headY), factor);
+      if (next === viewState) return null;
+      viewportRef.current = {
+        zoom: next.zoom,
+        framing,
+        offsetX,
+        offsetY,
+        panX: 0,
+        panY: next.panY,
+      };
+      syncStageLayout();
+      return next.zoom;
+    },
+    [canvasRef, syncStageLayout],
+  );
 
   const setTypingReaction = useCallback((_isTyping: boolean) => {
     // Handled by the animation system: no manual bone manipulation needed
@@ -873,6 +922,9 @@ export function useVRM(
     startLipSync,
     stopLipSync,
     setViewport,
+    zoomAtClientPoint,
+    resetPan,
+    resetOrbit: resetOrbitRotation,
     setTypingReaction,
     handlePointerDown,
     handlePointerMove,

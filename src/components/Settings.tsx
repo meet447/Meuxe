@@ -173,6 +173,7 @@ export function Settings({
   avatarZoom,
   avatarBackground,
   onAvatarZoomChange,
+  onAvatarResetView,
   onAvatarBackgroundChange,
 }: {
   onClose: () => void;
@@ -187,6 +188,7 @@ export function Settings({
   avatarZoom?: number;
   avatarBackground?: string;
   onAvatarZoomChange?: (zoom: number) => void;
+  onAvatarResetView?: () => void;
   onAvatarBackgroundChange?: (bg: string) => void;
 }) {
   const [page, setPage] = useState<SettingsPage>("llm");
@@ -351,6 +353,21 @@ export function Settings({
 
   const renderPageContent = () => {
     if (page === "updates") return <UpdatesSection />;
+
+    if (page === "avatar") {
+      if (avatarZoom != null && avatarBackground && onAvatarZoomChange && onAvatarBackgroundChange) {
+        return (
+          <AvatarViewportSettings
+            zoom={avatarZoom}
+            background={avatarBackground}
+            onZoomChange={onAvatarZoomChange}
+            onResetView={onAvatarResetView}
+            onBackgroundChange={onAvatarBackgroundChange}
+          />
+        );
+      }
+      return <Notice tone="neutral">Avatar controls are not available in this view.</Notice>;
+    }
 
     if (!config) {
       return (
@@ -601,20 +618,6 @@ export function Settings({
           onConversationCleared={onConversationCleared}
         />
       );
-    }
-
-    if (page === "avatar") {
-      if (avatarZoom != null && avatarBackground && onAvatarZoomChange && onAvatarBackgroundChange) {
-        return (
-          <AvatarViewportSettings
-            zoom={avatarZoom}
-            background={avatarBackground}
-            onZoomChange={onAvatarZoomChange}
-            onBackgroundChange={onAvatarBackgroundChange}
-          />
-        );
-      }
-      return <Notice tone="neutral">Avatar controls are not available in this view.</Notice>;
     }
 
     return null;

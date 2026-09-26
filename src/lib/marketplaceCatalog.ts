@@ -151,3 +151,11 @@ export function displayNameForModelId(id: string): string {
 
   return id.charAt(0).toUpperCase() + id.slice(1);
 }
+
+export function lookLabelForModelId(id: string, installedType?: string): string {
+  if (!id) return "Default look";
+  const listing = MARKETPLACE_LISTINGS.find((l) => l.id === id);
+  const type = listing?.type ?? installedType;
+  const typeLabel = type === "vrm" ? "VRM" : type === "live2d" ? "Live2D" : null;
+  return typeLabel ? `${displayNameForModelId(id)} · ${typeLabel}` : displayNameForModelId(id);
+}
