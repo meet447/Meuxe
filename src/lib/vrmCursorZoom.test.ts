@@ -7,9 +7,11 @@ import {
   clientToNdc,
   applyVrmCamera,
   raycastVrmHitY,
+  focusYForHit,
   visibleHalfHeightAtModel,
   VRM_ZOOM_MAX,
   FOCUS_FRAME_MARGIN,
+  FACE_BELOW_HEAD,
 } from "./vrmCursorZoom";
 
 describe("vrmCursorZoom", () => {
@@ -114,6 +116,13 @@ describe("vrmCursorZoom", () => {
     expect(hitY!).toBeCloseTo(1.45, 1);
 
     expect(raycastVrmHitY(camera, { x: 0.9, y: 0.9 }, root)).toBeNull();
+  });
+
+  it("focusYForHit uses the face when the hit is on hair or head", () => {
+    expect(focusYForHit(1.62, 1.5)).toBeCloseTo(1.5 - FACE_BELOW_HEAD);
+    expect(focusYForHit(1.4, 1.5)).toBeCloseTo(1.5 - FACE_BELOW_HEAD);
+    expect(focusYForHit(0.2, 1.5)).toBeCloseTo(0.2);
+    expect(focusYForHit(1.62, null)).toBeCloseTo(1.62);
   });
 
   it("visibleHalfHeightAtModel(full, 4.5)", () => {

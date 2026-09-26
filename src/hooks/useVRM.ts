@@ -15,6 +15,7 @@ import { resolveVrmExpressionName } from "../utils/vrmExpressions";
 import {
   applyVrmCamera,
   clientToNdc,
+  focusYForHit,
   raycastVrmHitY,
   zoomVrmTowardHit,
   VRM_CAMERA_FOV_DEG,
@@ -82,6 +83,7 @@ function applyEmotion(vrm: VRM, expressionName: string) {
 }
 
 const ORBIT_ROTATE_SPEED = 0.005;
+const _headWorld = new THREE.Vector3();
 
 export function useVRM(
   canvasRef: React.RefObject<HTMLCanvasElement | null>,
@@ -891,7 +893,10 @@ export function useVRM(
       const viewState: VrmViewState = { zoom, framing, panX, panY };
       applyVrmCamera(camera, viewState);
       const hitY = raycastVrmHitY(camera, ndc, vrm.scene);
-      const next = zoomVrmTowardHit(viewState, hitY, factor);
+      if (hitY === null) return null;
+      const head = vrm.humanoid?.getNormalizedBoneNode("head");
+      const headY = head ? head.getWorldPosition(_headWorld).y : null;
+      const next = zoomVrmTowardHit(viewState, focusYForHit(hitY, headY), factor);
       if (next === viewState) return null;
       viewportRef.current = {
         zoom: next.zoom,

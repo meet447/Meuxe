@@ -6,6 +6,10 @@ export const DEFAULT_AVATAR_ZOOM = 1.1;
 export const VRM_CAMERA_FOV_DEG = 30;
 export const ZOOM_FOCUS_START = 1.0;
 export const FOCUS_FRAME_MARGIN = 0.8;
+/** Hits within this world-Y of the head bone focus on the face, not hair tips. */
+export const HEAD_FOCUS_RADIUS = 0.45;
+/** Head bone sits above the eyes; drop look-at slightly for a face fill. */
+export const FACE_BELOW_HEAD = 0.08;
 export const MAX_CAMERA_PAN = 2.0;
 export const WHEEL_ZOOM_SENSITIVITY = 0.0015;
 export const PINCH_ZOOM_SENSITIVITY = 0.01;
@@ -77,6 +81,14 @@ export function visibleHalfHeightAtModel(framing: VrmFraming, zoom: number): num
   const rig = framingRig(framing);
   const halfFovRad = (VRM_CAMERA_FOV_DEG / 2) * (Math.PI / 180);
   return (rig.baseDistance / zoom) * Math.tan(halfFovRad);
+}
+
+export function focusYForHit(hitY: number, headY: number | null): number {
+  if (headY == null) return hitY;
+  if (Math.abs(hitY - headY) <= HEAD_FOCUS_RADIUS) {
+    return headY - FACE_BELOW_HEAD;
+  }
+  return hitY;
 }
 
 export function raycastVrmHitY(

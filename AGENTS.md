@@ -27,7 +27,7 @@ The full desktop app (`npm run tauri dev`) requires a display. In a headless Clo
 
 See `package.json` scripts.
 
-- **Frontend tests:** `npm test` (Vitest, 226 tests)
+- **Frontend tests:** `npm test` (Vitest, 227 tests)
 - **Frontend build:** `npm run build` (tsc + vite build)
 - **Rust format check:** `cargo fmt --all -- --check`
 - **Rust lint:** `cargo clippy --workspace --all-targets -- -D warnings`
