@@ -61,4 +61,12 @@ jobs:
 
       - name: Verify AppImage file modes
         if: runner.os == 'Linux'
-        run: bash scripts/appimage/verify-appimage-perms.sh src-tauri/target/release/bundle/appimage/Meuxe_*.AppImage
+        run: |
+          shopt -s nullglob
+          files=(target/release/bundle/appimage/Meuxe_*.AppImage)
+          if [ "${#files[@]}" -eq 0 ]; then
+            echo "No AppImage found under target/release/bundle/appimage" >&2
+            ls -la target/release/bundle/appimage >&2 || true
+            exit 1
+          fi
+          bash scripts/appimage/verify-appimage-perms.sh "${files[@]}"

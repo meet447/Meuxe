@@ -6,6 +6,16 @@ The GitHub Release workflow uses the version in `package.json` / `src-tauri/taur
 
 ## [Unreleased]
 
+## [0.1.6] - 2026-10-08
+
+### Fixed
+- Linux AppImage starts when a sandbox runs it as a different user. The launcher inside the image was not executable for that user, so AppImageHub and Firejail exited immediately with "Permission denied" before a window could open.
+
+### Known limits
+- macOS builds are not signed or notarized. After dragging the app to Applications, run `xattr -c /Applications/Meuxe.app`.
+- Intel Macs and Windows are not built for this release.
+- Chat requires an ACP-compatible agent. Model selection depends on the models the agent exposes and its sign-in state.
+
 ## [0.1.5] - 2026-09-26
 
 ### Added

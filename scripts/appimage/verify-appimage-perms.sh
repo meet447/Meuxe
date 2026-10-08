@@ -48,7 +48,10 @@ for img in "$@"; do
   )"
 
   for name in AppRun AppRun.wrapped; do
-    if ! printf '%s\n' "$listing" | grep -qE "[[:space:]][^[:space:]]*/${name}$"; then
+    # A pipe into grep -q trips pipefail: grep exits at the first match and
+    # the writer gets SIGPIPE, so a present file is reported missing.
+    pattern="${name//./\\.}"
+    if ! grep -qE -- "[[:space:]][^[:space:]]*/${pattern}$" <<< "$listing"; then
       problems="${problems}"$'\n'"missing ${name}"
     fi
   done
