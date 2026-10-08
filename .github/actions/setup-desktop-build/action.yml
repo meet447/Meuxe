@@ -39,6 +39,7 @@ runs:
           libcairo2-dev \
           libpango1.0-dev \
           libsoup-3.0-dev \
+          squashfs-tools \
           mold
 
     - name: Cargo and compiler env

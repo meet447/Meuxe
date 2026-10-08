@@ -39,6 +39,13 @@ jobs:
         id: notes
         run: node scripts/release-notes.mjs --github-output >> "$GITHUB_OUTPUT"
 
+      # Tauri packs AppRun as mode 0770. AppImageHub's firejail run then
+      # cannot execute AppRun.wrapped. Seed a plugin that chmods the AppDir
+      # before the squashfs is built.
+      - name: Seed AppImage packaging plugin
+        if: runner.os == 'Linux'
+        run: bash scripts/appimage/seed-linuxdeploy-plugin.sh
+
       - uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -51,3 +58,7 @@ jobs:
           releaseDraft: true
           prerelease: true
           args: ${{ matrix.args }}
+
+      - name: Verify AppImage file modes
+        if: runner.os == 'Linux'
+        run: bash scripts/appimage/verify-appimage-perms.sh src-tauri/target/release/bundle/appimage/Meuxe_*.AppImage
